@@ -153,9 +153,10 @@ single-GPU, no-audio settings: `height=480`, `width=832`, `num_frames=121`,
 
 [`run_with_diffusers.ipynb`](./run_with_diffusers.ipynb) is the full tutorial for
 the Diffusers backend: it provisions a dedicated venv, then walks through
-text-to-image, text-to-video, and image-to-video generation (with and without
-audio) using `Cosmos3OmniPipeline`, including a dedicated Cosmos3-Edge section
-with 480p text-to-image, text-to-video, and image-to-video examples and previews.
+text-to-image, text-to-video, image-to-video, and video-to-video generation (with
+and without audio) using `Cosmos3OmniPipeline`, including a dedicated Cosmos3-Edge
+section with 480p text-to-image, text-to-video, and image-to-video examples and
+previews.
 
 ## Run with vLLM-Omni
 
