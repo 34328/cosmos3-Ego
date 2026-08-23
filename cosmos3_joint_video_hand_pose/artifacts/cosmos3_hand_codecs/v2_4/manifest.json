@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "contract": {
+    "input": "20 non-wrist keypoints in current-frame wrist-local coordinates",
+    "input_shape_per_hand": [20, 3],
+    "flattened_input_dim": 60,
+    "latent_dim_per_hand": 15,
+    "sides_are_independent": true,
+    "same_codec_for_initial_and_future": true,
+    "selection_rule": "Choose option_a_pca15 or option_b_mlp15 before Cosmos training. A Cosmos checkpoint must record and reuse the same option and weight hashes at inference."
+  },
+  "option_a_pca15": {
+    "description": "Frozen per-side PCA-15 encoder and inverse PCA decoder",
+    "right": {
+      "path": "option_a_pca15/right_pca15.npz",
+      "sha256": "03aa8ebd4de69280f33950da447c5f8ad16388ec61db4c5af43ec46a5b3f2117"
+    },
+    "left": {
+      "path": "option_a_pca15/left_pca15.npz",
+      "sha256": "ef42901987c6ef71c18ac7282bf8f0e1fb0c6b8211fef9ec562edcd7e68fdb4d"
+    },
+    "test_mean_hand_scale_normalized_error": {
+      "right": 0.02507062722708501,
+      "left": 0.02272688793284948
+    }
+  },
+  "option_b_mlp15": {
+    "description": "Frozen per-side nonlinear autoencoder with a 15D bottleneck",
+    "encoder": "60 -> 64 -> SiLU -> 32 -> SiLU -> 15",
+    "decoder": "15 -> 32 -> SiLU -> 64 -> SiLU -> 60",
+    "trainable_parameter_count_per_side": 13003,
+    "training": {
+      "learning_rate": 0.0005,
+      "batch_size": 8192,
+      "epochs": 120,
+      "scheduler": "cosine to 0.05 times initial learning rate",
+      "loss": "mean hand-scale-normalized point error plus 0.01 coordinate-MSE"
+    },
+    "normalization": {
+      "encode": "x_norm=(x-state_dict.mean)/state_dict.std; z_raw=encoder(x_norm); z=(z_raw-latent_mean)/latent_std",
+      "decode": "z_raw=z*latent_std+latent_mean; x_hat=decoder(z_raw)*state_dict.std+state_dict.mean",
+      "note": "latent_mean and latent_std are top-level checkpoint tensors. The decoder expects z_raw, not standardized z."
+    },
+    "primary": {
+      "selection_note": "Canonical seed-1 weights, fixed before the seed-2 test reproduction; do not choose between seeds using test metrics.",
+      "right": {
+        "path": "option_b_mlp15/right_mlp15_primary.pt",
+        "sha256": "1173b50ef35a1d0eab5b36e2c4ba5a0e0a34c7400cbc3043387669e2cfd1f0c3"
+      },
+      "left": {
+        "path": "option_b_mlp15/left_mlp15_primary.pt",
+        "sha256": "3e11c7e535a968a08043b7e281b909e7689ed87708eb999126979de6b2be53a2"
+      },
+      "test_mean_hand_scale_normalized_error": {
+        "right": 0.018438763053441023,
+        "left": 0.016691121598631977
+      }
+    },
+    "replica_seed2": {
+      "purpose": "Independent initialization used only to verify reproducibility",
+      "right": {
+        "path": "option_b_mlp15/right_mlp15_replica_seed2.pt",
+        "sha256": "1aedd3511d92e3bd08301243f799d1e0b92b96729d89c24dda6f2b84d3433d9a"
+      },
+      "left": {
+        "path": "option_b_mlp15/left_mlp15_replica_seed2.pt",
+        "sha256": "4ae82edc0b3de2d807b8b1d8b7197768e2d3bc2b261923ed291a097a68f775f8"
+      },
+      "test_mean_hand_scale_normalized_error": {
+        "right": 0.01836319980311414,
+        "left": 0.015852691346727676
+      }
+    }
+  }
+}

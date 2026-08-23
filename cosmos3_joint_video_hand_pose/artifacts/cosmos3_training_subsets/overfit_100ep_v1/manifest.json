@@ -1,0 +1,13 @@
+{
+  "artifact_id": "cosmos3_overfit_100ep_v1",
+  "selection": "100 distinct train manifest_task values; one train episode per task",
+  "seed": 42,
+  "episodes": 100,
+  "tasks": 100,
+  "segments": 770,
+  "episode_hours": 2.3545325000000004,
+  "segment_hours": 2.344219166666667,
+  "episodes_sha256": "3f8350633401539377229225258abd92f7ba5975f5c44b5aba5b2fd29862dac3",
+  "segments_sha256": "14e72afdc8e3ba6389ff1b0852f680c5359627dd3b16d05c44858649bbb3855b",
+  "source_split": "train_only"
+}

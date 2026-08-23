@@ -1,0 +1,78 @@
+digraph OverfitDataPipeline {
+  graph [rankdir=TB, bgcolor="#fbfcfe", pad="0.35", nodesep="0.34", ranksep="0.52", splines=ortho,
+         label="overfit_v0.0 数据流  |  EgoVerse data -> aligned sample -> Cosmos batch -> replay",
+         labelloc=t, fontsize=26, fontname="Noto Sans CJK SC"];
+  node [shape=box, style="rounded,filled", color="#71869a", fillcolor="white", penwidth=1.5,
+        fontname="Noto Sans CJK SC", fontsize=13, margin="0.16,0.11"];
+  edge [color="#365b7e", penwidth=1.8, arrowsize=0.75, fontname="Noto Sans CJK SC", fontsize=10];
+
+  subgraph cluster_source {
+    label="1  原始数据 / Source"; color="#9d8bc0"; style="rounded";
+    episodes [label="episodes.csv\nepisode_id | task_description", fillcolor="#f2edfb"];
+    segments [label="segments.csv\nepisode_id | start_idx | end_idx\nsegment caption", fillcolor="#f2edfb"];
+    zarr [label="episode.zarr\nRGB | head pose | wrist pose\n21 keypoints | visibility | intrinsics", fillcolor="#f2edfb"];
+  }
+
+  lookup [label="Join by episode_id\nlocate Zarr + task text", fillcolor="#fff6e8"];
+  slice [label="Slice one segment\nframes [start_idx : end_idx]", fillcolor="#fff6e8"];
+  index [label="Build ONE shared temporal index\nT = 4n + 1\nfirst frame always retained", fillcolor="#fff6e8", penwidth=2.2];
+
+  episodes -> lookup; segments -> lookup; zarr -> lookup;
+  lookup -> slice -> index;
+
+  subgraph cluster_rgb {
+    label="2A  RGB 数据支路"; color="#79a7d2"; style="rounded";
+    rgb_slice [label="images.front_1[index]\nuint8 [T,360,640,3]", fillcolor="#edf6ff"];
+    rgb_pad [label="Bottom reflection pad 8 px\n[T,368,640,3]", fillcolor="#edf6ff"];
+    video_latent [label="Frozen Wan VAE encode\nvideo latent tokens", fillcolor="#edf6ff"];
+    rgb_slice -> rgb_pad -> video_latent;
+  }
+
+  subgraph cluster_prompt {
+    label="2B  Prompt 数据支路"; color="#dfa759"; style="rounded";
+    choose_text [label="Use segment caption\nfallback: task_description", fillcolor="#fff7ea"];
+    json_prompt [label="Official Action JSON\ndescription + ego_view + duration", fillcolor="#fff7ea"];
+    text_tokens [label="Text tokenizer\nprompt tokens", fillcolor="#fff7ea"];
+    choose_text -> json_prompt -> text_tokens;
+  }
+
+  subgraph cluster_action {
+    label="2C  Pose / Action 数据支路"; color="#66a17b"; style="rounded";
+    pose_slice [label="head / wrists / keypoints [index]\nvisibility [index,2]", fillcolor="#edf8f0"];
+    f0 [label="World -> first-camera frame F0\ncamera + wrist anchored pose", fillcolor="#edf8f0"];
+    local [label="20 non-wrist points\n-> each wrist-local frame\n60D per hand", fillcolor="#edf8f0"];
+    codec [label="Frozen left/right MLP-AE-15\n60D -> 15D per hand", fillcolor="#edf8f0"];
+    action57 [label="Native action [T,57]\ncamera9 | R wrist9 | R hand15\nL wrist9 | L hand15", fillcolor="#dff2e5", penwidth=2.2];
+    normalizer [label="a0: state normalizer\nfuture: anchored-delta normalizer\nhand: codec normalization", fillcolor="#edf8f0"];
+    action64 [label="Right-pad 7 channels\n[T,57] -> [T,64]", fillcolor="#edf8f0"];
+    pose_slice -> f0 -> local -> codec -> action57 -> normalizer -> action64;
+  }
+
+  index -> rgb_slice;
+  index -> pose_slice;
+  lookup -> choose_text;
+
+  sample [label="WAM sample / batch schema\nvideo latent | prompt tokens | action [T,64]\ncondition_mask=[1,0,...] | visibility [T,2]\nsample boundary + temporal ids", fillcolor="#f2edfb", color="#866bb3", penwidth=2.2];
+  video_latent -> sample;
+  text_tokens -> sample;
+  action64 -> sample;
+  pose_slice -> sample [label="GT loss metadata"];
+
+  packing [label="Cosmos native dynamic packing\ncombine complete valid samples\nkeep sample boundaries | cap = 85K tokens", fillcolor="#edf6ff", color="#5d91c3", penwidth=2.2];
+  noise [label="Create training x_t\nslot 0 stays clean\nfuture video + action receive noise", fillcolor="#fff6e8", color="#dfa759", penwidth=2.2];
+  cosmos [label="Cosmos 3 WAM forward / sampler\njoint future video + action flow", fillcolor="#dff2e5", color="#66a17b", penwidth=2.2];
+  sample -> packing -> noise -> cosmos;
+
+  subgraph cluster_output {
+    label="3  输出恢复 / Output"; color="#9d8bc0"; style="rounded";
+    video_out [label="Generated video latent\n-> frozen VAE decode\n-> RGB frames", fillcolor="#edf6ff"];
+    action_out [label="Generated action [T-1,64]\nunpad -> [T-1,57]", fillcolor="#edf8f0"];
+    inverse [label="Inverse normalizer + F0 recovery\nMLP-AE decode 15D -> 60D", fillcolor="#edf8f0"];
+    pose_out [label="Future headcam + wrists\nleft/right 21-point 3D hands", fillcolor="#edf8f0"];
+    replay [label="H.264 replay\ngenerated-video projection | F0 3D\nGT row + predicted row", fillcolor="#f2edfb", penwidth=2.2];
+    action_out -> inverse -> pose_out -> replay;
+    video_out -> replay;
+  }
+  cosmos -> video_out [label="video velocity / sampling"];
+  cosmos -> action_out [label="action velocity / sampling"];
+}

@@ -1,0 +1,182 @@
+episode_hash,split,manifest_task,relative_path,span_index,start_idx,end_idx,duration_sec,text_normalized
+69b1c40f666aa62abc610449,train,brushing_shoes,full/human/mecka/fc/69b1c40f666aa62abc610449.zarr,0,0,350,11.666666666666666,scrub shoe with brush
+69b1c40f666aa62abc610449,train,brushing_shoes,full/human/mecka/fc/69b1c40f666aa62abc610449.zarr,1,350,470,4.0,wipe shoe with cloth
+69b1c40f666aa62abc610449,train,brushing_shoes,full/human/mecka/fc/69b1c40f666aa62abc610449.zarr,2,470,999,17.633333333333333,scrub shoe with brush
+69b1c40f666aa62abc610449,train,brushing_shoes,full/human/mecka/fc/69b1c40f666aa62abc610449.zarr,3,999,1130,4.366666666666666,wipe shoe with cloth
+69b1c40f666aa62abc610449,train,brushing_shoes,full/human/mecka/fc/69b1c40f666aa62abc610449.zarr,4,1130,1164,1.1333333333333333,adjust brush in container
+69b1c40f666aa62abc610449,train,brushing_shoes,full/human/mecka/fc/69b1c40f666aa62abc610449.zarr,5,1164,1449,9.5,scrub shoe with brush
+69b1c40f666aa62abc610449,train,brushing_shoes,full/human/mecka/fc/69b1c40f666aa62abc610449.zarr,6,1449,1689,8.0,wipe shoe with cloth
+69b1c40f666aa62abc610449,train,brushing_shoes,full/human/mecka/fc/69b1c40f666aa62abc610449.zarr,7,1689,1795,3.533333333333333,adjust brush in container
+69b1c8af45b4a60380cdf7af,train,brushing_shoes,full/human/mecka/a8/69b1c8af45b4a60380cdf7af.zarr,0,0,69,2.3,scrub shoe with brush
+69b1c8af45b4a60380cdf7af,train,brushing_shoes,full/human/mecka/a8/69b1c8af45b4a60380cdf7af.zarr,1,69,542,15.766666666666667,wipe shoe with cloth
+69b1c8af45b4a60380cdf7af,train,brushing_shoes,full/human/mecka/a8/69b1c8af45b4a60380cdf7af.zarr,2,542,1389,28.23333333333333,"dip brush in cup, scrub shoe with brush"
+69b1c8af45b4a60380cdf7af,train,brushing_shoes,full/human/mecka/a8/69b1c8af45b4a60380cdf7af.zarr,3,1389,1795,13.533333333333331,"dip brush in cup, scrub shoe with brush"
+69b1ca19e589ef129317715a,train,brushing_shoes,full/human/mecka/4a/69b1ca19e589ef129317715a.zarr,0,0,969,32.3,scrub shoe with brush
+69b1ca19e589ef129317715a,train,brushing_shoes,full/human/mecka/4a/69b1ca19e589ef129317715a.zarr,1,969,1029,2.0,"place brush on plastic container, pick up cloth"
+69b1ca19e589ef129317715a,train,brushing_shoes,full/human/mecka/4a/69b1ca19e589ef129317715a.zarr,2,1029,1248,7.3,wipe shoe with cloth
+69b1ca19e589ef129317715a,train,brushing_shoes,full/human/mecka/4a/69b1ca19e589ef129317715a.zarr,3,1248,1278,1.0,place cloth on table
+69b1ca19e589ef129317715a,train,brushing_shoes,full/human/mecka/4a/69b1ca19e589ef129317715a.zarr,4,1278,1389,3.7,"pick up shoe, adjust shoe"
+69b1ca19e589ef129317715a,train,brushing_shoes,full/human/mecka/4a/69b1ca19e589ef129317715a.zarr,5,1389,1457,2.2666666666666666,"pick up brush, dip brush in cup"
+69b1ca19e589ef129317715a,train,brushing_shoes,full/human/mecka/4a/69b1ca19e589ef129317715a.zarr,6,1457,1795,11.266666666666667,scrub shoe with brush
+69b1ca2700828a0a0c8690c9,train,brushing_shoes,full/human/mecka/87/69b1ca2700828a0a0c8690c9.zarr,0,0,899,29.966666666666665,scrub shoe with brush
+69b1ca2700828a0a0c8690c9,train,brushing_shoes,full/human/mecka/87/69b1ca2700828a0a0c8690c9.zarr,1,899,1799,30.0,scrub shoe with brush
+69b1cad2d013bf6b844674b2,train,brushing_shoes,full/human/mecka/cb/69b1cad2d013bf6b844674b2.zarr,0,0,786,26.2,clean shoe with brush
+69b1cad2d013bf6b844674b2,train,brushing_shoes,full/human/mecka/cb/69b1cad2d013bf6b844674b2.zarr,1,786,816,1.0,place brush on container
+69b1cad2d013bf6b844674b2,train,brushing_shoes,full/human/mecka/cb/69b1cad2d013bf6b844674b2.zarr,2,816,1371,18.5,clean shoe with cloth
+69b1cad2d013bf6b844674b2,train,brushing_shoes,full/human/mecka/cb/69b1cad2d013bf6b844674b2.zarr,3,1371,1535,5.466666666666667,"place cloth on table, adjust shoe on table"
+69b1cad2d013bf6b844674b2,train,brushing_shoes,full/human/mecka/cb/69b1cad2d013bf6b844674b2.zarr,4,1535,1758,7.433333333333334,"rotate shoe on table, adjust container"
+69b1cad2d013bf6b844674b2,train,brushing_shoes,full/human/mecka/cb/69b1cad2d013bf6b844674b2.zarr,5,1758,1793,1.1666666666666667,pick up brush on container
+69b1cc2b5cc42faa9968178c,train,brushing_shoes,full/human/mecka/25/69b1cc2b5cc42faa9968178c.zarr,0,0,485,16.166666666666668,scrub shoe sole with brush
+69b1cc2b5cc42faa9968178c,train,brushing_shoes,full/human/mecka/25/69b1cc2b5cc42faa9968178c.zarr,1,485,701,7.2,"dip brush into container with solution, tap excess solution from brush"
+69b1cc2b5cc42faa9968178c,train,brushing_shoes,full/human/mecka/25/69b1cc2b5cc42faa9968178c.zarr,2,701,1795,36.46666666666667,scrub shoe sole with brush
+69b1f3ea5a0fb3802c89c869,train,brushing_shoes,full/human/mecka/01/69b1f3ea5a0fb3802c89c869.zarr,0,0,1209,40.3,scrub sandal with brush
+69b1f3ea5a0fb3802c89c869,train,brushing_shoes,full/human/mecka/01/69b1f3ea5a0fb3802c89c869.zarr,1,1209,1269,2.0,dip brush in container with solution
+69b1f3ea5a0fb3802c89c869,train,brushing_shoes,full/human/mecka/01/69b1f3ea5a0fb3802c89c869.zarr,2,1269,1944,22.5,"scrub sandal with brush, adjust sandal"
+69b20b031fa85f581929ee7e,train,brushing_shoes,full/human/mecka/0e/69b20b031fa85f581929ee7e.zarr,0,0,80,2.6666666666666665,dip brush in bowl
+69b20b031fa85f581929ee7e,train,brushing_shoes,full/human/mecka/0e/69b20b031fa85f581929ee7e.zarr,1,80,339,8.633333333333333,scrub side of shoe
+69b20b031fa85f581929ee7e,train,brushing_shoes,full/human/mecka/0e/69b20b031fa85f581929ee7e.zarr,2,339,420,2.7,dip brush in bowl and turn shoe over
+69b20b031fa85f581929ee7e,train,brushing_shoes,full/human/mecka/0e/69b20b031fa85f581929ee7e.zarr,3,420,1320,30.0,scrub sole of shoe
+69b20b031fa85f581929ee7e,train,brushing_shoes,full/human/mecka/0e/69b20b031fa85f581929ee7e.zarr,4,1320,1569,8.3,"turn shoe over, scrub shoe with brush"
+69b20b031fa85f581929ee7e,train,brushing_shoes,full/human/mecka/0e/69b20b031fa85f581929ee7e.zarr,5,1569,1830,8.7,dip brush in bowl
+69b20b031fa85f581929ee7e,train,brushing_shoes,full/human/mecka/0e/69b20b031fa85f581929ee7e.zarr,6,1830,1944,3.8,scrub heel of shoe
+69b218b8bf61da11df3fee35,train,brushing_shoes,full/human/mecka/5e/69b218b8bf61da11df3fee35.zarr,0,0,99,3.3,clean shoe with brush
+69b218b8bf61da11df3fee35,train,brushing_shoes,full/human/mecka/5e/69b218b8bf61da11df3fee35.zarr,1,99,135,1.2,dip brush in liquid
+69b218b8bf61da11df3fee35,train,brushing_shoes,full/human/mecka/5e/69b218b8bf61da11df3fee35.zarr,2,135,570,14.5,clean shoe with brush
+69b218b8bf61da11df3fee35,train,brushing_shoes,full/human/mecka/5e/69b218b8bf61da11df3fee35.zarr,3,570,615,1.5,"lift shoe, adjust surface"
+69b218b8bf61da11df3fee35,train,brushing_shoes,full/human/mecka/5e/69b218b8bf61da11df3fee35.zarr,4,615,1944,44.3,clean shoe with brush
+69b22224f8447b68e7d50f2a,train,brushing_shoes,full/human/mecka/f4/69b22224f8447b68e7d50f2a.zarr,0,0,39,1.3,pick up brush from cup
+69b22224f8447b68e7d50f2a,train,brushing_shoes,full/human/mecka/f4/69b22224f8447b68e7d50f2a.zarr,1,39,86,1.5666666666666669,"place brush in container, pick up brush"
+69b22224f8447b68e7d50f2a,train,brushing_shoes,full/human/mecka/f4/69b22224f8447b68e7d50f2a.zarr,2,86,963,29.23333333333333,"dip brush in container, scrub shoe with brush"
+69b22224f8447b68e7d50f2a,train,brushing_shoes,full/human/mecka/f4/69b22224f8447b68e7d50f2a.zarr,3,963,1013,1.6666666666666667,dip brush in container
+69b22224f8447b68e7d50f2a,train,brushing_shoes,full/human/mecka/f4/69b22224f8447b68e7d50f2a.zarr,4,1013,1944,31.03333333333333,scrub shoe with brush
+69b249225b56e7311fe82725,train,brushing_shoes,full/human/mecka/d7/69b249225b56e7311fe82725.zarr,0,0,90,3.0,pick up brush from container
+69b249225b56e7311fe82725,train,brushing_shoes,full/human/mecka/d7/69b249225b56e7311fe82725.zarr,1,90,1049,31.966666666666665,scrub shoe sole with brush
+69b249225b56e7311fe82725,train,brushing_shoes,full/human/mecka/d7/69b249225b56e7311fe82725.zarr,2,1049,1918,28.966666666666665,scrub shoe sole with brush
+69b27270a925bb63fc2f9155,train,brushing_shoes,full/human/mecka/44/69b27270a925bb63fc2f9155.zarr,0,0,30,1.0,pick up shoe
+69b27270a925bb63fc2f9155,train,brushing_shoes,full/human/mecka/44/69b27270a925bb63fc2f9155.zarr,1,30,1016,32.86666666666667,scrub shoe sole with brush
+69b27270a925bb63fc2f9155,train,brushing_shoes,full/human/mecka/44/69b27270a925bb63fc2f9155.zarr,2,1016,2003,32.9,scrub shoe sole with brush
+69b32c036ac3fc90331f7882,train,brushing_shoes,full/human/mecka/f1/69b32c036ac3fc90331f7882.zarr,0,0,470,15.666666666666666,brush shoe exterior
+69b32c036ac3fc90331f7882,train,brushing_shoes,full/human/mecka/f1/69b32c036ac3fc90331f7882.zarr,1,470,519,1.6333333333333333,dip brush in water container
+69b32c036ac3fc90331f7882,train,brushing_shoes,full/human/mecka/f1/69b32c036ac3fc90331f7882.zarr,2,519,1380,28.7,brush shoe exterior
+69b32c036ac3fc90331f7882,train,brushing_shoes,full/human/mecka/f1/69b32c036ac3fc90331f7882.zarr,3,1380,1449,2.3,"place brush in water container, adjust shoe"
+69b32c036ac3fc90331f7882,train,brushing_shoes,full/human/mecka/f1/69b32c036ac3fc90331f7882.zarr,4,1449,1749,10.0,wipe shoe with cloth
+69b32c036ac3fc90331f7882,train,brushing_shoes,full/human/mecka/f1/69b32c036ac3fc90331f7882.zarr,5,1749,1809,2.0,flip shoe
+69b32c036ac3fc90331f7882,train,brushing_shoes,full/human/mecka/f1/69b32c036ac3fc90331f7882.zarr,6,1809,2095,9.533333333333331,brush insole of shoe
+69b34932f16da5f841701dd0,train,brushing_shoes,full/human/mecka/2a/69b34932f16da5f841701dd0.zarr,0,0,1077,35.9,clean shoe sole with brush
+69b34932f16da5f841701dd0,train,brushing_shoes,full/human/mecka/2a/69b34932f16da5f841701dd0.zarr,1,1077,2155,35.93333333333333,clean shoe sole with brush
+69b34ef4add7e388ca36c60a,train,brushing_shoes,full/human/mecka/24/69b34ef4add7e388ca36c60a.zarr,0,0,909,30.3,brush the shoe upper collar and move the shoe and brush upper collar
+69b34ef4add7e388ca36c60a,train,brushing_shoes,full/human/mecka/24/69b34ef4add7e388ca36c60a.zarr,1,909,999,3.0,place shoe on towel and remove hand inside shoe and hold brush
+69b34ef4add7e388ca36c60a,train,brushing_shoes,full/human/mecka/24/69b34ef4add7e388ca36c60a.zarr,2,999,2010,33.7,twist the shoe and brush the shoe upper collar
+69b34ef4add7e388ca36c60a,train,brushing_shoes,full/human/mecka/24/69b34ef4add7e388ca36c60a.zarr,3,2010,2049,1.3,place the brush on the table
+69b34ef4add7e388ca36c60a,train,brushing_shoes,full/human/mecka/24/69b34ef4add7e388ca36c60a.zarr,4,2049,2155,3.533333333333333,pick up shoe and adjust towel
+69b35199cd15daa79db210c1,train,brushing_shoes,full/human/mecka/04/69b35199cd15daa79db210c1.zarr,0,0,207,6.9,adjust shoe on workbench
+69b35199cd15daa79db210c1,train,brushing_shoes,full/human/mecka/04/69b35199cd15daa79db210c1.zarr,1,207,471,8.8,pour liquid from blue cup into clear container
+69b35199cd15daa79db210c1,train,brushing_shoes,full/human/mecka/04/69b35199cd15daa79db210c1.zarr,2,471,690,7.3,rub liquid on shoe sole
+69b35199cd15daa79db210c1,train,brushing_shoes,full/human/mecka/04/69b35199cd15daa79db210c1.zarr,3,690,836,4.866666666666666,move brush from blue container into clear container
+69b35199cd15daa79db210c1,train,brushing_shoes,full/human/mecka/04/69b35199cd15daa79db210c1.zarr,4,836,2185,44.96666666666667,scrub shoe sole with brush and cleaning paste
+69b36b0d97fe745bf06022ed,train,brushing_shoes,full/human/mecka/bf/69b36b0d97fe745bf06022ed.zarr,0,0,90,3.0,dip brush into cleaning solution
+69b36b0d97fe745bf06022ed,train,brushing_shoes,full/human/mecka/bf/69b36b0d97fe745bf06022ed.zarr,1,90,1359,42.3,scrub shoe with brush
+69b36b0d97fe745bf06022ed,train,brushing_shoes,full/human/mecka/bf/69b36b0d97fe745bf06022ed.zarr,2,1359,1440,2.7,dip brush into cleaning solution
+69b36b0d97fe745bf06022ed,train,brushing_shoes,full/human/mecka/bf/69b36b0d97fe745bf06022ed.zarr,3,1440,2248,26.933333333333334,scrub shoe with brush
+69b3743a6ef4b52990dfd951,train,brushing_shoes,full/human/mecka/96/69b3743a6ef4b52990dfd951.zarr,0,0,39,1.3,dip brush in water from plastic container
+69b3743a6ef4b52990dfd951,train,brushing_shoes,full/human/mecka/96/69b3743a6ef4b52990dfd951.zarr,1,39,336,9.9,scrub shoe with brush
+69b3743a6ef4b52990dfd951,train,brushing_shoes,full/human/mecka/96/69b3743a6ef4b52990dfd951.zarr,2,336,1291,31.83333333333333,"adjust shoe, scrub shoe with brush"
+69b3743a6ef4b52990dfd951,train,brushing_shoes,full/human/mecka/96/69b3743a6ef4b52990dfd951.zarr,3,1291,2245,31.8,scrub shoe with brush
+69b39d3bce2f88d1a4f809e6,train,brushing_shoes,full/human/mecka/27/69b39d3bce2f88d1a4f809e6.zarr,0,0,1122,37.4,scrub shoe with brush
+69b39d3bce2f88d1a4f809e6,train,brushing_shoes,full/human/mecka/27/69b39d3bce2f88d1a4f809e6.zarr,1,1122,2245,37.43333333333333,scrub shoe with brush
+69b3bbacac9b11a4d5640676,train,brushing_shoes,full/human/mecka/ec/69b3bbacac9b11a4d5640676.zarr,0,0,1124,37.46666666666667,scrub the sole of the shoe with a brush
+69b3bbacac9b11a4d5640676,train,brushing_shoes,full/human/mecka/ec/69b3bbacac9b11a4d5640676.zarr,1,1124,2249,37.5,scrub the sole of the shoe with a brush
+69b4844c17e3a9ccf08b21ed,train,brushing_shoes,full/human/mecka/6e/69b4844c17e3a9ccf08b21ed.zarr,0,0,39,1.3,"pick up brush, dip brush in bowl"
+69b4844c17e3a9ccf08b21ed,train,brushing_shoes,full/human/mecka/6e/69b4844c17e3a9ccf08b21ed.zarr,1,39,780,24.7,scrub shoe sole with brush
+69b4844c17e3a9ccf08b21ed,train,brushing_shoes,full/human/mecka/6e/69b4844c17e3a9ccf08b21ed.zarr,2,780,1530,25.0,scrub shoe sole with brush
+69b4844c17e3a9ccf08b21ed,train,brushing_shoes,full/human/mecka/6e/69b4844c17e3a9ccf08b21ed.zarr,3,1530,2277,24.9,scrub shoe sole with brush
+69b49330f0a3602167935f02,train,brushing_shoes,full/human/mecka/a1/69b49330f0a3602167935f02.zarr,0,0,537,17.9,scrub shoe with brush
+69b49330f0a3602167935f02,train,brushing_shoes,full/human/mecka/a1/69b49330f0a3602167935f02.zarr,1,537,688,5.033333333333333,adjust shoe
+69b49330f0a3602167935f02,train,brushing_shoes,full/human/mecka/a1/69b49330f0a3602167935f02.zarr,2,688,753,2.1666666666666665,dip brush into liquid bowl
+69b49330f0a3602167935f02,train,brushing_shoes,full/human/mecka/a1/69b49330f0a3602167935f02.zarr,3,753,1344,19.7,scrub shoe with brush
+69b49330f0a3602167935f02,train,brushing_shoes,full/human/mecka/a1/69b49330f0a3602167935f02.zarr,4,1344,1428,2.8,dip brush into liquid bowl
+69b49330f0a3602167935f02,train,brushing_shoes,full/human/mecka/a1/69b49330f0a3602167935f02.zarr,5,1428,2244,27.2,scrub shoe with brush
+69b495659c40481a89baf665,train,brushing_shoes,full/human/mecka/d2/69b495659c40481a89baf665.zarr,0,0,1137,37.9,clean shoe with brush
+69b495659c40481a89baf665,train,brushing_shoes,full/human/mecka/d2/69b495659c40481a89baf665.zarr,1,1137,2274,37.9,clean shoe with brush
+69b495e2bceee9fb4ea30d73,train,brushing_shoes,full/human/mecka/23/69b495e2bceee9fb4ea30d73.zarr,0,0,64,2.1333333333333333,pick up brush and dip in bowl
+69b495e2bceee9fb4ea30d73,train,brushing_shoes,full/human/mecka/23/69b495e2bceee9fb4ea30d73.zarr,1,64,666,20.066666666666663,scrub shoe with brush
+69b495e2bceee9fb4ea30d73,train,brushing_shoes,full/human/mecka/23/69b495e2bceee9fb4ea30d73.zarr,2,666,720,1.8,scrub shoe with brush
+69b495e2bceee9fb4ea30d73,train,brushing_shoes,full/human/mecka/23/69b495e2bceee9fb4ea30d73.zarr,3,720,1084,12.133333333333333,scrub shoe with brush
+69b495e2bceee9fb4ea30d73,train,brushing_shoes,full/human/mecka/23/69b495e2bceee9fb4ea30d73.zarr,4,1084,1126,1.4,rotate shoe
+69b495e2bceee9fb4ea30d73,train,brushing_shoes,full/human/mecka/23/69b495e2bceee9fb4ea30d73.zarr,5,1126,1677,18.366666666666667,scrub shoe with brush
+69b495e2bceee9fb4ea30d73,train,brushing_shoes,full/human/mecka/23/69b495e2bceee9fb4ea30d73.zarr,6,1677,1761,2.8,scrub shoe with brush
+69b495e2bceee9fb4ea30d73,train,brushing_shoes,full/human/mecka/23/69b495e2bceee9fb4ea30d73.zarr,7,1761,2274,17.1,dip brush in cleaning solution
+69b49ca78c0e050035cc59f4,train,brushing_shoes,full/human/mecka/e8/69b49ca78c0e050035cc59f4.zarr,0,0,184,6.133333333333334,dip brush into bowl of cleaning solution
+69b49ca78c0e050035cc59f4,train,brushing_shoes,full/human/mecka/e8/69b49ca78c0e050035cc59f4.zarr,1,184,660,15.866666666666667,scrub shoe with brush
+69b49ca78c0e050035cc59f4,train,brushing_shoes,full/human/mecka/e8/69b49ca78c0e050035cc59f4.zarr,2,660,1168,16.933333333333334,scrub shoe sole with brush
+69b49ca78c0e050035cc59f4,train,brushing_shoes,full/human/mecka/e8/69b49ca78c0e050035cc59f4.zarr,3,1168,1404,7.866666666666666,dip brush into bowl of cleaning solution
+69b49ca78c0e050035cc59f4,train,brushing_shoes,full/human/mecka/e8/69b49ca78c0e050035cc59f4.zarr,4,1404,1872,15.6,scrub shoe with brush
+69b49ca78c0e050035cc59f4,train,brushing_shoes,full/human/mecka/e8/69b49ca78c0e050035cc59f4.zarr,5,1872,2334,15.4,scrub shoe tongue with brush
+69b4a1b45bb6442829fb4091,train,brushing_shoes,full/human/mecka/a8/69b4a1b45bb6442829fb4091.zarr,0,0,1124,37.46666666666667,clean shoe with toothbrush
+69b4a1b45bb6442829fb4091,train,brushing_shoes,full/human/mecka/a8/69b4a1b45bb6442829fb4091.zarr,1,1124,2394,42.333333333333336,clean shoe with toothbrush
+69b4ad5d09ee8318e185a395,train,brushing_shoes,full/human/mecka/56/69b4ad5d09ee8318e185a395.zarr,0,0,1110,37.0,scrub shoe with brush on table
+69b4ad5d09ee8318e185a395,train,brushing_shoes,full/human/mecka/56/69b4ad5d09ee8318e185a395.zarr,1,1110,2394,42.8,scrub shoe with brush on table
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,0,0,95,3.1666666666666665,"hold shoe, adjust brush"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,1,95,152,1.9,"pick up polish bottle from table, adjust shoe"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,2,152,183,1.0333333333333334,apply polish on shoe
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,3,183,237,1.8,place polish bottle on table
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,4,237,270,1.1,"adjust shoe, pick up brush from table"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,5,270,369,3.3,"pick up shoe from table, hold brush"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,6,369,402,1.1,adjust small box
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,7,402,693,9.7,"place shoe on table, scrap polish on shoe with brush"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,8,693,1254,18.7,scrap polish on shoe with brush
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,9,1254,1340,2.8666666666666667,"place brush on table, pick up cloth from table"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,10,1340,1437,3.2333333333333334,"wipe shoe with cloth, place cloth on table"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,11,1437,1551,3.8,"adjust shoe, pick up polish bottle from table"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,12,1551,1676,4.166666666666667,"apply polish on shoe, place polish bottle"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,13,1676,2020,11.466666666666669,"pick up brush from table, scrap polish on shoe with brush"
+69b4af284f139f5088428a67,train,brushing_shoes,full/human/mecka/04/69b4af284f139f5088428a67.zarr,14,2020,2399,12.633333333333333,"dip brush in bowl, scrap polish on shoe with brush"
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,0,0,36,1.2,hold brush
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,1,36,146,3.6666666666666665,dip brush into container
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,2,146,245,3.3,"dip brush into container of powder, spread powder on bristles"
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,3,245,300,1.8333333333333333,scoop liquid from container and wet brush
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,4,300,1050,25.0,scrub shoe sole with brush
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,5,1050,1818,25.6,scrub shoe sole with cloth
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,6,1818,1899,2.7,place brush on table
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,7,1899,1980,2.7,"pick up cloth, wipe shoe sole with cloth"
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,8,1980,2303,10.766666666666667,"adjust cloth, wipe shoe sole with cloth"
+69b4b45af70d1949244a6037,train,brushing_shoes,full/human/mecka/77/69b4b45af70d1949244a6037.zarr,9,2303,2417,3.8,"pick up shoe, place cloth on table"
+69b5258608a0268c1c38bf9b,train,brushing_shoes,full/human/mecka/ab/69b5258608a0268c1c38bf9b.zarr,0,0,1350,45.0,scrub white shoe with brush
+69b5258608a0268c1c38bf9b,train,brushing_shoes,full/human/mecka/ab/69b5258608a0268c1c38bf9b.zarr,1,1350,2694,44.8,scrub white shoe with brush
+69b52a14eac64bf65ebcd7d3,train,brushing_shoes,full/human/mecka/1c/69b52a14eac64bf65ebcd7d3.zarr,0,0,429,14.3,scrub sneaker with toothbrush
+69b52a14eac64bf65ebcd7d3,train,brushing_shoes,full/human/mecka/1c/69b52a14eac64bf65ebcd7d3.zarr,1,429,510,2.7,position tongue flat inside shoe
+69b52a14eac64bf65ebcd7d3,train,brushing_shoes,full/human/mecka/1c/69b52a14eac64bf65ebcd7d3.zarr,2,510,693,6.1,scrub sole of sneaker with brush
+69b52a14eac64bf65ebcd7d3,train,brushing_shoes,full/human/mecka/1c/69b52a14eac64bf65ebcd7d3.zarr,3,693,744,1.7,dip brush into bowl
+69b52a14eac64bf65ebcd7d3,train,brushing_shoes,full/human/mecka/1c/69b52a14eac64bf65ebcd7d3.zarr,4,744,1059,10.5,scrub heel of sneaker with brush
+69b52a14eac64bf65ebcd7d3,train,brushing_shoes,full/human/mecka/1c/69b52a14eac64bf65ebcd7d3.zarr,5,1059,1110,1.7,dip brush into bowl
+69b52a14eac64bf65ebcd7d3,train,brushing_shoes,full/human/mecka/1c/69b52a14eac64bf65ebcd7d3.zarr,6,1110,1893,26.1,scrub sole of sneaker with brush
+69b52a14eac64bf65ebcd7d3,train,brushing_shoes,full/human/mecka/1c/69b52a14eac64bf65ebcd7d3.zarr,7,1893,1944,1.7,dip brush into bowl
+69b52a14eac64bf65ebcd7d3,train,brushing_shoes,full/human/mecka/1c/69b52a14eac64bf65ebcd7d3.zarr,8,1944,2544,20.0,scrub sneaker with brush
+69b547e88c9ffbb680c3cd19,train,brushing_shoes,full/human/mecka/97/69b547e88c9ffbb680c3cd19.zarr,0,0,168,5.6,scrub inside of sneaker with brush
+69b547e88c9ffbb680c3cd19,train,brushing_shoes,full/human/mecka/97/69b547e88c9ffbb680c3cd19.zarr,1,168,435,8.9,scrub sneaker with brush
+69b547e88c9ffbb680c3cd19,train,brushing_shoes,full/human/mecka/97/69b547e88c9ffbb680c3cd19.zarr,2,435,666,7.7,"adjust sneaker, dip brush into solution in container"
+69b547e88c9ffbb680c3cd19,train,brushing_shoes,full/human/mecka/97/69b547e88c9ffbb680c3cd19.zarr,3,666,1341,22.5,scrub sneaker with brush
+69b547e88c9ffbb680c3cd19,train,brushing_shoes,full/human/mecka/97/69b547e88c9ffbb680c3cd19.zarr,4,1341,1392,1.7,adjust shoe on table
+69b547e88c9ffbb680c3cd19,train,brushing_shoes,full/human/mecka/97/69b547e88c9ffbb680c3cd19.zarr,5,1392,2697,43.5,scrub sneaker with brush
+69b55e544963ef0ac28d5eb8,train,brushing_shoes,full/human/mecka/71/69b55e544963ef0ac28d5eb8.zarr,0,0,720,24.0,scrub shoe with a brush
+69b55e544963ef0ac28d5eb8,train,brushing_shoes,full/human/mecka/71/69b55e544963ef0ac28d5eb8.zarr,1,720,1440,24.0,scrub the side of the shoe with a brush
+69b55e544963ef0ac28d5eb8,train,brushing_shoes,full/human/mecka/71/69b55e544963ef0ac28d5eb8.zarr,2,1440,2100,22.0,scrub the side of the shoe with a brush
+69b55e544963ef0ac28d5eb8,train,brushing_shoes,full/human/mecka/71/69b55e544963ef0ac28d5eb8.zarr,3,2100,2544,14.8,scrub the bottom side of the shoe with a brush
+69b573b0f3ef6b95c177e304,train,brushing_shoes,full/human/mecka/05/69b573b0f3ef6b95c177e304.zarr,0,0,1350,45.0,clean shoe with brush
+69b573b0f3ef6b95c177e304,train,brushing_shoes,full/human/mecka/05/69b573b0f3ef6b95c177e304.zarr,1,1350,1977,20.9,clean shoe with brush
+69b573b0f3ef6b95c177e304,train,brushing_shoes,full/human/mecka/05/69b573b0f3ef6b95c177e304.zarr,2,1977,2049,2.4,dip brush in cleaning solution
+69b573b0f3ef6b95c177e304,train,brushing_shoes,full/human/mecka/05/69b573b0f3ef6b95c177e304.zarr,3,2049,2697,21.6,clean shoe with brush
+69b582d9d673f8a5bdac1002,train,brushing_shoes,full/human/mecka/17/69b582d9d673f8a5bdac1002.zarr,0,0,570,19.0,"scrub shoe with brush, rotate and adjust shoe"
+69b582d9d673f8a5bdac1002,train,brushing_shoes,full/human/mecka/17/69b582d9d673f8a5bdac1002.zarr,1,570,1150,19.33333333333333,"scrub shoe with brush, rotate and adjust shoe"
+69b582d9d673f8a5bdac1002,train,brushing_shoes,full/human/mecka/17/69b582d9d673f8a5bdac1002.zarr,2,1150,1956,26.866666666666667,"scrub shoe with brush, rotate and adjust shoe"
+69b582d9d673f8a5bdac1002,train,brushing_shoes,full/human/mecka/17/69b582d9d673f8a5bdac1002.zarr,3,1956,2694,24.6,"scrub shoe with brush, rotate and adjust shoe"
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,0,0,408,13.6,scrub shoe insole with brush
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,1,408,442,1.1333333333333333,dip brush into container
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,2,442,711,8.966666666666667,scrub shoe insole with brush
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,3,711,780,2.3,dip brush into container
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,4,780,1311,17.7,scrub shoe insole with brush
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,5,1311,1528,7.233333333333333,dip brush into container
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,6,1528,1836,10.266666666666667,scrub shoe insole with brush
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,7,1836,2305,15.633333333333333,scrub shoe insole with brush
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,8,2305,2355,1.6666666666666667,dip brush into container
+69b9caccbb20394db7cb83f4,train,brushing_shoes,full/human/mecka/6b/69b9caccbb20394db7cb83f4.zarr,9,2355,2694,11.3,scrub shoe insole with brush

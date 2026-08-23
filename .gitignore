@@ -177,7 +177,6 @@ secrets.yaml
 **/env.sh
 
 # Cookbook runtime checkouts and generated artifacts
-packages/
 cookbooks/cosmos3/generator/audiovisual/outputs/
 outputs/
 
@@ -204,3 +203,14 @@ core.*
 /dataset/
 /downloaded_data/
 .ipynb_checkpoints
+
+# Local EgoVerse manifests and project tests are not versioned yet.
+/training_manifests/
+/tests/
+
+# Small frozen codec and overfit-subset artifacts remain reproducibility inputs.
+!cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/**/*.csv
+!cosmos3_joint_video_hand_pose/artifacts/cosmos3_hand_codecs/**/*.npz
+!cosmos3_joint_video_hand_pose/artifacts/cosmos3_hand_codecs/**/*.pt
+
+wandb/

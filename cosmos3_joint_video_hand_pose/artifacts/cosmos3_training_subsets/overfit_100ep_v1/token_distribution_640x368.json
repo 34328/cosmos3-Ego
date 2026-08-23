@@ -1,0 +1,42 @@
+{
+  "split": "train",
+  "num_segments": 770,
+  "spatial_tokens_per_latent_frame": 240,
+  "token_formula": "text + 1 + 240*(1+floor((T-1)/4)) + 2 + T",
+  "caption_contract": "text_normalized; is_video=true; use_system_prompt=false",
+  "text_token_percentiles": {
+    "0": 10.0,
+    "50": 15.0,
+    "90": 21.0,
+    "95": 23.0,
+    "99": 29.0,
+    "100": 39.0
+  },
+  "total_token_percentiles": {
+    "0": 1480.0,
+    "50": 12464.5,
+    "75": 25638.75,
+    "90": 45648.7,
+    "95": 60931.399999999965,
+    "99": 100937.58999999997,
+    "100": 163737.0
+  },
+  "caps": {
+    "110000": {
+      "oversized_segments": 3,
+      "oversized_fraction": 0.003896103896103896,
+      "oversized_percent": 0.38961038961038963,
+      "original_duration_hours": 0.06887962962962962,
+      "max_tokens": 163737,
+      "retain_ratio_for_oversized": 0.8,
+      "still_oversized_after_one_pass": 2,
+      "max_tokens_after_one_pass": 131039,
+      "max_frames_after_one_pass": 2145,
+      "passes_until_within_cap": {
+        "1": 1,
+        "2": 2
+      },
+      "min_final_retained_fraction": 0.6384644055162132
+    }
+  }
+}

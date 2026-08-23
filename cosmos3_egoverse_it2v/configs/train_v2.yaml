@@ -1,0 +1,27 @@
+experiment: egoverse_it2v_v2
+initialization: /mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464
+dataset:
+  episodes: 36
+  segments: 181
+  canvas: [640, 368]
+  max_sequence_length: 85000
+training:
+  world_size: 8
+  cp: 2
+  fsdp: 4
+  max_iter: 600
+  checkpoints: [300, 600]
+  base_lr: 8.0e-5
+  optimizer:
+    betas: [0.9, 0.95]
+    eps: 1.0e-6
+    weight_decay: 0.0
+  scheduler:
+    warm_up_steps: 50
+    cycle_length: 1000
+    f_min: 0.0
+loss:
+  video_only: true
+outputs:
+  train: /mnt/lzh/cosmos/outputs/egoverse_it2v/train/v2
+  inference: /mnt/lzh/cosmos/outputs/egoverse_it2v/inference/v2

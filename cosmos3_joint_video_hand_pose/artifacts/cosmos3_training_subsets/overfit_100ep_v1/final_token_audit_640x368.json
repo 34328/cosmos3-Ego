@@ -1,0 +1,6944 @@
+{
+  "contract": "TODO-4 final sampler",
+  "canvas": "640x368",
+  "cap": 110000,
+  "segments": 770,
+  "used_segments": 770,
+  "skipped_segments": 0,
+  "original_tokens_max": 109815,
+  "post_sampling_tokens_total": 15399319,
+  "post_sampling_tokens_max": 109815,
+  "oversized_after_sampling": 0,
+  "records": [
+    {
+      "episode_hash": "696b0c713e1499d81d87bbb2",
+      "span_index": 0,
+      "original_frames": 279,
+      "sampled_frames": 277,
+      "text_tokens": 17,
+      "tokens": 17097,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b0c713e1499d81d87bbb2",
+      "span_index": 1,
+      "original_frames": 431,
+      "sampled_frames": 429,
+      "text_tokens": 13,
+      "tokens": 26365,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b0c713e1499d81d87bbb2",
+      "span_index": 2,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 14,
+      "tokens": 25634,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b0c713e1499d81d87bbb2",
+      "span_index": 3,
+      "original_frames": 630,
+      "sampled_frames": 629,
+      "text_tokens": 13,
+      "tokens": 38565,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b0c713e1499d81d87bbb2",
+      "span_index": 4,
+      "original_frames": 229,
+      "sampled_frames": 229,
+      "text_tokens": 22,
+      "tokens": 14174,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b0c713e1499d81d87bbb2",
+      "span_index": 5,
+      "original_frames": 397,
+      "sampled_frames": 397,
+      "text_tokens": 13,
+      "tokens": 24413,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b19a2f8e8293f615f75e9",
+      "span_index": 0,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 23,
+      "tokens": 7343,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b19a2f8e8293f615f75e9",
+      "span_index": 1,
+      "original_frames": 253,
+      "sampled_frames": 253,
+      "text_tokens": 13,
+      "tokens": 15629,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b19a2f8e8293f615f75e9",
+      "span_index": 2,
+      "original_frames": 656,
+      "sampled_frames": 653,
+      "text_tokens": 14,
+      "tokens": 40030,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b19a2f8e8293f615f75e9",
+      "span_index": 3,
+      "original_frames": 657,
+      "sampled_frames": 657,
+      "text_tokens": 14,
+      "tokens": 40274,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b19a2f8e8293f615f75e9",
+      "span_index": 4,
+      "original_frames": 657,
+      "sampled_frames": 657,
+      "text_tokens": 32,
+      "tokens": 40292,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b19a2f8e8293f615f75e9",
+      "span_index": 5,
+      "original_frames": 640,
+      "sampled_frames": 637,
+      "text_tokens": 27,
+      "tokens": 39067,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b4af2f20f919514c6f145",
+      "span_index": 0,
+      "original_frames": 300,
+      "sampled_frames": 297,
+      "text_tokens": 18,
+      "tokens": 18318,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b4af2f20f919514c6f145",
+      "span_index": 1,
+      "original_frames": 270,
+      "sampled_frames": 269,
+      "text_tokens": 18,
+      "tokens": 16610,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b4af2f20f919514c6f145",
+      "span_index": 2,
+      "original_frames": 290,
+      "sampled_frames": 289,
+      "text_tokens": 18,
+      "tokens": 17830,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b4af2f20f919514c6f145",
+      "span_index": 3,
+      "original_frames": 580,
+      "sampled_frames": 577,
+      "text_tokens": 18,
+      "tokens": 35398,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b4af2f20f919514c6f145",
+      "span_index": 4,
+      "original_frames": 360,
+      "sampled_frames": 357,
+      "text_tokens": 14,
+      "tokens": 21974,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b4af2f20f919514c6f145",
+      "span_index": 5,
+      "original_frames": 290,
+      "sampled_frames": 289,
+      "text_tokens": 14,
+      "tokens": 17826,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b4af2f20f919514c6f145",
+      "span_index": 6,
+      "original_frames": 400,
+      "sampled_frames": 397,
+      "text_tokens": 16,
+      "tokens": 24416,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b4af2f20f919514c6f145",
+      "span_index": 7,
+      "original_frames": 300,
+      "sampled_frames": 297,
+      "text_tokens": 18,
+      "tokens": 18318,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b4af2f20f919514c6f145",
+      "span_index": 8,
+      "original_frames": 196,
+      "sampled_frames": 193,
+      "text_tokens": 14,
+      "tokens": 11970,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b59621376c8db5e314fb9",
+      "span_index": 0,
+      "original_frames": 93,
+      "sampled_frames": 93,
+      "text_tokens": 19,
+      "tokens": 5875,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b59621376c8db5e314fb9",
+      "span_index": 1,
+      "original_frames": 510,
+      "sampled_frames": 509,
+      "text_tokens": 14,
+      "tokens": 31246,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b59621376c8db5e314fb9",
+      "span_index": 2,
+      "original_frames": 153,
+      "sampled_frames": 153,
+      "text_tokens": 19,
+      "tokens": 9535,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b59621376c8db5e314fb9",
+      "span_index": 3,
+      "original_frames": 710,
+      "sampled_frames": 709,
+      "text_tokens": 14,
+      "tokens": 43446,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b59621376c8db5e314fb9",
+      "span_index": 4,
+      "original_frames": 157,
+      "sampled_frames": 157,
+      "text_tokens": 19,
+      "tokens": 9779,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b59621376c8db5e314fb9",
+      "span_index": 5,
+      "original_frames": 347,
+      "sampled_frames": 345,
+      "text_tokens": 14,
+      "tokens": 21242,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b59621376c8db5e314fb9",
+      "span_index": 6,
+      "original_frames": 148,
+      "sampled_frames": 145,
+      "text_tokens": 19,
+      "tokens": 9047,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b59621376c8db5e314fb9",
+      "span_index": 7,
+      "original_frames": 865,
+      "sampled_frames": 865,
+      "text_tokens": 14,
+      "tokens": 52962,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b80331e187f32c5eb5895",
+      "span_index": 0,
+      "original_frames": 1650,
+      "sampled_frames": 1649,
+      "text_tokens": 13,
+      "tokens": 100785,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b80331e187f32c5eb5895",
+      "span_index": 1,
+      "original_frames": 99,
+      "sampled_frames": 97,
+      "text_tokens": 12,
+      "tokens": 6112,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b80331e187f32c5eb5895",
+      "span_index": 2,
+      "original_frames": 141,
+      "sampled_frames": 141,
+      "text_tokens": 10,
+      "tokens": 8794,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b80331e187f32c5eb5895",
+      "span_index": 3,
+      "original_frames": 80,
+      "sampled_frames": 77,
+      "text_tokens": 12,
+      "tokens": 4892,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b80331e187f32c5eb5895",
+      "span_index": 4,
+      "original_frames": 210,
+      "sampled_frames": 209,
+      "text_tokens": 13,
+      "tokens": 12945,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b80331e187f32c5eb5895",
+      "span_index": 5,
+      "original_frames": 130,
+      "sampled_frames": 129,
+      "text_tokens": 14,
+      "tokens": 8066,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b80331e187f32c5eb5895",
+      "span_index": 6,
+      "original_frames": 390,
+      "sampled_frames": 389,
+      "text_tokens": 13,
+      "tokens": 23925,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b80331e187f32c5eb5895",
+      "span_index": 7,
+      "original_frames": 268,
+      "sampled_frames": 265,
+      "text_tokens": 13,
+      "tokens": 16361,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b831a93818b7b258ebed1",
+      "span_index": 0,
+      "original_frames": 1204,
+      "sampled_frames": 1201,
+      "text_tokens": 16,
+      "tokens": 73460,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b831a93818b7b258ebed1",
+      "span_index": 1,
+      "original_frames": 1205,
+      "sampled_frames": 1205,
+      "text_tokens": 16,
+      "tokens": 73704,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b831a93818b7b258ebed1",
+      "span_index": 2,
+      "original_frames": 345,
+      "sampled_frames": 345,
+      "text_tokens": 18,
+      "tokens": 21246,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b831a93818b7b258ebed1",
+      "span_index": 3,
+      "original_frames": 219,
+      "sampled_frames": 217,
+      "text_tokens": 26,
+      "tokens": 13446,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b831a93818b7b258ebed1",
+      "span_index": 4,
+      "original_frames": 613,
+      "sampled_frames": 613,
+      "text_tokens": 16,
+      "tokens": 37592,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b838ad3cc9dc76c561443",
+      "span_index": 0,
+      "original_frames": 73,
+      "sampled_frames": 73,
+      "text_tokens": 21,
+      "tokens": 4657,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b838ad3cc9dc76c561443",
+      "span_index": 1,
+      "original_frames": 100,
+      "sampled_frames": 97,
+      "text_tokens": 14,
+      "tokens": 6114,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b838ad3cc9dc76c561443",
+      "span_index": 2,
+      "original_frames": 152,
+      "sampled_frames": 149,
+      "text_tokens": 20,
+      "tokens": 9292,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b838ad3cc9dc76c561443",
+      "span_index": 3,
+      "original_frames": 272,
+      "sampled_frames": 269,
+      "text_tokens": 17,
+      "tokens": 16609,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b838ad3cc9dc76c561443",
+      "span_index": 4,
+      "original_frames": 1236,
+      "sampled_frames": 1233,
+      "text_tokens": 25,
+      "tokens": 75421,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b838ad3cc9dc76c561443",
+      "span_index": 5,
+      "original_frames": 481,
+      "sampled_frames": 481,
+      "text_tokens": 25,
+      "tokens": 29549,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b9ee479bc0402722c2216",
+      "span_index": 0,
+      "original_frames": 357,
+      "sampled_frames": 357,
+      "text_tokens": 19,
+      "tokens": 21979,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b9ee479bc0402722c2216",
+      "span_index": 1,
+      "original_frames": 1323,
+      "sampled_frames": 1321,
+      "text_tokens": 30,
+      "tokens": 80794,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b9ee479bc0402722c2216",
+      "span_index": 2,
+      "original_frames": 618,
+      "sampled_frames": 617,
+      "text_tokens": 30,
+      "tokens": 37850,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696b9ee479bc0402722c2216",
+      "span_index": 3,
+      "original_frames": 385,
+      "sampled_frames": 385,
+      "text_tokens": 28,
+      "tokens": 23696,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba1a51e187f32c5eb59f7",
+      "span_index": 0,
+      "original_frames": 276,
+      "sampled_frames": 273,
+      "text_tokens": 15,
+      "tokens": 16851,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba1a51e187f32c5eb59f7",
+      "span_index": 1,
+      "original_frames": 633,
+      "sampled_frames": 633,
+      "text_tokens": 19,
+      "tokens": 38815,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba1a51e187f32c5eb59f7",
+      "span_index": 2,
+      "original_frames": 246,
+      "sampled_frames": 245,
+      "text_tokens": 20,
+      "tokens": 15148,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba1a51e187f32c5eb59f7",
+      "span_index": 3,
+      "original_frames": 744,
+      "sampled_frames": 741,
+      "text_tokens": 13,
+      "tokens": 45397,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba1a51e187f32c5eb59f7",
+      "span_index": 4,
+      "original_frames": 243,
+      "sampled_frames": 241,
+      "text_tokens": 13,
+      "tokens": 14897,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba1a51e187f32c5eb59f7",
+      "span_index": 5,
+      "original_frames": 309,
+      "sampled_frames": 309,
+      "text_tokens": 18,
+      "tokens": 19050,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba1a51e187f32c5eb59f7",
+      "span_index": 6,
+      "original_frames": 385,
+      "sampled_frames": 385,
+      "text_tokens": 16,
+      "tokens": 23684,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba85976b41c2326097fa5",
+      "span_index": 0,
+      "original_frames": 189,
+      "sampled_frames": 189,
+      "text_tokens": 17,
+      "tokens": 11729,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba85976b41c2326097fa5",
+      "span_index": 1,
+      "original_frames": 191,
+      "sampled_frames": 189,
+      "text_tokens": 23,
+      "tokens": 11735,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba85976b41c2326097fa5",
+      "span_index": 2,
+      "original_frames": 499,
+      "sampled_frames": 497,
+      "text_tokens": 19,
+      "tokens": 30519,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba85976b41c2326097fa5",
+      "span_index": 3,
+      "original_frames": 51,
+      "sampled_frames": 49,
+      "text_tokens": 13,
+      "tokens": 3185,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ba85976b41c2326097fa5",
+      "span_index": 4,
+      "original_frames": 991,
+      "sampled_frames": 989,
+      "text_tokens": 17,
+      "tokens": 60529,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 0,
+      "original_frames": 1086,
+      "sampled_frames": 1085,
+      "text_tokens": 18,
+      "tokens": 66386,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 1,
+      "original_frames": 101,
+      "sampled_frames": 101,
+      "text_tokens": 22,
+      "tokens": 6366,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 2,
+      "original_frames": 115,
+      "sampled_frames": 113,
+      "text_tokens": 22,
+      "tokens": 7098,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 3,
+      "original_frames": 108,
+      "sampled_frames": 105,
+      "text_tokens": 18,
+      "tokens": 6606,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 4,
+      "original_frames": 102,
+      "sampled_frames": 101,
+      "text_tokens": 18,
+      "tokens": 6362,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 5,
+      "original_frames": 78,
+      "sampled_frames": 77,
+      "text_tokens": 18,
+      "tokens": 4898,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 6,
+      "original_frames": 102,
+      "sampled_frames": 101,
+      "text_tokens": 18,
+      "tokens": 6362,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 7,
+      "original_frames": 711,
+      "sampled_frames": 709,
+      "text_tokens": 22,
+      "tokens": 43454,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 8,
+      "original_frames": 47,
+      "sampled_frames": 45,
+      "text_tokens": 22,
+      "tokens": 2950,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 9,
+      "original_frames": 118,
+      "sampled_frames": 117,
+      "text_tokens": 22,
+      "tokens": 7342,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 10,
+      "original_frames": 54,
+      "sampled_frames": 53,
+      "text_tokens": 11,
+      "tokens": 3427,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 11,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 18,
+      "tokens": 5630,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 12,
+      "original_frames": 108,
+      "sampled_frames": 105,
+      "text_tokens": 18,
+      "tokens": 6606,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 13,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 18,
+      "tokens": 5630,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb012a5b1694665c19712",
+      "span_index": 14,
+      "original_frames": 73,
+      "sampled_frames": 73,
+      "text_tokens": 12,
+      "tokens": 4648,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb301f79f22003e62032b",
+      "span_index": 0,
+      "original_frames": 879,
+      "sampled_frames": 877,
+      "text_tokens": 22,
+      "tokens": 53702,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb301f79f22003e62032b",
+      "span_index": 1,
+      "original_frames": 431,
+      "sampled_frames": 429,
+      "text_tokens": 32,
+      "tokens": 26384,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb301f79f22003e62032b",
+      "span_index": 2,
+      "original_frames": 388,
+      "sampled_frames": 385,
+      "text_tokens": 21,
+      "tokens": 23689,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb301f79f22003e62032b",
+      "span_index": 3,
+      "original_frames": 111,
+      "sampled_frames": 109,
+      "text_tokens": 11,
+      "tokens": 6843,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb301f79f22003e62032b",
+      "span_index": 4,
+      "original_frames": 209,
+      "sampled_frames": 209,
+      "text_tokens": 39,
+      "tokens": 12971,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb301f79f22003e62032b",
+      "span_index": 5,
+      "original_frames": 61,
+      "sampled_frames": 61,
+      "text_tokens": 11,
+      "tokens": 3915,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb301f79f22003e62032b",
+      "span_index": 6,
+      "original_frames": 901,
+      "sampled_frames": 901,
+      "text_tokens": 28,
+      "tokens": 55172,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 0,
+      "original_frames": 126,
+      "sampled_frames": 125,
+      "text_tokens": 10,
+      "tokens": 7818,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 1,
+      "original_frames": 96,
+      "sampled_frames": 93,
+      "text_tokens": 10,
+      "tokens": 5866,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 2,
+      "original_frames": 36,
+      "sampled_frames": 33,
+      "text_tokens": 10,
+      "tokens": 2206,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 3,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 10,
+      "tokens": 9282,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 4,
+      "original_frames": 141,
+      "sampled_frames": 141,
+      "text_tokens": 10,
+      "tokens": 8794,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 5,
+      "original_frames": 180,
+      "sampled_frames": 177,
+      "text_tokens": 10,
+      "tokens": 10990,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 6,
+      "original_frames": 60,
+      "sampled_frames": 57,
+      "text_tokens": 10,
+      "tokens": 3670,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 7,
+      "original_frames": 57,
+      "sampled_frames": 57,
+      "text_tokens": 10,
+      "tokens": 3670,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 8,
+      "original_frames": 69,
+      "sampled_frames": 69,
+      "text_tokens": 10,
+      "tokens": 4402,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 9,
+      "original_frames": 75,
+      "sampled_frames": 73,
+      "text_tokens": 10,
+      "tokens": 4646,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 11,
+      "original_frames": 45,
+      "sampled_frames": 45,
+      "text_tokens": 10,
+      "tokens": 2938,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 12,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 10,
+      "tokens": 9282,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 13,
+      "original_frames": 69,
+      "sampled_frames": 69,
+      "text_tokens": 10,
+      "tokens": 4402,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 15,
+      "original_frames": 165,
+      "sampled_frames": 165,
+      "text_tokens": 10,
+      "tokens": 10258,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 16,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 10,
+      "tokens": 7330,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 17,
+      "original_frames": 135,
+      "sampled_frames": 133,
+      "text_tokens": 10,
+      "tokens": 8306,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 18,
+      "original_frames": 60,
+      "sampled_frames": 57,
+      "text_tokens": 10,
+      "tokens": 3670,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 19,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 10,
+      "tokens": 7330,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 20,
+      "original_frames": 45,
+      "sampled_frames": 45,
+      "text_tokens": 10,
+      "tokens": 2938,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 21,
+      "original_frames": 75,
+      "sampled_frames": 73,
+      "text_tokens": 10,
+      "tokens": 4646,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 22,
+      "original_frames": 45,
+      "sampled_frames": 45,
+      "text_tokens": 10,
+      "tokens": 2938,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 23,
+      "original_frames": 54,
+      "sampled_frames": 53,
+      "text_tokens": 10,
+      "tokens": 3426,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 24,
+      "original_frames": 66,
+      "sampled_frames": 65,
+      "text_tokens": 10,
+      "tokens": 4158,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 25,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 10,
+      "tokens": 9282,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 26,
+      "original_frames": 60,
+      "sampled_frames": 57,
+      "text_tokens": 10,
+      "tokens": 3670,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 27,
+      "original_frames": 75,
+      "sampled_frames": 73,
+      "text_tokens": 10,
+      "tokens": 4646,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 28,
+      "original_frames": 60,
+      "sampled_frames": 57,
+      "text_tokens": 10,
+      "tokens": 3670,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb38792c84474ed1b5622",
+      "span_index": 29,
+      "original_frames": 55,
+      "sampled_frames": 53,
+      "text_tokens": 10,
+      "tokens": 3426,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 0,
+      "original_frames": 129,
+      "sampled_frames": 129,
+      "text_tokens": 12,
+      "tokens": 8064,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 1,
+      "original_frames": 141,
+      "sampled_frames": 141,
+      "text_tokens": 14,
+      "tokens": 8798,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 2,
+      "original_frames": 110,
+      "sampled_frames": 109,
+      "text_tokens": 14,
+      "tokens": 6846,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 3,
+      "original_frames": 289,
+      "sampled_frames": 289,
+      "text_tokens": 15,
+      "tokens": 17827,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 4,
+      "original_frames": 144,
+      "sampled_frames": 141,
+      "text_tokens": 12,
+      "tokens": 8796,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 5,
+      "original_frames": 147,
+      "sampled_frames": 145,
+      "text_tokens": 15,
+      "tokens": 9043,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 6,
+      "original_frames": 230,
+      "sampled_frames": 229,
+      "text_tokens": 12,
+      "tokens": 14164,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 7,
+      "original_frames": 60,
+      "sampled_frames": 57,
+      "text_tokens": 13,
+      "tokens": 3673,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 8,
+      "original_frames": 259,
+      "sampled_frames": 257,
+      "text_tokens": 15,
+      "tokens": 15875,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 9,
+      "original_frames": 96,
+      "sampled_frames": 93,
+      "text_tokens": 19,
+      "tokens": 5875,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 10,
+      "original_frames": 93,
+      "sampled_frames": 93,
+      "text_tokens": 13,
+      "tokens": 5869,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bb8de4efa2e122be60246",
+      "span_index": 11,
+      "original_frames": 385,
+      "sampled_frames": 385,
+      "text_tokens": 15,
+      "tokens": 23683,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bba30316c07a505ec66f9",
+      "span_index": 0,
+      "original_frames": 1520,
+      "sampled_frames": 1517,
+      "text_tokens": 16,
+      "tokens": 92736,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bba30316c07a505ec66f9",
+      "span_index": 1,
+      "original_frames": 109,
+      "sampled_frames": 109,
+      "text_tokens": 13,
+      "tokens": 6845,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bba30316c07a505ec66f9",
+      "span_index": 2,
+      "original_frames": 1351,
+      "sampled_frames": 1349,
+      "text_tokens": 16,
+      "tokens": 82488,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bd3a80281c838642f1840",
+      "span_index": 0,
+      "original_frames": 69,
+      "sampled_frames": 69,
+      "text_tokens": 23,
+      "tokens": 4415,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bd3a80281c838642f1840",
+      "span_index": 1,
+      "original_frames": 1563,
+      "sampled_frames": 1561,
+      "text_tokens": 28,
+      "tokens": 95432,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bd3a80281c838642f1840",
+      "span_index": 2,
+      "original_frames": 471,
+      "sampled_frames": 469,
+      "text_tokens": 25,
+      "tokens": 28817,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bd3a80281c838642f1840",
+      "span_index": 3,
+      "original_frames": 413,
+      "sampled_frames": 413,
+      "text_tokens": 21,
+      "tokens": 25397,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bd3a80281c838642f1840",
+      "span_index": 4,
+      "original_frames": 84,
+      "sampled_frames": 81,
+      "text_tokens": 18,
+      "tokens": 5142,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bd3a80281c838642f1840",
+      "span_index": 5,
+      "original_frames": 48,
+      "sampled_frames": 45,
+      "text_tokens": 17,
+      "tokens": 2945,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bed30cca65ef14372042f",
+      "span_index": 0,
+      "original_frames": 1350,
+      "sampled_frames": 1349,
+      "text_tokens": 14,
+      "tokens": 82486,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696bed30cca65ef14372042f",
+      "span_index": 1,
+      "original_frames": 1333,
+      "sampled_frames": 1333,
+      "text_tokens": 14,
+      "tokens": 81510,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696c61bc6902ce4cbbd7defe",
+      "span_index": 0,
+      "original_frames": 189,
+      "sampled_frames": 189,
+      "text_tokens": 16,
+      "tokens": 11728,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696c61bc6902ce4cbbd7defe",
+      "span_index": 1,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 16,
+      "tokens": 25636,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696c61bc6902ce4cbbd7defe",
+      "span_index": 2,
+      "original_frames": 300,
+      "sampled_frames": 297,
+      "text_tokens": 18,
+      "tokens": 18318,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696c61bc6902ce4cbbd7defe",
+      "span_index": 3,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 23,
+      "tokens": 25643,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696c61bc6902ce4cbbd7defe",
+      "span_index": 4,
+      "original_frames": 311,
+      "sampled_frames": 309,
+      "text_tokens": 16,
+      "tokens": 19048,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696c61bc6902ce4cbbd7defe",
+      "span_index": 5,
+      "original_frames": 670,
+      "sampled_frames": 669,
+      "text_tokens": 14,
+      "tokens": 41006,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696c61bc6902ce4cbbd7defe",
+      "span_index": 6,
+      "original_frames": 676,
+      "sampled_frames": 673,
+      "text_tokens": 23,
+      "tokens": 41259,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 0,
+      "original_frames": 305,
+      "sampled_frames": 305,
+      "text_tokens": 19,
+      "tokens": 18807,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 1,
+      "original_frames": 252,
+      "sampled_frames": 249,
+      "text_tokens": 16,
+      "tokens": 15388,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 2,
+      "original_frames": 252,
+      "sampled_frames": 249,
+      "text_tokens": 19,
+      "tokens": 15391,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 3,
+      "original_frames": 166,
+      "sampled_frames": 165,
+      "text_tokens": 17,
+      "tokens": 10265,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 4,
+      "original_frames": 232,
+      "sampled_frames": 229,
+      "text_tokens": 16,
+      "tokens": 14168,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 5,
+      "original_frames": 311,
+      "sampled_frames": 309,
+      "text_tokens": 19,
+      "tokens": 19051,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 6,
+      "original_frames": 348,
+      "sampled_frames": 345,
+      "text_tokens": 16,
+      "tokens": 21244,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 7,
+      "original_frames": 276,
+      "sampled_frames": 273,
+      "text_tokens": 19,
+      "tokens": 16855,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 8,
+      "original_frames": 123,
+      "sampled_frames": 121,
+      "text_tokens": 17,
+      "tokens": 7581,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696d9f4ae0ac2bc918d467c1",
+      "span_index": 9,
+      "original_frames": 421,
+      "sampled_frames": 421,
+      "text_tokens": 16,
+      "tokens": 25880,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 0,
+      "original_frames": 279,
+      "sampled_frames": 277,
+      "text_tokens": 14,
+      "tokens": 17094,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 1,
+      "original_frames": 135,
+      "sampled_frames": 133,
+      "text_tokens": 18,
+      "tokens": 8314,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 2,
+      "original_frames": 405,
+      "sampled_frames": 405,
+      "text_tokens": 19,
+      "tokens": 24907,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 3,
+      "original_frames": 191,
+      "sampled_frames": 189,
+      "text_tokens": 14,
+      "tokens": 11726,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 4,
+      "original_frames": 108,
+      "sampled_frames": 105,
+      "text_tokens": 18,
+      "tokens": 6606,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 5,
+      "original_frames": 181,
+      "sampled_frames": 181,
+      "text_tokens": 11,
+      "tokens": 11235,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 6,
+      "original_frames": 81,
+      "sampled_frames": 81,
+      "text_tokens": 11,
+      "tokens": 5135,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 7,
+      "original_frames": 159,
+      "sampled_frames": 157,
+      "text_tokens": 14,
+      "tokens": 9774,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 8,
+      "original_frames": 72,
+      "sampled_frames": 69,
+      "text_tokens": 16,
+      "tokens": 4408,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 9,
+      "original_frames": 138,
+      "sampled_frames": 137,
+      "text_tokens": 23,
+      "tokens": 8563,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 10,
+      "original_frames": 141,
+      "sampled_frames": 141,
+      "text_tokens": 18,
+      "tokens": 8802,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 11,
+      "original_frames": 110,
+      "sampled_frames": 109,
+      "text_tokens": 16,
+      "tokens": 6848,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 12,
+      "original_frames": 79,
+      "sampled_frames": 77,
+      "text_tokens": 23,
+      "tokens": 4903,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 13,
+      "original_frames": 132,
+      "sampled_frames": 129,
+      "text_tokens": 15,
+      "tokens": 8067,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 14,
+      "original_frames": 149,
+      "sampled_frames": 149,
+      "text_tokens": 14,
+      "tokens": 9286,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 15,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 14,
+      "tokens": 5626,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 16,
+      "original_frames": 94,
+      "sampled_frames": 93,
+      "text_tokens": 16,
+      "tokens": 5872,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 17,
+      "original_frames": 186,
+      "sampled_frames": 185,
+      "text_tokens": 21,
+      "tokens": 11489,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da11064a75ad017733b41",
+      "span_index": 18,
+      "original_frames": 106,
+      "sampled_frames": 105,
+      "text_tokens": 16,
+      "tokens": 6604,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 0,
+      "original_frames": 69,
+      "sampled_frames": 69,
+      "text_tokens": 12,
+      "tokens": 4404,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 1,
+      "original_frames": 221,
+      "sampled_frames": 221,
+      "text_tokens": 16,
+      "tokens": 13680,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 2,
+      "original_frames": 330,
+      "sampled_frames": 329,
+      "text_tokens": 18,
+      "tokens": 20270,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 3,
+      "original_frames": 109,
+      "sampled_frames": 109,
+      "text_tokens": 10,
+      "tokens": 6842,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 4,
+      "original_frames": 203,
+      "sampled_frames": 201,
+      "text_tokens": 13,
+      "tokens": 12457,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 5,
+      "original_frames": 88,
+      "sampled_frames": 85,
+      "text_tokens": 11,
+      "tokens": 5379,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 6,
+      "original_frames": 639,
+      "sampled_frames": 637,
+      "text_tokens": 23,
+      "tokens": 39063,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 7,
+      "original_frames": 261,
+      "sampled_frames": 261,
+      "text_tokens": 14,
+      "tokens": 16118,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 8,
+      "original_frames": 279,
+      "sampled_frames": 277,
+      "text_tokens": 16,
+      "tokens": 17096,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 9,
+      "original_frames": 431,
+      "sampled_frames": 429,
+      "text_tokens": 19,
+      "tokens": 26371,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da14ac8b3144c937f8c59",
+      "span_index": 10,
+      "original_frames": 56,
+      "sampled_frames": 53,
+      "text_tokens": 13,
+      "tokens": 3429,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da39bde1537c60354d9ff",
+      "span_index": 0,
+      "original_frames": 222,
+      "sampled_frames": 221,
+      "text_tokens": 11,
+      "tokens": 13675,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da39bde1537c60354d9ff",
+      "span_index": 1,
+      "original_frames": 228,
+      "sampled_frames": 225,
+      "text_tokens": 14,
+      "tokens": 13922,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da39bde1537c60354d9ff",
+      "span_index": 2,
+      "original_frames": 134,
+      "sampled_frames": 133,
+      "text_tokens": 13,
+      "tokens": 8309,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da39bde1537c60354d9ff",
+      "span_index": 3,
+      "original_frames": 625,
+      "sampled_frames": 625,
+      "text_tokens": 18,
+      "tokens": 38326,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da39bde1537c60354d9ff",
+      "span_index": 4,
+      "original_frames": 237,
+      "sampled_frames": 237,
+      "text_tokens": 14,
+      "tokens": 14654,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da39bde1537c60354d9ff",
+      "span_index": 5,
+      "original_frames": 32,
+      "sampled_frames": 29,
+      "text_tokens": 13,
+      "tokens": 1965,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696da39bde1537c60354d9ff",
+      "span_index": 6,
+      "original_frames": 758,
+      "sampled_frames": 757,
+      "text_tokens": 18,
+      "tokens": 46378,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e3380dc2838e08b0cec7e",
+      "span_index": 0,
+      "original_frames": 2683,
+      "sampled_frames": 1797,
+      "text_tokens": 11,
+      "tokens": 109811,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e72da103f142a3d3fab6e",
+      "span_index": 0,
+      "original_frames": 579,
+      "sampled_frames": 577,
+      "text_tokens": 14,
+      "tokens": 35394,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e72da103f142a3d3fab6e",
+      "span_index": 1,
+      "original_frames": 311,
+      "sampled_frames": 309,
+      "text_tokens": 22,
+      "tokens": 19054,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e72da103f142a3d3fab6e",
+      "span_index": 2,
+      "original_frames": 649,
+      "sampled_frames": 649,
+      "text_tokens": 15,
+      "tokens": 39787,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e72da103f142a3d3fab6e",
+      "span_index": 3,
+      "original_frames": 1080,
+      "sampled_frames": 1077,
+      "text_tokens": 19,
+      "tokens": 65899,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e72da103f142a3d3fab6e",
+      "span_index": 4,
+      "original_frames": 361,
+      "sampled_frames": 361,
+      "text_tokens": 12,
+      "tokens": 22216,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e86744a5fcb629b337c8d",
+      "span_index": 0,
+      "original_frames": 669,
+      "sampled_frames": 669,
+      "text_tokens": 23,
+      "tokens": 41015,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e86744a5fcb629b337c8d",
+      "span_index": 1,
+      "original_frames": 371,
+      "sampled_frames": 369,
+      "text_tokens": 23,
+      "tokens": 22715,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e86744a5fcb629b337c8d",
+      "span_index": 2,
+      "original_frames": 829,
+      "sampled_frames": 829,
+      "text_tokens": 23,
+      "tokens": 50775,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696e86744a5fcb629b337c8d",
+      "span_index": 3,
+      "original_frames": 814,
+      "sampled_frames": 813,
+      "text_tokens": 23,
+      "tokens": 49799,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 0,
+      "original_frames": 114,
+      "sampled_frames": 113,
+      "text_tokens": 14,
+      "tokens": 7090,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 1,
+      "original_frames": 175,
+      "sampled_frames": 173,
+      "text_tokens": 21,
+      "tokens": 10757,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 2,
+      "original_frames": 253,
+      "sampled_frames": 253,
+      "text_tokens": 21,
+      "tokens": 15637,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 3,
+      "original_frames": 169,
+      "sampled_frames": 169,
+      "text_tokens": 21,
+      "tokens": 10513,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 4,
+      "original_frames": 457,
+      "sampled_frames": 457,
+      "text_tokens": 13,
+      "tokens": 28073,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 5,
+      "original_frames": 445,
+      "sampled_frames": 445,
+      "text_tokens": 21,
+      "tokens": 27349,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 6,
+      "original_frames": 121,
+      "sampled_frames": 121,
+      "text_tokens": 21,
+      "tokens": 7585,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 7,
+      "original_frames": 73,
+      "sampled_frames": 73,
+      "text_tokens": 13,
+      "tokens": 4649,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 8,
+      "original_frames": 355,
+      "sampled_frames": 353,
+      "text_tokens": 21,
+      "tokens": 21737,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 9,
+      "original_frames": 229,
+      "sampled_frames": 229,
+      "text_tokens": 21,
+      "tokens": 14173,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 10,
+      "original_frames": 113,
+      "sampled_frames": 113,
+      "text_tokens": 13,
+      "tokens": 7089,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 11,
+      "original_frames": 155,
+      "sampled_frames": 153,
+      "text_tokens": 21,
+      "tokens": 9537,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696eaebd0388683cf18b0ff3",
+      "span_index": 12,
+      "original_frames": 24,
+      "sampled_frames": 21,
+      "text_tokens": 13,
+      "tokens": 1477,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ec90f4a5fcb629b3380da",
+      "span_index": 0,
+      "original_frames": 1499,
+      "sampled_frames": 1497,
+      "text_tokens": 15,
+      "tokens": 91515,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696ec90f4a5fcb629b3380da",
+      "span_index": 1,
+      "original_frames": 1487,
+      "sampled_frames": 1485,
+      "text_tokens": 15,
+      "tokens": 90783,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696f39f0e074cc7861dced43",
+      "span_index": 0,
+      "original_frames": 1500,
+      "sampled_frames": 1497,
+      "text_tokens": 20,
+      "tokens": 91520,
+      "skipped": false
+    },
+    {
+      "episode_hash": "696f39f0e074cc7861dced43",
+      "span_index": 1,
+      "original_frames": 1516,
+      "sampled_frames": 1513,
+      "text_tokens": 16,
+      "tokens": 92492,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69716b313afa247001595a64",
+      "span_index": 0,
+      "original_frames": 1500,
+      "sampled_frames": 1497,
+      "text_tokens": 17,
+      "tokens": 91517,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69716b313afa247001595a64",
+      "span_index": 1,
+      "original_frames": 1486,
+      "sampled_frames": 1485,
+      "text_tokens": 17,
+      "tokens": 90785,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 0,
+      "original_frames": 66,
+      "sampled_frames": 65,
+      "text_tokens": 25,
+      "tokens": 4173,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 1,
+      "original_frames": 207,
+      "sampled_frames": 205,
+      "text_tokens": 26,
+      "tokens": 12714,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 2,
+      "original_frames": 264,
+      "sampled_frames": 261,
+      "text_tokens": 27,
+      "tokens": 16131,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 3,
+      "original_frames": 309,
+      "sampled_frames": 309,
+      "text_tokens": 29,
+      "tokens": 19061,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 4,
+      "original_frames": 279,
+      "sampled_frames": 277,
+      "text_tokens": 29,
+      "tokens": 17109,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 5,
+      "original_frames": 171,
+      "sampled_frames": 169,
+      "text_tokens": 18,
+      "tokens": 10510,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 6,
+      "original_frames": 156,
+      "sampled_frames": 153,
+      "text_tokens": 29,
+      "tokens": 9545,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 7,
+      "original_frames": 271,
+      "sampled_frames": 269,
+      "text_tokens": 29,
+      "tokens": 16621,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 8,
+      "original_frames": 253,
+      "sampled_frames": 253,
+      "text_tokens": 18,
+      "tokens": 15634,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 9,
+      "original_frames": 187,
+      "sampled_frames": 185,
+      "text_tokens": 29,
+      "tokens": 11497,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 10,
+      "original_frames": 363,
+      "sampled_frames": 361,
+      "text_tokens": 29,
+      "tokens": 22233,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 11,
+      "original_frames": 171,
+      "sampled_frames": 169,
+      "text_tokens": 18,
+      "tokens": 10510,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 12,
+      "original_frames": 141,
+      "sampled_frames": 141,
+      "text_tokens": 29,
+      "tokens": 8813,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 13,
+      "original_frames": 100,
+      "sampled_frames": 97,
+      "text_tokens": 20,
+      "tokens": 6120,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 14,
+      "original_frames": 77,
+      "sampled_frames": 77,
+      "text_tokens": 29,
+      "tokens": 4909,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69727b42d7ab7ec2aaae4623",
+      "span_index": 15,
+      "original_frames": 268,
+      "sampled_frames": 265,
+      "text_tokens": 29,
+      "tokens": 16377,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972bdb676d67db920c86a46",
+      "span_index": 0,
+      "original_frames": 660,
+      "sampled_frames": 657,
+      "text_tokens": 11,
+      "tokens": 40271,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972bdb676d67db920c86a46",
+      "span_index": 1,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 16,
+      "tokens": 7336,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972bdb676d67db920c86a46",
+      "span_index": 2,
+      "original_frames": 270,
+      "sampled_frames": 269,
+      "text_tokens": 15,
+      "tokens": 16607,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972bdb676d67db920c86a46",
+      "span_index": 3,
+      "original_frames": 1290,
+      "sampled_frames": 1289,
+      "text_tokens": 16,
+      "tokens": 78828,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972bdb676d67db920c86a46",
+      "span_index": 4,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 16,
+      "tokens": 25636,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972bdb676d67db920c86a46",
+      "span_index": 5,
+      "original_frames": 823,
+      "sampled_frames": 821,
+      "text_tokens": 16,
+      "tokens": 50280,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 0,
+      "original_frames": 114,
+      "sampled_frames": 113,
+      "text_tokens": 17,
+      "tokens": 7093,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 1,
+      "original_frames": 36,
+      "sampled_frames": 33,
+      "text_tokens": 11,
+      "tokens": 2207,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 2,
+      "original_frames": 119,
+      "sampled_frames": 117,
+      "text_tokens": 12,
+      "tokens": 7332,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 3,
+      "original_frames": 253,
+      "sampled_frames": 253,
+      "text_tokens": 19,
+      "tokens": 15635,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 4,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 17,
+      "tokens": 9289,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 5,
+      "original_frames": 84,
+      "sampled_frames": 81,
+      "text_tokens": 12,
+      "tokens": 5136,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 6,
+      "original_frames": 180,
+      "sampled_frames": 177,
+      "text_tokens": 19,
+      "tokens": 10999,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 7,
+      "original_frames": 96,
+      "sampled_frames": 93,
+      "text_tokens": 17,
+      "tokens": 5873,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 8,
+      "original_frames": 72,
+      "sampled_frames": 69,
+      "text_tokens": 12,
+      "tokens": 4404,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 9,
+      "original_frames": 222,
+      "sampled_frames": 221,
+      "text_tokens": 19,
+      "tokens": 13683,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 10,
+      "original_frames": 69,
+      "sampled_frames": 69,
+      "text_tokens": 13,
+      "tokens": 4405,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 11,
+      "original_frames": 117,
+      "sampled_frames": 117,
+      "text_tokens": 12,
+      "tokens": 7332,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 12,
+      "original_frames": 227,
+      "sampled_frames": 225,
+      "text_tokens": 19,
+      "tokens": 13927,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 13,
+      "original_frames": 103,
+      "sampled_frames": 101,
+      "text_tokens": 13,
+      "tokens": 6357,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 14,
+      "original_frames": 84,
+      "sampled_frames": 81,
+      "text_tokens": 12,
+      "tokens": 5136,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 15,
+      "original_frames": 189,
+      "sampled_frames": 189,
+      "text_tokens": 19,
+      "tokens": 11731,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 16,
+      "original_frames": 96,
+      "sampled_frames": 93,
+      "text_tokens": 17,
+      "tokens": 5873,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 17,
+      "original_frames": 99,
+      "sampled_frames": 97,
+      "text_tokens": 12,
+      "tokens": 6112,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 18,
+      "original_frames": 159,
+      "sampled_frames": 157,
+      "text_tokens": 19,
+      "tokens": 9779,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 19,
+      "original_frames": 93,
+      "sampled_frames": 93,
+      "text_tokens": 11,
+      "tokens": 5867,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 20,
+      "original_frames": 123,
+      "sampled_frames": 121,
+      "text_tokens": 17,
+      "tokens": 7581,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 21,
+      "original_frames": 69,
+      "sampled_frames": 69,
+      "text_tokens": 12,
+      "tokens": 4404,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 22,
+      "original_frames": 204,
+      "sampled_frames": 201,
+      "text_tokens": 19,
+      "tokens": 12463,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6972c094969cdf4e87112d2a",
+      "span_index": 23,
+      "original_frames": 28,
+      "sampled_frames": 25,
+      "text_tokens": 13,
+      "tokens": 1721,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69739f41026a2ba2357ee2b3",
+      "span_index": 0,
+      "original_frames": 1560,
+      "sampled_frames": 1557,
+      "text_tokens": 10,
+      "tokens": 95170,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69739f41026a2ba2357ee2b3",
+      "span_index": 1,
+      "original_frames": 1560,
+      "sampled_frames": 1557,
+      "text_tokens": 10,
+      "tokens": 95170,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6976b5cb39510854b7622940",
+      "span_index": 0,
+      "original_frames": 240,
+      "sampled_frames": 237,
+      "text_tokens": 16,
+      "tokens": 14656,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6976b5cb39510854b7622940",
+      "span_index": 1,
+      "original_frames": 389,
+      "sampled_frames": 389,
+      "text_tokens": 15,
+      "tokens": 23927,
+      "skipped": false
+    },
+    {
+      "episode_hash": "6976b5cb39510854b7622940",
+      "span_index": 2,
+      "original_frames": 2507,
+      "sampled_frames": 1797,
+      "text_tokens": 15,
+      "tokens": 109815,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b10497fecba246fce64c64",
+      "span_index": 0,
+      "original_frames": 1779,
+      "sampled_frames": 1777,
+      "text_tokens": 12,
+      "tokens": 108592,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b10497fecba246fce64c64",
+      "span_index": 1,
+      "original_frames": 1660,
+      "sampled_frames": 1657,
+      "text_tokens": 12,
+      "tokens": 101272,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1c81863f2e0a33670f8eb",
+      "span_index": 0,
+      "original_frames": 35,
+      "sampled_frames": 33,
+      "text_tokens": 11,
+      "tokens": 2207,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1c81863f2e0a33670f8eb",
+      "span_index": 1,
+      "original_frames": 145,
+      "sampled_frames": 145,
+      "text_tokens": 14,
+      "tokens": 9042,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1c81863f2e0a33670f8eb",
+      "span_index": 2,
+      "original_frames": 554,
+      "sampled_frames": 553,
+      "text_tokens": 18,
+      "tokens": 33934,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1c81863f2e0a33670f8eb",
+      "span_index": 3,
+      "original_frames": 196,
+      "sampled_frames": 193,
+      "text_tokens": 11,
+      "tokens": 11967,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1c81863f2e0a33670f8eb",
+      "span_index": 4,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 14,
+      "tokens": 7334,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1c81863f2e0a33670f8eb",
+      "span_index": 5,
+      "original_frames": 639,
+      "sampled_frames": 637,
+      "text_tokens": 12,
+      "tokens": 39052,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1c81863f2e0a33670f8eb",
+      "span_index": 6,
+      "original_frames": 42,
+      "sampled_frames": 41,
+      "text_tokens": 13,
+      "tokens": 2697,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1c81863f2e0a33670f8eb",
+      "span_index": 7,
+      "original_frames": 64,
+      "sampled_frames": 61,
+      "text_tokens": 11,
+      "tokens": 3915,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 0,
+      "original_frames": 30,
+      "sampled_frames": 29,
+      "text_tokens": 11,
+      "tokens": 1963,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 1,
+      "original_frames": 159,
+      "sampled_frames": 157,
+      "text_tokens": 21,
+      "tokens": 9781,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 2,
+      "original_frames": 39,
+      "sampled_frames": 37,
+      "text_tokens": 11,
+      "tokens": 2451,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 3,
+      "original_frames": 152,
+      "sampled_frames": 149,
+      "text_tokens": 21,
+      "tokens": 9293,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 4,
+      "original_frames": 31,
+      "sampled_frames": 29,
+      "text_tokens": 11,
+      "tokens": 1963,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 5,
+      "original_frames": 129,
+      "sampled_frames": 129,
+      "text_tokens": 21,
+      "tokens": 8073,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 6,
+      "original_frames": 30,
+      "sampled_frames": 29,
+      "text_tokens": 11,
+      "tokens": 1963,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 7,
+      "original_frames": 110,
+      "sampled_frames": 109,
+      "text_tokens": 21,
+      "tokens": 6853,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 8,
+      "original_frames": 58,
+      "sampled_frames": 57,
+      "text_tokens": 11,
+      "tokens": 3671,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 9,
+      "original_frames": 132,
+      "sampled_frames": 129,
+      "text_tokens": 21,
+      "tokens": 8073,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 10,
+      "original_frames": 98,
+      "sampled_frames": 97,
+      "text_tokens": 11,
+      "tokens": 6111,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 11,
+      "original_frames": 180,
+      "sampled_frames": 177,
+      "text_tokens": 21,
+      "tokens": 11001,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 12,
+      "original_frames": 37,
+      "sampled_frames": 37,
+      "text_tokens": 11,
+      "tokens": 2451,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 13,
+      "original_frames": 234,
+      "sampled_frames": 233,
+      "text_tokens": 21,
+      "tokens": 14417,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 14,
+      "original_frames": 39,
+      "sampled_frames": 37,
+      "text_tokens": 11,
+      "tokens": 2451,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 15,
+      "original_frames": 182,
+      "sampled_frames": 181,
+      "text_tokens": 21,
+      "tokens": 11245,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 16,
+      "original_frames": 70,
+      "sampled_frames": 69,
+      "text_tokens": 11,
+      "tokens": 4403,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1ca05f5e7396077b83a7a",
+      "span_index": 17,
+      "original_frames": 89,
+      "sampled_frames": 89,
+      "text_tokens": 21,
+      "tokens": 5633,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 0,
+      "original_frames": 33,
+      "sampled_frames": 33,
+      "text_tokens": 18,
+      "tokens": 2214,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 1,
+      "original_frames": 177,
+      "sampled_frames": 177,
+      "text_tokens": 17,
+      "tokens": 10997,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 2,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 17,
+      "tokens": 7337,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 3,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 19,
+      "tokens": 7339,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 4,
+      "original_frames": 81,
+      "sampled_frames": 81,
+      "text_tokens": 11,
+      "tokens": 5135,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 5,
+      "original_frames": 135,
+      "sampled_frames": 133,
+      "text_tokens": 14,
+      "tokens": 8310,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 7,
+      "original_frames": 222,
+      "sampled_frames": 221,
+      "text_tokens": 14,
+      "tokens": 13678,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 8,
+      "original_frames": 363,
+      "sampled_frames": 361,
+      "text_tokens": 11,
+      "tokens": 22215,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 9,
+      "original_frames": 209,
+      "sampled_frames": 209,
+      "text_tokens": 12,
+      "tokens": 12944,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 10,
+      "original_frames": 37,
+      "sampled_frames": 37,
+      "text_tokens": 14,
+      "tokens": 2454,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 11,
+      "original_frames": 159,
+      "sampled_frames": 157,
+      "text_tokens": 22,
+      "tokens": 9782,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc1a7bbf15d61c802fe9",
+      "span_index": 12,
+      "original_frames": 97,
+      "sampled_frames": 97,
+      "text_tokens": 19,
+      "tokens": 6119,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc852e36136371f32383",
+      "span_index": 0,
+      "original_frames": 219,
+      "sampled_frames": 217,
+      "text_tokens": 11,
+      "tokens": 13431,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc852e36136371f32383",
+      "span_index": 1,
+      "original_frames": 171,
+      "sampled_frames": 169,
+      "text_tokens": 14,
+      "tokens": 10506,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc852e36136371f32383",
+      "span_index": 2,
+      "original_frames": 510,
+      "sampled_frames": 509,
+      "text_tokens": 14,
+      "tokens": 31246,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc852e36136371f32383",
+      "span_index": 3,
+      "original_frames": 399,
+      "sampled_frames": 397,
+      "text_tokens": 15,
+      "tokens": 24415,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc852e36136371f32383",
+      "span_index": 4,
+      "original_frames": 71,
+      "sampled_frames": 69,
+      "text_tokens": 11,
+      "tokens": 4403,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc852e36136371f32383",
+      "span_index": 5,
+      "original_frames": 100,
+      "sampled_frames": 97,
+      "text_tokens": 13,
+      "tokens": 6113,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc852e36136371f32383",
+      "span_index": 6,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 12,
+      "tokens": 5624,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1cc852e36136371f32383",
+      "span_index": 7,
+      "original_frames": 238,
+      "sampled_frames": 237,
+      "text_tokens": 16,
+      "tokens": 14656,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1fe72c70619d18bc1649c",
+      "span_index": 0,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 11,
+      "tokens": 9283,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1fe72c70619d18bc1649c",
+      "span_index": 1,
+      "original_frames": 630,
+      "sampled_frames": 629,
+      "text_tokens": 11,
+      "tokens": 38563,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1fe72c70619d18bc1649c",
+      "span_index": 2,
+      "original_frames": 279,
+      "sampled_frames": 277,
+      "text_tokens": 12,
+      "tokens": 17092,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1fe72c70619d18bc1649c",
+      "span_index": 3,
+      "original_frames": 321,
+      "sampled_frames": 321,
+      "text_tokens": 12,
+      "tokens": 19776,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1fe72c70619d18bc1649c",
+      "span_index": 4,
+      "original_frames": 240,
+      "sampled_frames": 237,
+      "text_tokens": 12,
+      "tokens": 14652,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b1fe72c70619d18bc1649c",
+      "span_index": 5,
+      "original_frames": 299,
+      "sampled_frames": 297,
+      "text_tokens": 12,
+      "tokens": 18312,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b2031961f41e36320e7752",
+      "span_index": 0,
+      "original_frames": 974,
+      "sampled_frames": 973,
+      "text_tokens": 12,
+      "tokens": 59548,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b2031961f41e36320e7752",
+      "span_index": 1,
+      "original_frames": 975,
+      "sampled_frames": 973,
+      "text_tokens": 12,
+      "tokens": 59548,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b204842d7a7dc083ea7b4e",
+      "span_index": 0,
+      "original_frames": 639,
+      "sampled_frames": 637,
+      "text_tokens": 11,
+      "tokens": 39051,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b204842d7a7dc083ea7b4e",
+      "span_index": 1,
+      "original_frames": 600,
+      "sampled_frames": 597,
+      "text_tokens": 12,
+      "tokens": 36612,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b204842d7a7dc083ea7b4e",
+      "span_index": 2,
+      "original_frames": 51,
+      "sampled_frames": 49,
+      "text_tokens": 11,
+      "tokens": 3183,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b204842d7a7dc083ea7b4e",
+      "span_index": 3,
+      "original_frames": 260,
+      "sampled_frames": 257,
+      "text_tokens": 12,
+      "tokens": 15872,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b204842d7a7dc083ea7b4e",
+      "span_index": 4,
+      "original_frames": 130,
+      "sampled_frames": 129,
+      "text_tokens": 10,
+      "tokens": 8062,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b204842d7a7dc083ea7b4e",
+      "span_index": 5,
+      "original_frames": 39,
+      "sampled_frames": 37,
+      "text_tokens": 12,
+      "tokens": 2452,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b204842d7a7dc083ea7b4e",
+      "span_index": 6,
+      "original_frames": 82,
+      "sampled_frames": 81,
+      "text_tokens": 11,
+      "tokens": 5135,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 0,
+      "original_frames": 99,
+      "sampled_frames": 97,
+      "text_tokens": 11,
+      "tokens": 6111,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 1,
+      "original_frames": 141,
+      "sampled_frames": 141,
+      "text_tokens": 16,
+      "tokens": 8800,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 2,
+      "original_frames": 110,
+      "sampled_frames": 109,
+      "text_tokens": 13,
+      "tokens": 6845,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 3,
+      "original_frames": 70,
+      "sampled_frames": 69,
+      "text_tokens": 11,
+      "tokens": 4403,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 4,
+      "original_frames": 351,
+      "sampled_frames": 349,
+      "text_tokens": 22,
+      "tokens": 21494,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 5,
+      "original_frames": 159,
+      "sampled_frames": 157,
+      "text_tokens": 17,
+      "tokens": 9777,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 6,
+      "original_frames": 182,
+      "sampled_frames": 181,
+      "text_tokens": 17,
+      "tokens": 11241,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 7,
+      "original_frames": 208,
+      "sampled_frames": 205,
+      "text_tokens": 18,
+      "tokens": 12706,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 8,
+      "original_frames": 148,
+      "sampled_frames": 145,
+      "text_tokens": 18,
+      "tokens": 9046,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 9,
+      "original_frames": 148,
+      "sampled_frames": 145,
+      "text_tokens": 20,
+      "tokens": 9048,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 10,
+      "original_frames": 156,
+      "sampled_frames": 153,
+      "text_tokens": 19,
+      "tokens": 9535,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 11,
+      "original_frames": 187,
+      "sampled_frames": 185,
+      "text_tokens": 20,
+      "tokens": 11488,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b272057d5af359fc3326e5",
+      "span_index": 12,
+      "original_frames": 136,
+      "sampled_frames": 133,
+      "text_tokens": 15,
+      "tokens": 8311,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b3257ae7e3b57c9e1779e8",
+      "span_index": 0,
+      "original_frames": 828,
+      "sampled_frames": 825,
+      "text_tokens": 17,
+      "tokens": 50525,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b3257ae7e3b57c9e1779e8",
+      "span_index": 1,
+      "original_frames": 162,
+      "sampled_frames": 161,
+      "text_tokens": 14,
+      "tokens": 10018,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b3257ae7e3b57c9e1779e8",
+      "span_index": 2,
+      "original_frames": 1109,
+      "sampled_frames": 1109,
+      "text_tokens": 17,
+      "tokens": 67849,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b327d3241a6c270e2e2588",
+      "span_index": 0,
+      "original_frames": 110,
+      "sampled_frames": 109,
+      "text_tokens": 21,
+      "tokens": 6853,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b327d3241a6c270e2e2588",
+      "span_index": 1,
+      "original_frames": 666,
+      "sampled_frames": 665,
+      "text_tokens": 19,
+      "tokens": 40767,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b327d3241a6c270e2e2588",
+      "span_index": 2,
+      "original_frames": 163,
+      "sampled_frames": 161,
+      "text_tokens": 17,
+      "tokens": 10021,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b327d3241a6c270e2e2588",
+      "span_index": 3,
+      "original_frames": 64,
+      "sampled_frames": 61,
+      "text_tokens": 22,
+      "tokens": 3926,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b327d3241a6c270e2e2588",
+      "span_index": 4,
+      "original_frames": 143,
+      "sampled_frames": 141,
+      "text_tokens": 23,
+      "tokens": 8807,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b327d3241a6c270e2e2588",
+      "span_index": 5,
+      "original_frames": 114,
+      "sampled_frames": 113,
+      "text_tokens": 20,
+      "tokens": 7096,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b327d3241a6c270e2e2588",
+      "span_index": 6,
+      "original_frames": 285,
+      "sampled_frames": 285,
+      "text_tokens": 19,
+      "tokens": 17587,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b327d3241a6c270e2e2588",
+      "span_index": 7,
+      "original_frames": 365,
+      "sampled_frames": 365,
+      "text_tokens": 19,
+      "tokens": 22467,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b327d3241a6c270e2e2588",
+      "span_index": 8,
+      "original_frames": 94,
+      "sampled_frames": 93,
+      "text_tokens": 12,
+      "tokens": 5868,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b3285ccd1a4bcc06afa06f",
+      "span_index": 0,
+      "original_frames": 30,
+      "sampled_frames": 29,
+      "text_tokens": 14,
+      "tokens": 1966,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b3285ccd1a4bcc06afa06f",
+      "span_index": 1,
+      "original_frames": 99,
+      "sampled_frames": 97,
+      "text_tokens": 14,
+      "tokens": 6114,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b3285ccd1a4bcc06afa06f",
+      "span_index": 2,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 12,
+      "tokens": 5624,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b3285ccd1a4bcc06afa06f",
+      "span_index": 3,
+      "original_frames": 1541,
+      "sampled_frames": 1541,
+      "text_tokens": 16,
+      "tokens": 94200,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b3285ccd1a4bcc06afa06f",
+      "span_index": 5,
+      "original_frames": 205,
+      "sampled_frames": 205,
+      "text_tokens": 14,
+      "tokens": 12702,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b32fc2cf7a852768645d3e",
+      "span_index": 0,
+      "original_frames": 303,
+      "sampled_frames": 301,
+      "text_tokens": 17,
+      "tokens": 18561,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b32fc2cf7a852768645d3e",
+      "span_index": 1,
+      "original_frames": 75,
+      "sampled_frames": 73,
+      "text_tokens": 12,
+      "tokens": 4648,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b32fc2cf7a852768645d3e",
+      "span_index": 2,
+      "original_frames": 315,
+      "sampled_frames": 313,
+      "text_tokens": 17,
+      "tokens": 19293,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b32fc2cf7a852768645d3e",
+      "span_index": 3,
+      "original_frames": 483,
+      "sampled_frames": 481,
+      "text_tokens": 18,
+      "tokens": 29542,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b32fc2cf7a852768645d3e",
+      "span_index": 4,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 14,
+      "tokens": 9286,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b32fc2cf7a852768645d3e",
+      "span_index": 5,
+      "original_frames": 381,
+      "sampled_frames": 381,
+      "text_tokens": 12,
+      "tokens": 23436,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b32fc2cf7a852768645d3e",
+      "span_index": 6,
+      "original_frames": 392,
+      "sampled_frames": 389,
+      "text_tokens": 16,
+      "tokens": 23928,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b374e38b7e31850a2c3f3b",
+      "span_index": 0,
+      "original_frames": 39,
+      "sampled_frames": 37,
+      "text_tokens": 10,
+      "tokens": 2450,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b374e38b7e31850a2c3f3b",
+      "span_index": 1,
+      "original_frames": 101,
+      "sampled_frames": 101,
+      "text_tokens": 17,
+      "tokens": 6361,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b374e38b7e31850a2c3f3b",
+      "span_index": 2,
+      "original_frames": 490,
+      "sampled_frames": 489,
+      "text_tokens": 17,
+      "tokens": 30029,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b374e38b7e31850a2c3f3b",
+      "span_index": 3,
+      "original_frames": 530,
+      "sampled_frames": 529,
+      "text_tokens": 15,
+      "tokens": 32467,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b374e38b7e31850a2c3f3b",
+      "span_index": 4,
+      "original_frames": 79,
+      "sampled_frames": 77,
+      "text_tokens": 17,
+      "tokens": 4897,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b374e38b7e31850a2c3f3b",
+      "span_index": 5,
+      "original_frames": 231,
+      "sampled_frames": 229,
+      "text_tokens": 17,
+      "tokens": 14169,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b374e38b7e31850a2c3f3b",
+      "span_index": 6,
+      "original_frames": 669,
+      "sampled_frames": 669,
+      "text_tokens": 17,
+      "tokens": 41009,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b374e38b7e31850a2c3f3b",
+      "span_index": 7,
+      "original_frames": 109,
+      "sampled_frames": 109,
+      "text_tokens": 17,
+      "tokens": 6849,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b37f82798c89398b267ff3",
+      "span_index": 0,
+      "original_frames": 2249,
+      "sampled_frames": 1797,
+      "text_tokens": 15,
+      "tokens": 109815,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b38f3f1e56f6bdf5a37559",
+      "span_index": 0,
+      "original_frames": 447,
+      "sampled_frames": 445,
+      "text_tokens": 14,
+      "tokens": 27342,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b38f3f1e56f6bdf5a37559",
+      "span_index": 1,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 17,
+      "tokens": 25637,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b38f3f1e56f6bdf5a37559",
+      "span_index": 2,
+      "original_frames": 683,
+      "sampled_frames": 681,
+      "text_tokens": 17,
+      "tokens": 41741,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b38f3f1e56f6bdf5a37559",
+      "span_index": 3,
+      "original_frames": 324,
+      "sampled_frames": 321,
+      "text_tokens": 17,
+      "tokens": 19781,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b40d5d9cd671b2e770aa3e",
+      "span_index": 0,
+      "original_frames": 720,
+      "sampled_frames": 717,
+      "text_tokens": 14,
+      "tokens": 43934,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b40d5d9cd671b2e770aa3e",
+      "span_index": 1,
+      "original_frames": 780,
+      "sampled_frames": 777,
+      "text_tokens": 18,
+      "tokens": 47598,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b40d5d9cd671b2e770aa3e",
+      "span_index": 2,
+      "original_frames": 745,
+      "sampled_frames": 745,
+      "text_tokens": 27,
+      "tokens": 45655,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 0,
+      "original_frames": 36,
+      "sampled_frames": 33,
+      "text_tokens": 10,
+      "tokens": 2206,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 1,
+      "original_frames": 66,
+      "sampled_frames": 65,
+      "text_tokens": 18,
+      "tokens": 4166,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 2,
+      "original_frames": 252,
+      "sampled_frames": 249,
+      "text_tokens": 18,
+      "tokens": 15390,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 3,
+      "original_frames": 93,
+      "sampled_frames": 93,
+      "text_tokens": 18,
+      "tokens": 5874,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 4,
+      "original_frames": 207,
+      "sampled_frames": 205,
+      "text_tokens": 18,
+      "tokens": 12706,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 5,
+      "original_frames": 192,
+      "sampled_frames": 189,
+      "text_tokens": 15,
+      "tokens": 11727,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 6,
+      "original_frames": 216,
+      "sampled_frames": 213,
+      "text_tokens": 17,
+      "tokens": 13193,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 7,
+      "original_frames": 45,
+      "sampled_frames": 45,
+      "text_tokens": 17,
+      "tokens": 2945,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 8,
+      "original_frames": 219,
+      "sampled_frames": 217,
+      "text_tokens": 18,
+      "tokens": 13438,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 9,
+      "original_frames": 54,
+      "sampled_frames": 53,
+      "text_tokens": 17,
+      "tokens": 3433,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 10,
+      "original_frames": 174,
+      "sampled_frames": 173,
+      "text_tokens": 18,
+      "tokens": 10754,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 11,
+      "original_frames": 225,
+      "sampled_frames": 225,
+      "text_tokens": 15,
+      "tokens": 13923,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 12,
+      "original_frames": 54,
+      "sampled_frames": 53,
+      "text_tokens": 14,
+      "tokens": 3430,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 13,
+      "original_frames": 141,
+      "sampled_frames": 141,
+      "text_tokens": 16,
+      "tokens": 8800,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 14,
+      "original_frames": 75,
+      "sampled_frames": 73,
+      "text_tokens": 12,
+      "tokens": 4648,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 15,
+      "original_frames": 66,
+      "sampled_frames": 65,
+      "text_tokens": 14,
+      "tokens": 4162,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b429ce19bfe1efa7ca9cdc",
+      "span_index": 16,
+      "original_frames": 135,
+      "sampled_frames": 133,
+      "text_tokens": 14,
+      "tokens": 8310,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b489f84f13e26864ae0dbc",
+      "span_index": 0,
+      "original_frames": 360,
+      "sampled_frames": 357,
+      "text_tokens": 20,
+      "tokens": 21980,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b489f84f13e26864ae0dbc",
+      "span_index": 1,
+      "original_frames": 330,
+      "sampled_frames": 329,
+      "text_tokens": 20,
+      "tokens": 20272,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b489f84f13e26864ae0dbc",
+      "span_index": 2,
+      "original_frames": 348,
+      "sampled_frames": 345,
+      "text_tokens": 20,
+      "tokens": 21248,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b489f84f13e26864ae0dbc",
+      "span_index": 3,
+      "original_frames": 42,
+      "sampled_frames": 41,
+      "text_tokens": 13,
+      "tokens": 2697,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b489f84f13e26864ae0dbc",
+      "span_index": 4,
+      "original_frames": 222,
+      "sampled_frames": 221,
+      "text_tokens": 20,
+      "tokens": 13684,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b489f84f13e26864ae0dbc",
+      "span_index": 5,
+      "original_frames": 258,
+      "sampled_frames": 257,
+      "text_tokens": 10,
+      "tokens": 15870,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b489f84f13e26864ae0dbc",
+      "span_index": 6,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 12,
+      "tokens": 25632,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b489f84f13e26864ae0dbc",
+      "span_index": 7,
+      "original_frames": 270,
+      "sampled_frames": 269,
+      "text_tokens": 20,
+      "tokens": 16612,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b490c517e3a9ccf08b229a",
+      "span_index": 0,
+      "original_frames": 1500,
+      "sampled_frames": 1497,
+      "text_tokens": 17,
+      "tokens": 91517,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b490c517e3a9ccf08b229a",
+      "span_index": 1,
+      "original_frames": 747,
+      "sampled_frames": 745,
+      "text_tokens": 18,
+      "tokens": 45646,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b494925fadf00f5a3f1857",
+      "span_index": 0,
+      "original_frames": 153,
+      "sampled_frames": 153,
+      "text_tokens": 15,
+      "tokens": 9531,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b494925fadf00f5a3f1857",
+      "span_index": 1,
+      "original_frames": 69,
+      "sampled_frames": 69,
+      "text_tokens": 16,
+      "tokens": 4408,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b494925fadf00f5a3f1857",
+      "span_index": 2,
+      "original_frames": 234,
+      "sampled_frames": 233,
+      "text_tokens": 15,
+      "tokens": 14411,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b494925fadf00f5a3f1857",
+      "span_index": 3,
+      "original_frames": 219,
+      "sampled_frames": 217,
+      "text_tokens": 16,
+      "tokens": 13436,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b494925fadf00f5a3f1857",
+      "span_index": 4,
+      "original_frames": 338,
+      "sampled_frames": 337,
+      "text_tokens": 15,
+      "tokens": 20755,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b494925fadf00f5a3f1857",
+      "span_index": 5,
+      "original_frames": 352,
+      "sampled_frames": 349,
+      "text_tokens": 16,
+      "tokens": 21488,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b494925fadf00f5a3f1857",
+      "span_index": 6,
+      "original_frames": 291,
+      "sampled_frames": 289,
+      "text_tokens": 15,
+      "tokens": 17827,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b494925fadf00f5a3f1857",
+      "span_index": 7,
+      "original_frames": 296,
+      "sampled_frames": 293,
+      "text_tokens": 16,
+      "tokens": 18072,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b494925fadf00f5a3f1857",
+      "span_index": 8,
+      "original_frames": 322,
+      "sampled_frames": 321,
+      "text_tokens": 16,
+      "tokens": 19780,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 0,
+      "original_frames": 240,
+      "sampled_frames": 237,
+      "text_tokens": 12,
+      "tokens": 14652,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 1,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 12,
+      "tokens": 7332,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 2,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 12,
+      "tokens": 7332,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 3,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 12,
+      "tokens": 25632,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 4,
+      "original_frames": 60,
+      "sampled_frames": 57,
+      "text_tokens": 16,
+      "tokens": 3676,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 5,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 12,
+      "tokens": 5624,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 6,
+      "original_frames": 60,
+      "sampled_frames": 57,
+      "text_tokens": 12,
+      "tokens": 3672,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 7,
+      "original_frames": 720,
+      "sampled_frames": 717,
+      "text_tokens": 12,
+      "tokens": 43932,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 8,
+      "original_frames": 60,
+      "sampled_frames": 57,
+      "text_tokens": 12,
+      "tokens": 3672,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 9,
+      "original_frames": 258,
+      "sampled_frames": 257,
+      "text_tokens": 21,
+      "tokens": 15881,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 10,
+      "original_frames": 42,
+      "sampled_frames": 41,
+      "text_tokens": 11,
+      "tokens": 2695,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b496ca699f525ceebed0fb",
+      "span_index": 11,
+      "original_frames": 144,
+      "sampled_frames": 141,
+      "text_tokens": 12,
+      "tokens": 8796,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49cc55d6b48c59a9320ab",
+      "span_index": 0,
+      "original_frames": 180,
+      "sampled_frames": 177,
+      "text_tokens": 15,
+      "tokens": 10995,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49cc55d6b48c59a9320ab",
+      "span_index": 1,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 16,
+      "tokens": 7336,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49cc55d6b48c59a9320ab",
+      "span_index": 2,
+      "original_frames": 1020,
+      "sampled_frames": 1017,
+      "text_tokens": 17,
+      "tokens": 62237,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49cc55d6b48c59a9320ab",
+      "span_index": 3,
+      "original_frames": 108,
+      "sampled_frames": 105,
+      "text_tokens": 16,
+      "tokens": 6604,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49cc55d6b48c59a9320ab",
+      "span_index": 4,
+      "original_frames": 909,
+      "sampled_frames": 909,
+      "text_tokens": 17,
+      "tokens": 55649,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 0,
+      "original_frames": 36,
+      "sampled_frames": 33,
+      "text_tokens": 21,
+      "tokens": 2217,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 1,
+      "original_frames": 33,
+      "sampled_frames": 33,
+      "text_tokens": 14,
+      "tokens": 2210,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 2,
+      "original_frames": 148,
+      "sampled_frames": 145,
+      "text_tokens": 14,
+      "tokens": 9042,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 3,
+      "original_frames": 83,
+      "sampled_frames": 81,
+      "text_tokens": 20,
+      "tokens": 5144,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 4,
+      "original_frames": 226,
+      "sampled_frames": 225,
+      "text_tokens": 24,
+      "tokens": 13932,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 5,
+      "original_frames": 62,
+      "sampled_frames": 61,
+      "text_tokens": 13,
+      "tokens": 3917,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 6,
+      "original_frames": 76,
+      "sampled_frames": 73,
+      "text_tokens": 14,
+      "tokens": 4650,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 7,
+      "original_frames": 118,
+      "sampled_frames": 117,
+      "text_tokens": 20,
+      "tokens": 7340,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 8,
+      "original_frames": 71,
+      "sampled_frames": 69,
+      "text_tokens": 21,
+      "tokens": 4413,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 9,
+      "original_frames": 782,
+      "sampled_frames": 781,
+      "text_tokens": 15,
+      "tokens": 47839,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 10,
+      "original_frames": 281,
+      "sampled_frames": 281,
+      "text_tokens": 19,
+      "tokens": 17343,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b49ff240272c2234cd2d0f",
+      "span_index": 11,
+      "original_frames": 451,
+      "sampled_frames": 449,
+      "text_tokens": 15,
+      "tokens": 27587,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4af3b38fbfdf7b20f1174",
+      "span_index": 0,
+      "original_frames": 699,
+      "sampled_frames": 697,
+      "text_tokens": 13,
+      "tokens": 42713,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4af3b38fbfdf7b20f1174",
+      "span_index": 1,
+      "original_frames": 921,
+      "sampled_frames": 921,
+      "text_tokens": 13,
+      "tokens": 56377,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4af3b38fbfdf7b20f1174",
+      "span_index": 2,
+      "original_frames": 114,
+      "sampled_frames": 113,
+      "text_tokens": 13,
+      "tokens": 7089,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4af3b38fbfdf7b20f1174",
+      "span_index": 3,
+      "original_frames": 486,
+      "sampled_frames": 485,
+      "text_tokens": 13,
+      "tokens": 29781,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4af3b38fbfdf7b20f1174",
+      "span_index": 4,
+      "original_frames": 210,
+      "sampled_frames": 209,
+      "text_tokens": 13,
+      "tokens": 12945,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b040f19ed0467e17179a",
+      "span_index": 0,
+      "original_frames": 354,
+      "sampled_frames": 353,
+      "text_tokens": 12,
+      "tokens": 21728,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b040f19ed0467e17179a",
+      "span_index": 1,
+      "original_frames": 618,
+      "sampled_frames": 617,
+      "text_tokens": 13,
+      "tokens": 37833,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b040f19ed0467e17179a",
+      "span_index": 2,
+      "original_frames": 528,
+      "sampled_frames": 525,
+      "text_tokens": 12,
+      "tokens": 32220,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b040f19ed0467e17179a",
+      "span_index": 3,
+      "original_frames": 450,
+      "sampled_frames": 449,
+      "text_tokens": 13,
+      "tokens": 27585,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b040f19ed0467e17179a",
+      "span_index": 4,
+      "original_frames": 503,
+      "sampled_frames": 501,
+      "text_tokens": 12,
+      "tokens": 30756,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 0,
+      "original_frames": 102,
+      "sampled_frames": 101,
+      "text_tokens": 11,
+      "tokens": 6355,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 1,
+      "original_frames": 300,
+      "sampled_frames": 297,
+      "text_tokens": 10,
+      "tokens": 18310,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 2,
+      "original_frames": 306,
+      "sampled_frames": 305,
+      "text_tokens": 10,
+      "tokens": 18798,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 3,
+      "original_frames": 264,
+      "sampled_frames": 261,
+      "text_tokens": 10,
+      "tokens": 16114,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 4,
+      "original_frames": 588,
+      "sampled_frames": 585,
+      "text_tokens": 14,
+      "tokens": 35882,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 5,
+      "original_frames": 30,
+      "sampled_frames": 29,
+      "text_tokens": 13,
+      "tokens": 1965,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 6,
+      "original_frames": 72,
+      "sampled_frames": 69,
+      "text_tokens": 13,
+      "tokens": 4405,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 7,
+      "original_frames": 93,
+      "sampled_frames": 93,
+      "text_tokens": 11,
+      "tokens": 5867,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 8,
+      "original_frames": 222,
+      "sampled_frames": 221,
+      "text_tokens": 10,
+      "tokens": 13674,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b1833065bf627cde2af6",
+      "span_index": 9,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 10,
+      "tokens": 25630,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b196d2b46435f93cb12e",
+      "span_index": 0,
+      "original_frames": 1698,
+      "sampled_frames": 1697,
+      "text_tokens": 14,
+      "tokens": 103714,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b196d2b46435f93cb12e",
+      "span_index": 1,
+      "original_frames": 726,
+      "sampled_frames": 725,
+      "text_tokens": 14,
+      "tokens": 44422,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b3e7c8f3797a5f1f67ba",
+      "span_index": 0,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 17,
+      "tokens": 5629,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b3e7c8f3797a5f1f67ba",
+      "span_index": 1,
+      "original_frames": 600,
+      "sampled_frames": 597,
+      "text_tokens": 17,
+      "tokens": 36617,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b3e7c8f3797a5f1f67ba",
+      "span_index": 2,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 14,
+      "tokens": 7334,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b3e7c8f3797a5f1f67ba",
+      "span_index": 3,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 15,
+      "tokens": 25635,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b3e7c8f3797a5f1f67ba",
+      "span_index": 4,
+      "original_frames": 66,
+      "sampled_frames": 65,
+      "text_tokens": 13,
+      "tokens": 4161,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b3e7c8f3797a5f1f67ba",
+      "span_index": 5,
+      "original_frames": 372,
+      "sampled_frames": 369,
+      "text_tokens": 18,
+      "tokens": 22710,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b3e7c8f3797a5f1f67ba",
+      "span_index": 6,
+      "original_frames": 162,
+      "sampled_frames": 161,
+      "text_tokens": 14,
+      "tokens": 10018,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b3e7c8f3797a5f1f67ba",
+      "span_index": 7,
+      "original_frames": 480,
+      "sampled_frames": 477,
+      "text_tokens": 16,
+      "tokens": 29296,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b3e7c8f3797a5f1f67ba",
+      "span_index": 8,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 13,
+      "tokens": 5625,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b5ca1d57a6d358e47a64",
+      "span_index": 0,
+      "original_frames": 342,
+      "sampled_frames": 341,
+      "text_tokens": 15,
+      "tokens": 20999,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b5ca1d57a6d358e47a64",
+      "span_index": 1,
+      "original_frames": 486,
+      "sampled_frames": 485,
+      "text_tokens": 15,
+      "tokens": 29783,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b5ca1d57a6d358e47a64",
+      "span_index": 2,
+      "original_frames": 204,
+      "sampled_frames": 201,
+      "text_tokens": 15,
+      "tokens": 12459,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b5ca1d57a6d358e47a64",
+      "span_index": 3,
+      "original_frames": 36,
+      "sampled_frames": 33,
+      "text_tokens": 18,
+      "tokens": 2214,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b5ca1d57a6d358e47a64",
+      "span_index": 4,
+      "original_frames": 552,
+      "sampled_frames": 549,
+      "text_tokens": 15,
+      "tokens": 33687,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b5ca1d57a6d358e47a64",
+      "span_index": 5,
+      "original_frames": 777,
+      "sampled_frames": 777,
+      "text_tokens": 15,
+      "tokens": 47595,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b97f671bfb1f5254e223",
+      "span_index": 0,
+      "original_frames": 153,
+      "sampled_frames": 153,
+      "text_tokens": 15,
+      "tokens": 9531,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b97f671bfb1f5254e223",
+      "span_index": 1,
+      "original_frames": 762,
+      "sampled_frames": 761,
+      "text_tokens": 14,
+      "tokens": 46618,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b97f671bfb1f5254e223",
+      "span_index": 2,
+      "original_frames": 675,
+      "sampled_frames": 673,
+      "text_tokens": 15,
+      "tokens": 41251,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4b97f671bfb1f5254e223",
+      "span_index": 3,
+      "original_frames": 867,
+      "sampled_frames": 865,
+      "text_tokens": 16,
+      "tokens": 52964,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4bfcc74ac87c55e05aa9e",
+      "span_index": 0,
+      "original_frames": 810,
+      "sampled_frames": 809,
+      "text_tokens": 14,
+      "tokens": 49546,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4bfcc74ac87c55e05aa9e",
+      "span_index": 1,
+      "original_frames": 840,
+      "sampled_frames": 837,
+      "text_tokens": 14,
+      "tokens": 51254,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4bfcc74ac87c55e05aa9e",
+      "span_index": 2,
+      "original_frames": 741,
+      "sampled_frames": 741,
+      "text_tokens": 15,
+      "tokens": 45399,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 0,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 18,
+      "tokens": 7338,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 1,
+      "original_frames": 540,
+      "sampled_frames": 537,
+      "text_tokens": 13,
+      "tokens": 32953,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 2,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 11,
+      "tokens": 5623,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 3,
+      "original_frames": 810,
+      "sampled_frames": 809,
+      "text_tokens": 18,
+      "tokens": 49550,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 4,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 15,
+      "tokens": 9287,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 5,
+      "original_frames": 240,
+      "sampled_frames": 237,
+      "text_tokens": 21,
+      "tokens": 14661,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 6,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 18,
+      "tokens": 9290,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 7,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 11,
+      "tokens": 5623,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 8,
+      "original_frames": 78,
+      "sampled_frames": 77,
+      "text_tokens": 22,
+      "tokens": 4902,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 9,
+      "original_frames": 102,
+      "sampled_frames": 101,
+      "text_tokens": 20,
+      "tokens": 6364,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4cec112a6cbd534b5ba8e",
+      "span_index": 10,
+      "original_frames": 129,
+      "sampled_frames": 129,
+      "text_tokens": 13,
+      "tokens": 8065,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d0542e0e1cd2280ed428",
+      "span_index": 0,
+      "original_frames": 390,
+      "sampled_frames": 389,
+      "text_tokens": 17,
+      "tokens": 23929,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d0542e0e1cd2280ed428",
+      "span_index": 1,
+      "original_frames": 75,
+      "sampled_frames": 73,
+      "text_tokens": 20,
+      "tokens": 4656,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d0542e0e1cd2280ed428",
+      "span_index": 2,
+      "original_frames": 873,
+      "sampled_frames": 873,
+      "text_tokens": 11,
+      "tokens": 53447,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d0542e0e1cd2280ed428",
+      "span_index": 3,
+      "original_frames": 431,
+      "sampled_frames": 429,
+      "text_tokens": 14,
+      "tokens": 26366,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d0542e0e1cd2280ed428",
+      "span_index": 4,
+      "original_frames": 778,
+      "sampled_frames": 777,
+      "text_tokens": 17,
+      "tokens": 47597,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d354fa004527e6445863",
+      "span_index": 0,
+      "original_frames": 141,
+      "sampled_frames": 141,
+      "text_tokens": 14,
+      "tokens": 8798,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d354fa004527e6445863",
+      "span_index": 1,
+      "original_frames": 75,
+      "sampled_frames": 73,
+      "text_tokens": 11,
+      "tokens": 4647,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d354fa004527e6445863",
+      "span_index": 2,
+      "original_frames": 184,
+      "sampled_frames": 181,
+      "text_tokens": 12,
+      "tokens": 11236,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d354fa004527e6445863",
+      "span_index": 3,
+      "original_frames": 93,
+      "sampled_frames": 93,
+      "text_tokens": 12,
+      "tokens": 5868,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d354fa004527e6445863",
+      "span_index": 4,
+      "original_frames": 321,
+      "sampled_frames": 321,
+      "text_tokens": 14,
+      "tokens": 19778,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d354fa004527e6445863",
+      "span_index": 5,
+      "original_frames": 194,
+      "sampled_frames": 193,
+      "text_tokens": 17,
+      "tokens": 11973,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d354fa004527e6445863",
+      "span_index": 6,
+      "original_frames": 631,
+      "sampled_frames": 629,
+      "text_tokens": 21,
+      "tokens": 38573,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d354fa004527e6445863",
+      "span_index": 7,
+      "original_frames": 224,
+      "sampled_frames": 221,
+      "text_tokens": 17,
+      "tokens": 13681,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d354fa004527e6445863",
+      "span_index": 8,
+      "original_frames": 705,
+      "sampled_frames": 705,
+      "text_tokens": 15,
+      "tokens": 43203,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d6776371c861a170a2ad",
+      "span_index": 0,
+      "original_frames": 36,
+      "sampled_frames": 33,
+      "text_tokens": 12,
+      "tokens": 2208,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d6776371c861a170a2ad",
+      "span_index": 1,
+      "original_frames": 219,
+      "sampled_frames": 217,
+      "text_tokens": 11,
+      "tokens": 13431,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d6776371c861a170a2ad",
+      "span_index": 2,
+      "original_frames": 219,
+      "sampled_frames": 217,
+      "text_tokens": 13,
+      "tokens": 13433,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d6776371c861a170a2ad",
+      "span_index": 3,
+      "original_frames": 321,
+      "sampled_frames": 321,
+      "text_tokens": 14,
+      "tokens": 19778,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d6776371c861a170a2ad",
+      "span_index": 4,
+      "original_frames": 441,
+      "sampled_frames": 441,
+      "text_tokens": 15,
+      "tokens": 27099,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d6776371c861a170a2ad",
+      "span_index": 5,
+      "original_frames": 449,
+      "sampled_frames": 449,
+      "text_tokens": 15,
+      "tokens": 27587,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d6776371c861a170a2ad",
+      "span_index": 6,
+      "original_frames": 457,
+      "sampled_frames": 457,
+      "text_tokens": 20,
+      "tokens": 28080,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b4d6776371c861a170a2ad",
+      "span_index": 7,
+      "original_frames": 315,
+      "sampled_frames": 313,
+      "text_tokens": 15,
+      "tokens": 19291,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5007641a4401e4c3f54ee",
+      "span_index": 0,
+      "original_frames": 240,
+      "sampled_frames": 237,
+      "text_tokens": 14,
+      "tokens": 14654,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5007641a4401e4c3f54ee",
+      "span_index": 1,
+      "original_frames": 210,
+      "sampled_frames": 209,
+      "text_tokens": 14,
+      "tokens": 12946,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5007641a4401e4c3f54ee",
+      "span_index": 2,
+      "original_frames": 180,
+      "sampled_frames": 177,
+      "text_tokens": 14,
+      "tokens": 10994,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5007641a4401e4c3f54ee",
+      "span_index": 3,
+      "original_frames": 227,
+      "sampled_frames": 225,
+      "text_tokens": 15,
+      "tokens": 13923,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5007641a4401e4c3f54ee",
+      "span_index": 4,
+      "original_frames": 73,
+      "sampled_frames": 73,
+      "text_tokens": 15,
+      "tokens": 4651,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5007641a4401e4c3f54ee",
+      "span_index": 5,
+      "original_frames": 71,
+      "sampled_frames": 69,
+      "text_tokens": 13,
+      "tokens": 4405,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5007641a4401e4c3f54ee",
+      "span_index": 6,
+      "original_frames": 979,
+      "sampled_frames": 977,
+      "text_tokens": 19,
+      "tokens": 59799,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5007641a4401e4c3f54ee",
+      "span_index": 7,
+      "original_frames": 210,
+      "sampled_frames": 209,
+      "text_tokens": 14,
+      "tokens": 12946,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5007641a4401e4c3f54ee",
+      "span_index": 8,
+      "original_frames": 474,
+      "sampled_frames": 473,
+      "text_tokens": 14,
+      "tokens": 29050,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b51c9862fdc2f575078a8a",
+      "span_index": 0,
+      "original_frames": 768,
+      "sampled_frames": 765,
+      "text_tokens": 11,
+      "tokens": 46859,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b51c9862fdc2f575078a8a",
+      "span_index": 1,
+      "original_frames": 408,
+      "sampled_frames": 405,
+      "text_tokens": 13,
+      "tokens": 24901,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b51c9862fdc2f575078a8a",
+      "span_index": 2,
+      "original_frames": 1518,
+      "sampled_frames": 1517,
+      "text_tokens": 11,
+      "tokens": 92731,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 0,
+      "original_frames": 103,
+      "sampled_frames": 101,
+      "text_tokens": 14,
+      "tokens": 6358,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 1,
+      "original_frames": 77,
+      "sampled_frames": 77,
+      "text_tokens": 17,
+      "tokens": 4897,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 2,
+      "original_frames": 99,
+      "sampled_frames": 97,
+      "text_tokens": 15,
+      "tokens": 6115,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 3,
+      "original_frames": 103,
+      "sampled_frames": 101,
+      "text_tokens": 14,
+      "tokens": 6358,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 4,
+      "original_frames": 112,
+      "sampled_frames": 109,
+      "text_tokens": 17,
+      "tokens": 6849,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 5,
+      "original_frames": 101,
+      "sampled_frames": 101,
+      "text_tokens": 16,
+      "tokens": 6360,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 6,
+      "original_frames": 103,
+      "sampled_frames": 101,
+      "text_tokens": 17,
+      "tokens": 6361,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 7,
+      "original_frames": 115,
+      "sampled_frames": 113,
+      "text_tokens": 15,
+      "tokens": 7091,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 8,
+      "original_frames": 115,
+      "sampled_frames": 113,
+      "text_tokens": 15,
+      "tokens": 7091,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 9,
+      "original_frames": 123,
+      "sampled_frames": 121,
+      "text_tokens": 15,
+      "tokens": 7579,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 10,
+      "original_frames": 115,
+      "sampled_frames": 113,
+      "text_tokens": 14,
+      "tokens": 7090,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 11,
+      "original_frames": 109,
+      "sampled_frames": 109,
+      "text_tokens": 17,
+      "tokens": 6849,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 12,
+      "original_frames": 115,
+      "sampled_frames": 113,
+      "text_tokens": 14,
+      "tokens": 7090,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 13,
+      "original_frames": 112,
+      "sampled_frames": 109,
+      "text_tokens": 18,
+      "tokens": 6850,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 14,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 15,
+      "tokens": 7335,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 15,
+      "original_frames": 124,
+      "sampled_frames": 121,
+      "text_tokens": 14,
+      "tokens": 7578,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 16,
+      "original_frames": 110,
+      "sampled_frames": 109,
+      "text_tokens": 17,
+      "tokens": 6849,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 17,
+      "original_frames": 116,
+      "sampled_frames": 113,
+      "text_tokens": 15,
+      "tokens": 7091,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 18,
+      "original_frames": 113,
+      "sampled_frames": 113,
+      "text_tokens": 14,
+      "tokens": 7090,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 19,
+      "original_frames": 111,
+      "sampled_frames": 109,
+      "text_tokens": 18,
+      "tokens": 6850,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 20,
+      "original_frames": 117,
+      "sampled_frames": 117,
+      "text_tokens": 16,
+      "tokens": 7336,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 21,
+      "original_frames": 119,
+      "sampled_frames": 117,
+      "text_tokens": 14,
+      "tokens": 7334,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 22,
+      "original_frames": 119,
+      "sampled_frames": 117,
+      "text_tokens": 17,
+      "tokens": 7337,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 23,
+      "original_frames": 89,
+      "sampled_frames": 89,
+      "text_tokens": 15,
+      "tokens": 5627,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b52a105d5efd59f80d4b4a",
+      "span_index": 24,
+      "original_frames": 57,
+      "sampled_frames": 57,
+      "text_tokens": 16,
+      "tokens": 3676,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5333a7ab5cb8d58718e37",
+      "span_index": 1,
+      "original_frames": 270,
+      "sampled_frames": 269,
+      "text_tokens": 12,
+      "tokens": 16604,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5333a7ab5cb8d58718e37",
+      "span_index": 2,
+      "original_frames": 630,
+      "sampled_frames": 629,
+      "text_tokens": 12,
+      "tokens": 38564,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5333a7ab5cb8d58718e37",
+      "span_index": 3,
+      "original_frames": 330,
+      "sampled_frames": 329,
+      "text_tokens": 14,
+      "tokens": 20266,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5333a7ab5cb8d58718e37",
+      "span_index": 4,
+      "original_frames": 330,
+      "sampled_frames": 329,
+      "text_tokens": 18,
+      "tokens": 20270,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5333a7ab5cb8d58718e37",
+      "span_index": 5,
+      "original_frames": 414,
+      "sampled_frames": 413,
+      "text_tokens": 13,
+      "tokens": 25389,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533aba55386e5af547a6c",
+      "span_index": 0,
+      "original_frames": 141,
+      "sampled_frames": 141,
+      "text_tokens": 15,
+      "tokens": 8799,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533aba55386e5af547a6c",
+      "span_index": 1,
+      "original_frames": 1734,
+      "sampled_frames": 1733,
+      "text_tokens": 17,
+      "tokens": 105913,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533aba55386e5af547a6c",
+      "span_index": 2,
+      "original_frames": 822,
+      "sampled_frames": 821,
+      "text_tokens": 17,
+      "tokens": 50281,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533daa55386e5af547a6f",
+      "span_index": 0,
+      "original_frames": 279,
+      "sampled_frames": 277,
+      "text_tokens": 13,
+      "tokens": 17093,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533daa55386e5af547a6f",
+      "span_index": 1,
+      "original_frames": 281,
+      "sampled_frames": 281,
+      "text_tokens": 13,
+      "tokens": 17337,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533daa55386e5af547a6f",
+      "span_index": 2,
+      "original_frames": 499,
+      "sampled_frames": 497,
+      "text_tokens": 13,
+      "tokens": 30513,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533daa55386e5af547a6f",
+      "span_index": 3,
+      "original_frames": 171,
+      "sampled_frames": 169,
+      "text_tokens": 13,
+      "tokens": 10505,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533daa55386e5af547a6f",
+      "span_index": 4,
+      "original_frames": 463,
+      "sampled_frames": 461,
+      "text_tokens": 14,
+      "tokens": 28318,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533daa55386e5af547a6f",
+      "span_index": 5,
+      "original_frames": 463,
+      "sampled_frames": 461,
+      "text_tokens": 14,
+      "tokens": 28318,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533daa55386e5af547a6f",
+      "span_index": 6,
+      "original_frames": 463,
+      "sampled_frames": 461,
+      "text_tokens": 14,
+      "tokens": 28318,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b533daa55386e5af547a6f",
+      "span_index": 7,
+      "original_frames": 78,
+      "sampled_frames": 77,
+      "text_tokens": 14,
+      "tokens": 4894,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 0,
+      "original_frames": 223,
+      "sampled_frames": 221,
+      "text_tokens": 18,
+      "tokens": 13682,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 1,
+      "original_frames": 158,
+      "sampled_frames": 157,
+      "text_tokens": 18,
+      "tokens": 9778,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 2,
+      "original_frames": 163,
+      "sampled_frames": 161,
+      "text_tokens": 18,
+      "tokens": 10022,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 3,
+      "original_frames": 245,
+      "sampled_frames": 245,
+      "text_tokens": 18,
+      "tokens": 15146,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 4,
+      "original_frames": 195,
+      "sampled_frames": 193,
+      "text_tokens": 18,
+      "tokens": 11974,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 5,
+      "original_frames": 187,
+      "sampled_frames": 185,
+      "text_tokens": 18,
+      "tokens": 11486,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 6,
+      "original_frames": 239,
+      "sampled_frames": 237,
+      "text_tokens": 18,
+      "tokens": 14658,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 7,
+      "original_frames": 159,
+      "sampled_frames": 157,
+      "text_tokens": 18,
+      "tokens": 9778,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 8,
+      "original_frames": 166,
+      "sampled_frames": 165,
+      "text_tokens": 18,
+      "tokens": 10266,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 9,
+      "original_frames": 155,
+      "sampled_frames": 153,
+      "text_tokens": 14,
+      "tokens": 9530,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 10,
+      "original_frames": 504,
+      "sampled_frames": 501,
+      "text_tokens": 15,
+      "tokens": 30759,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b541c9c7e02bc8d412b086",
+      "span_index": 11,
+      "original_frames": 303,
+      "sampled_frames": 301,
+      "text_tokens": 11,
+      "tokens": 18555,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5444917219d378d74aa8f",
+      "span_index": 0,
+      "original_frames": 660,
+      "sampled_frames": 657,
+      "text_tokens": 12,
+      "tokens": 40272,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5444917219d378d74aa8f",
+      "span_index": 1,
+      "original_frames": 660,
+      "sampled_frames": 657,
+      "text_tokens": 12,
+      "tokens": 40272,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5444917219d378d74aa8f",
+      "span_index": 2,
+      "original_frames": 660,
+      "sampled_frames": 657,
+      "text_tokens": 12,
+      "tokens": 40272,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5444917219d378d74aa8f",
+      "span_index": 3,
+      "original_frames": 717,
+      "sampled_frames": 717,
+      "text_tokens": 12,
+      "tokens": 43932,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5556a0403c14bba1f62f6",
+      "span_index": 0,
+      "original_frames": 930,
+      "sampled_frames": 929,
+      "text_tokens": 13,
+      "tokens": 56865,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5556a0403c14bba1f62f6",
+      "span_index": 1,
+      "original_frames": 66,
+      "sampled_frames": 65,
+      "text_tokens": 18,
+      "tokens": 4166,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5556a0403c14bba1f62f6",
+      "span_index": 2,
+      "original_frames": 651,
+      "sampled_frames": 649,
+      "text_tokens": 13,
+      "tokens": 39785,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5556a0403c14bba1f62f6",
+      "span_index": 3,
+      "original_frames": 132,
+      "sampled_frames": 129,
+      "text_tokens": 12,
+      "tokens": 8064,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5556a0403c14bba1f62f6",
+      "span_index": 4,
+      "original_frames": 33,
+      "sampled_frames": 33,
+      "text_tokens": 13,
+      "tokens": 2209,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5556a0403c14bba1f62f6",
+      "span_index": 5,
+      "original_frames": 882,
+      "sampled_frames": 881,
+      "text_tokens": 13,
+      "tokens": 53937,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b555b7a97937a3e2fb3d65",
+      "span_index": 0,
+      "original_frames": 491,
+      "sampled_frames": 489,
+      "text_tokens": 17,
+      "tokens": 30029,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b555b7a97937a3e2fb3d65",
+      "span_index": 1,
+      "original_frames": 91,
+      "sampled_frames": 89,
+      "text_tokens": 24,
+      "tokens": 5636,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b555b7a97937a3e2fb3d65",
+      "span_index": 2,
+      "original_frames": 1077,
+      "sampled_frames": 1077,
+      "text_tokens": 17,
+      "tokens": 65897,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b555b7a97937a3e2fb3d65",
+      "span_index": 3,
+      "original_frames": 159,
+      "sampled_frames": 157,
+      "text_tokens": 24,
+      "tokens": 9784,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b555b7a97937a3e2fb3d65",
+      "span_index": 4,
+      "original_frames": 360,
+      "sampled_frames": 357,
+      "text_tokens": 18,
+      "tokens": 21978,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b555b7a97937a3e2fb3d65",
+      "span_index": 5,
+      "original_frames": 96,
+      "sampled_frames": 93,
+      "text_tokens": 17,
+      "tokens": 5873,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b555b7a97937a3e2fb3d65",
+      "span_index": 6,
+      "original_frames": 420,
+      "sampled_frames": 417,
+      "text_tokens": 17,
+      "tokens": 25637,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b55b6a6371c861a170a698",
+      "span_index": 0,
+      "original_frames": 450,
+      "sampled_frames": 449,
+      "text_tokens": 14,
+      "tokens": 27586,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b55b6a6371c861a170a698",
+      "span_index": 1,
+      "original_frames": 765,
+      "sampled_frames": 765,
+      "text_tokens": 14,
+      "tokens": 46862,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b55b6a6371c861a170a698",
+      "span_index": 2,
+      "original_frames": 81,
+      "sampled_frames": 81,
+      "text_tokens": 17,
+      "tokens": 5141,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b55b6a6371c861a170a698",
+      "span_index": 3,
+      "original_frames": 105,
+      "sampled_frames": 105,
+      "text_tokens": 17,
+      "tokens": 6605,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b55b6a6371c861a170a698",
+      "span_index": 4,
+      "original_frames": 60,
+      "sampled_frames": 57,
+      "text_tokens": 15,
+      "tokens": 3675,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b55b6a6371c861a170a698",
+      "span_index": 5,
+      "original_frames": 639,
+      "sampled_frames": 637,
+      "text_tokens": 14,
+      "tokens": 39054,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b55b6a6371c861a170a698",
+      "span_index": 6,
+      "original_frames": 576,
+      "sampled_frames": 573,
+      "text_tokens": 14,
+      "tokens": 35150,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 0,
+      "original_frames": 63,
+      "sampled_frames": 61,
+      "text_tokens": 15,
+      "tokens": 3919,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 1,
+      "original_frames": 50,
+      "sampled_frames": 49,
+      "text_tokens": 13,
+      "tokens": 3185,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 2,
+      "original_frames": 73,
+      "sampled_frames": 73,
+      "text_tokens": 12,
+      "tokens": 4648,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 3,
+      "original_frames": 207,
+      "sampled_frames": 205,
+      "text_tokens": 12,
+      "tokens": 12700,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 4,
+      "original_frames": 429,
+      "sampled_frames": 429,
+      "text_tokens": 12,
+      "tokens": 26364,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 5,
+      "original_frames": 558,
+      "sampled_frames": 557,
+      "text_tokens": 13,
+      "tokens": 34173,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 6,
+      "original_frames": 300,
+      "sampled_frames": 297,
+      "text_tokens": 17,
+      "tokens": 18317,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 7,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 17,
+      "tokens": 5629,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 8,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 17,
+      "tokens": 7337,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 9,
+      "original_frames": 125,
+      "sampled_frames": 125,
+      "text_tokens": 17,
+      "tokens": 7825,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 10,
+      "original_frames": 95,
+      "sampled_frames": 93,
+      "text_tokens": 17,
+      "tokens": 5873,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 11,
+      "original_frames": 110,
+      "sampled_frames": 109,
+      "text_tokens": 17,
+      "tokens": 6849,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 12,
+      "original_frames": 101,
+      "sampled_frames": 101,
+      "text_tokens": 17,
+      "tokens": 6361,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 13,
+      "original_frames": 109,
+      "sampled_frames": 109,
+      "text_tokens": 17,
+      "tokens": 6849,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 14,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 17,
+      "tokens": 5629,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 15,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 17,
+      "tokens": 5629,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b567c5179ecfd3b33aa382",
+      "span_index": 16,
+      "original_frames": 84,
+      "sampled_frames": 81,
+      "text_tokens": 10,
+      "tokens": 5134,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 0,
+      "original_frames": 153,
+      "sampled_frames": 153,
+      "text_tokens": 13,
+      "tokens": 9529,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 1,
+      "original_frames": 106,
+      "sampled_frames": 105,
+      "text_tokens": 13,
+      "tokens": 6601,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 2,
+      "original_frames": 138,
+      "sampled_frames": 137,
+      "text_tokens": 13,
+      "tokens": 8553,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 3,
+      "original_frames": 206,
+      "sampled_frames": 205,
+      "text_tokens": 14,
+      "tokens": 12702,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 4,
+      "original_frames": 264,
+      "sampled_frames": 261,
+      "text_tokens": 12,
+      "tokens": 16116,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 5,
+      "original_frames": 55,
+      "sampled_frames": 53,
+      "text_tokens": 17,
+      "tokens": 3433,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 6,
+      "original_frames": 54,
+      "sampled_frames": 53,
+      "text_tokens": 19,
+      "tokens": 3435,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 7,
+      "original_frames": 236,
+      "sampled_frames": 233,
+      "text_tokens": 13,
+      "tokens": 14409,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 8,
+      "original_frames": 345,
+      "sampled_frames": 345,
+      "text_tokens": 14,
+      "tokens": 21242,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 9,
+      "original_frames": 126,
+      "sampled_frames": 125,
+      "text_tokens": 13,
+      "tokens": 7821,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 10,
+      "original_frames": 227,
+      "sampled_frames": 225,
+      "text_tokens": 13,
+      "tokens": 13921,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 11,
+      "original_frames": 57,
+      "sampled_frames": 57,
+      "text_tokens": 12,
+      "tokens": 3672,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 12,
+      "original_frames": 57,
+      "sampled_frames": 57,
+      "text_tokens": 17,
+      "tokens": 3677,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 13,
+      "original_frames": 101,
+      "sampled_frames": 101,
+      "text_tokens": 14,
+      "tokens": 6358,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 14,
+      "original_frames": 235,
+      "sampled_frames": 233,
+      "text_tokens": 13,
+      "tokens": 14409,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56a877c84b98b9831e9f3",
+      "span_index": 15,
+      "original_frames": 334,
+      "sampled_frames": 333,
+      "text_tokens": 13,
+      "tokens": 20509,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56b04ab11feb5530532da",
+      "span_index": 0,
+      "original_frames": 600,
+      "sampled_frames": 597,
+      "text_tokens": 21,
+      "tokens": 36621,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56b04ab11feb5530532da",
+      "span_index": 1,
+      "original_frames": 510,
+      "sampled_frames": 509,
+      "text_tokens": 14,
+      "tokens": 31246,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56b04ab11feb5530532da",
+      "span_index": 2,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 11,
+      "tokens": 9283,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56b04ab11feb5530532da",
+      "span_index": 3,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 13,
+      "tokens": 7333,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56b04ab11feb5530532da",
+      "span_index": 4,
+      "original_frames": 690,
+      "sampled_frames": 689,
+      "text_tokens": 21,
+      "tokens": 42233,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56b04ab11feb5530532da",
+      "span_index": 5,
+      "original_frames": 614,
+      "sampled_frames": 613,
+      "text_tokens": 14,
+      "tokens": 37590,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56d77130037c5b4ba6271",
+      "span_index": 0,
+      "original_frames": 336,
+      "sampled_frames": 333,
+      "text_tokens": 17,
+      "tokens": 20513,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56d77130037c5b4ba6271",
+      "span_index": 1,
+      "original_frames": 697,
+      "sampled_frames": 697,
+      "text_tokens": 17,
+      "tokens": 42717,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56d77130037c5b4ba6271",
+      "span_index": 2,
+      "original_frames": 830,
+      "sampled_frames": 829,
+      "text_tokens": 17,
+      "tokens": 50769,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b56d77130037c5b4ba6271",
+      "span_index": 3,
+      "original_frames": 828,
+      "sampled_frames": 825,
+      "text_tokens": 16,
+      "tokens": 50524,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5787422471f0894f4cd4b",
+      "span_index": 0,
+      "original_frames": 89,
+      "sampled_frames": 89,
+      "text_tokens": 13,
+      "tokens": 5625,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5787422471f0894f4cd4b",
+      "span_index": 1,
+      "original_frames": 463,
+      "sampled_frames": 461,
+      "text_tokens": 17,
+      "tokens": 28321,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5787422471f0894f4cd4b",
+      "span_index": 2,
+      "original_frames": 888,
+      "sampled_frames": 885,
+      "text_tokens": 15,
+      "tokens": 54183,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5787422471f0894f4cd4b",
+      "span_index": 3,
+      "original_frames": 900,
+      "sampled_frames": 897,
+      "text_tokens": 11,
+      "tokens": 54911,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5787422471f0894f4cd4b",
+      "span_index": 4,
+      "original_frames": 225,
+      "sampled_frames": 225,
+      "text_tokens": 11,
+      "tokens": 13919,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5787422471f0894f4cd4b",
+      "span_index": 5,
+      "original_frames": 132,
+      "sampled_frames": 129,
+      "text_tokens": 16,
+      "tokens": 8068,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5797cc4c5496f9afd4bf9",
+      "span_index": 0,
+      "original_frames": 133,
+      "sampled_frames": 133,
+      "text_tokens": 16,
+      "tokens": 8312,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5797cc4c5496f9afd4bf9",
+      "span_index": 1,
+      "original_frames": 266,
+      "sampled_frames": 265,
+      "text_tokens": 16,
+      "tokens": 16364,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5797cc4c5496f9afd4bf9",
+      "span_index": 2,
+      "original_frames": 462,
+      "sampled_frames": 461,
+      "text_tokens": 16,
+      "tokens": 28320,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5797cc4c5496f9afd4bf9",
+      "span_index": 3,
+      "original_frames": 339,
+      "sampled_frames": 337,
+      "text_tokens": 16,
+      "tokens": 20756,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5797cc4c5496f9afd4bf9",
+      "span_index": 4,
+      "original_frames": 376,
+      "sampled_frames": 373,
+      "text_tokens": 16,
+      "tokens": 22952,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5797cc4c5496f9afd4bf9",
+      "span_index": 5,
+      "original_frames": 290,
+      "sampled_frames": 289,
+      "text_tokens": 16,
+      "tokens": 17828,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5797cc4c5496f9afd4bf9",
+      "span_index": 6,
+      "original_frames": 96,
+      "sampled_frames": 93,
+      "text_tokens": 18,
+      "tokens": 5874,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5797cc4c5496f9afd4bf9",
+      "span_index": 7,
+      "original_frames": 582,
+      "sampled_frames": 581,
+      "text_tokens": 16,
+      "tokens": 35640,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b5797cc4c5496f9afd4bf9",
+      "span_index": 8,
+      "original_frames": 153,
+      "sampled_frames": 153,
+      "text_tokens": 18,
+      "tokens": 9534,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b57dfc096a5342c3dc7bf9",
+      "span_index": 0,
+      "original_frames": 240,
+      "sampled_frames": 237,
+      "text_tokens": 21,
+      "tokens": 14661,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b57dfc096a5342c3dc7bf9",
+      "span_index": 1,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 13,
+      "tokens": 7333,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b57dfc096a5342c3dc7bf9",
+      "span_index": 2,
+      "original_frames": 695,
+      "sampled_frames": 693,
+      "text_tokens": 18,
+      "tokens": 42474,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b57dfc096a5342c3dc7bf9",
+      "span_index": 3,
+      "original_frames": 232,
+      "sampled_frames": 229,
+      "text_tokens": 18,
+      "tokens": 14170,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b57dfc096a5342c3dc7bf9",
+      "span_index": 4,
+      "original_frames": 249,
+      "sampled_frames": 249,
+      "text_tokens": 17,
+      "tokens": 15389,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b57dfc096a5342c3dc7bf9",
+      "span_index": 5,
+      "original_frames": 249,
+      "sampled_frames": 249,
+      "text_tokens": 17,
+      "tokens": 15389,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b57dfc096a5342c3dc7bf9",
+      "span_index": 6,
+      "original_frames": 57,
+      "sampled_frames": 57,
+      "text_tokens": 17,
+      "tokens": 3677,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b57dfc096a5342c3dc7bf9",
+      "span_index": 7,
+      "original_frames": 342,
+      "sampled_frames": 341,
+      "text_tokens": 17,
+      "tokens": 21001,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b57dfc096a5342c3dc7bf9",
+      "span_index": 8,
+      "original_frames": 507,
+      "sampled_frames": 505,
+      "text_tokens": 15,
+      "tokens": 31003,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b68ec2f2710b05b13a6d88",
+      "span_index": 0,
+      "original_frames": 354,
+      "sampled_frames": 353,
+      "text_tokens": 11,
+      "tokens": 21727,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b68ec2f2710b05b13a6d88",
+      "span_index": 1,
+      "original_frames": 111,
+      "sampled_frames": 109,
+      "text_tokens": 12,
+      "tokens": 6844,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b68ec2f2710b05b13a6d88",
+      "span_index": 2,
+      "original_frames": 198,
+      "sampled_frames": 197,
+      "text_tokens": 14,
+      "tokens": 12214,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b68ec2f2710b05b13a6d88",
+      "span_index": 3,
+      "original_frames": 265,
+      "sampled_frames": 265,
+      "text_tokens": 11,
+      "tokens": 16359,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b68ec2f2710b05b13a6d88",
+      "span_index": 4,
+      "original_frames": 104,
+      "sampled_frames": 101,
+      "text_tokens": 12,
+      "tokens": 6356,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b68ec2f2710b05b13a6d88",
+      "span_index": 5,
+      "original_frames": 579,
+      "sampled_frames": 577,
+      "text_tokens": 11,
+      "tokens": 35391,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b68ec2f2710b05b13a6d88",
+      "span_index": 6,
+      "original_frames": 114,
+      "sampled_frames": 113,
+      "text_tokens": 12,
+      "tokens": 7088,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b68ec2f2710b05b13a6d88",
+      "span_index": 7,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 11,
+      "tokens": 5623,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6988e4da1fe51454a083e",
+      "span_index": 0,
+      "original_frames": 1800,
+      "sampled_frames": 1797,
+      "text_tokens": 14,
+      "tokens": 109814,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6988e4da1fe51454a083e",
+      "span_index": 1,
+      "original_frames": 144,
+      "sampled_frames": 141,
+      "text_tokens": 14,
+      "tokens": 8798,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 0,
+      "original_frames": 386,
+      "sampled_frames": 385,
+      "text_tokens": 19,
+      "tokens": 23687,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 1,
+      "original_frames": 40,
+      "sampled_frames": 37,
+      "text_tokens": 19,
+      "tokens": 2459,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 2,
+      "original_frames": 255,
+      "sampled_frames": 253,
+      "text_tokens": 20,
+      "tokens": 15636,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 3,
+      "original_frames": 251,
+      "sampled_frames": 249,
+      "text_tokens": 17,
+      "tokens": 15389,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 4,
+      "original_frames": 165,
+      "sampled_frames": 165,
+      "text_tokens": 16,
+      "tokens": 10264,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 5,
+      "original_frames": 85,
+      "sampled_frames": 85,
+      "text_tokens": 21,
+      "tokens": 5389,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 6,
+      "original_frames": 192,
+      "sampled_frames": 189,
+      "text_tokens": 21,
+      "tokens": 11733,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 7,
+      "original_frames": 99,
+      "sampled_frames": 97,
+      "text_tokens": 22,
+      "tokens": 6122,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 8,
+      "original_frames": 48,
+      "sampled_frames": 45,
+      "text_tokens": 15,
+      "tokens": 2943,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 9,
+      "original_frames": 138,
+      "sampled_frames": 137,
+      "text_tokens": 19,
+      "tokens": 8559,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 10,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 22,
+      "tokens": 7342,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 11,
+      "original_frames": 156,
+      "sampled_frames": 153,
+      "text_tokens": 18,
+      "tokens": 9534,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6a6274c0646b574a5100e",
+      "span_index": 12,
+      "original_frames": 99,
+      "sampled_frames": 97,
+      "text_tokens": 15,
+      "tokens": 6115,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6bd0ce1b8ba5278f6c1c9",
+      "span_index": 0,
+      "original_frames": 1109,
+      "sampled_frames": 1109,
+      "text_tokens": 13,
+      "tokens": 67845,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6bd0ce1b8ba5278f6c1c9",
+      "span_index": 1,
+      "original_frames": 265,
+      "sampled_frames": 265,
+      "text_tokens": 16,
+      "tokens": 16364,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b6bd0ce1b8ba5278f6c1c9",
+      "span_index": 2,
+      "original_frames": 690,
+      "sampled_frames": 689,
+      "text_tokens": 13,
+      "tokens": 42225,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 0,
+      "original_frames": 383,
+      "sampled_frames": 381,
+      "text_tokens": 21,
+      "tokens": 23445,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 1,
+      "original_frames": 211,
+      "sampled_frames": 209,
+      "text_tokens": 19,
+      "tokens": 12951,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 2,
+      "original_frames": 165,
+      "sampled_frames": 165,
+      "text_tokens": 24,
+      "tokens": 10272,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 3,
+      "original_frames": 69,
+      "sampled_frames": 69,
+      "text_tokens": 15,
+      "tokens": 4407,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 4,
+      "original_frames": 132,
+      "sampled_frames": 129,
+      "text_tokens": 21,
+      "tokens": 8073,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 5,
+      "original_frames": 132,
+      "sampled_frames": 129,
+      "text_tokens": 21,
+      "tokens": 8073,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 6,
+      "original_frames": 177,
+      "sampled_frames": 177,
+      "text_tokens": 24,
+      "tokens": 11004,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 7,
+      "original_frames": 123,
+      "sampled_frames": 121,
+      "text_tokens": 21,
+      "tokens": 7585,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 8,
+      "original_frames": 285,
+      "sampled_frames": 285,
+      "text_tokens": 25,
+      "tokens": 17593,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 9,
+      "original_frames": 393,
+      "sampled_frames": 393,
+      "text_tokens": 24,
+      "tokens": 24180,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 10,
+      "original_frames": 140,
+      "sampled_frames": 137,
+      "text_tokens": 19,
+      "tokens": 8559,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 11,
+      "original_frames": 496,
+      "sampled_frames": 493,
+      "text_tokens": 24,
+      "tokens": 30280,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 12,
+      "original_frames": 78,
+      "sampled_frames": 77,
+      "text_tokens": 17,
+      "tokens": 4897,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b872ec0a20ea4e2d821e66",
+      "span_index": 13,
+      "original_frames": 93,
+      "sampled_frames": 93,
+      "text_tokens": 31,
+      "tokens": 5887,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b88da8329155a5c842746b",
+      "span_index": 0,
+      "original_frames": 696,
+      "sampled_frames": 693,
+      "text_tokens": 12,
+      "tokens": 42468,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b88da8329155a5c842746b",
+      "span_index": 1,
+      "original_frames": 216,
+      "sampled_frames": 213,
+      "text_tokens": 15,
+      "tokens": 13191,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b88da8329155a5c842746b",
+      "span_index": 2,
+      "original_frames": 735,
+      "sampled_frames": 733,
+      "text_tokens": 15,
+      "tokens": 44911,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b88da8329155a5c842746b",
+      "span_index": 3,
+      "original_frames": 225,
+      "sampled_frames": 225,
+      "text_tokens": 15,
+      "tokens": 13923,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b88da8329155a5c842746b",
+      "span_index": 4,
+      "original_frames": 585,
+      "sampled_frames": 585,
+      "text_tokens": 15,
+      "tokens": 35883,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 0,
+      "original_frames": 279,
+      "sampled_frames": 277,
+      "text_tokens": 17,
+      "tokens": 17097,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 1,
+      "original_frames": 96,
+      "sampled_frames": 93,
+      "text_tokens": 16,
+      "tokens": 5872,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 2,
+      "original_frames": 285,
+      "sampled_frames": 285,
+      "text_tokens": 17,
+      "tokens": 17585,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 3,
+      "original_frames": 204,
+      "sampled_frames": 201,
+      "text_tokens": 16,
+      "tokens": 12460,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 4,
+      "original_frames": 78,
+      "sampled_frames": 77,
+      "text_tokens": 16,
+      "tokens": 4896,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 5,
+      "original_frames": 315,
+      "sampled_frames": 313,
+      "text_tokens": 17,
+      "tokens": 19293,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 6,
+      "original_frames": 33,
+      "sampled_frames": 33,
+      "text_tokens": 11,
+      "tokens": 2207,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 7,
+      "original_frames": 810,
+      "sampled_frames": 809,
+      "text_tokens": 16,
+      "tokens": 49548,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 8,
+      "original_frames": 126,
+      "sampled_frames": 125,
+      "text_tokens": 14,
+      "tokens": 7822,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 9,
+      "original_frames": 66,
+      "sampled_frames": 65,
+      "text_tokens": 16,
+      "tokens": 4164,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b901d5ace9d1c4923cfc20",
+      "span_index": 10,
+      "original_frames": 528,
+      "sampled_frames": 525,
+      "text_tokens": 16,
+      "tokens": 32224,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b937964a18f0c8d9bf7b61",
+      "span_index": 0,
+      "original_frames": 780,
+      "sampled_frames": 777,
+      "text_tokens": 12,
+      "tokens": 47592,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b937964a18f0c8d9bf7b61",
+      "span_index": 1,
+      "original_frames": 1140,
+      "sampled_frames": 1137,
+      "text_tokens": 12,
+      "tokens": 69552,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b937964a18f0c8d9bf7b61",
+      "span_index": 2,
+      "original_frames": 117,
+      "sampled_frames": 117,
+      "text_tokens": 13,
+      "tokens": 7333,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b967c2a8f5c8c8ef9bb24c",
+      "span_index": 0,
+      "original_frames": 360,
+      "sampled_frames": 357,
+      "text_tokens": 13,
+      "tokens": 21973,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b967c2a8f5c8c8ef9bb24c",
+      "span_index": 1,
+      "original_frames": 540,
+      "sampled_frames": 537,
+      "text_tokens": 13,
+      "tokens": 32953,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b967c2a8f5c8c8ef9bb24c",
+      "span_index": 2,
+      "original_frames": 750,
+      "sampled_frames": 749,
+      "text_tokens": 13,
+      "tokens": 45885,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b967c2a8f5c8c8ef9bb24c",
+      "span_index": 3,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 10,
+      "tokens": 5622,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b967c2a8f5c8c8ef9bb24c",
+      "span_index": 4,
+      "original_frames": 630,
+      "sampled_frames": 629,
+      "text_tokens": 13,
+      "tokens": 38565,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b967c2a8f5c8c8ef9bb24c",
+      "span_index": 5,
+      "original_frames": 114,
+      "sampled_frames": 113,
+      "text_tokens": 14,
+      "tokens": 7090,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 0,
+      "original_frames": 108,
+      "sampled_frames": 105,
+      "text_tokens": 10,
+      "tokens": 6598,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 1,
+      "original_frames": 1002,
+      "sampled_frames": 1001,
+      "text_tokens": 14,
+      "tokens": 61258,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 2,
+      "original_frames": 120,
+      "sampled_frames": 117,
+      "text_tokens": 18,
+      "tokens": 7338,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 3,
+      "original_frames": 57,
+      "sampled_frames": 57,
+      "text_tokens": 12,
+      "tokens": 3672,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 4,
+      "original_frames": 63,
+      "sampled_frames": 61,
+      "text_tokens": 12,
+      "tokens": 3916,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 5,
+      "original_frames": 270,
+      "sampled_frames": 269,
+      "text_tokens": 19,
+      "tokens": 16611,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 6,
+      "original_frames": 180,
+      "sampled_frames": 177,
+      "text_tokens": 20,
+      "tokens": 11000,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 7,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 12,
+      "tokens": 5624,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 8,
+      "original_frames": 210,
+      "sampled_frames": 209,
+      "text_tokens": 18,
+      "tokens": 12950,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 9,
+      "original_frames": 90,
+      "sampled_frames": 89,
+      "text_tokens": 12,
+      "tokens": 5624,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b97ed5a5fa7432c21c957f",
+      "span_index": 10,
+      "original_frames": 627,
+      "sampled_frames": 625,
+      "text_tokens": 15,
+      "tokens": 38323,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b9833052dad08d449b0091",
+      "span_index": 0,
+      "original_frames": 593,
+      "sampled_frames": 593,
+      "text_tokens": 13,
+      "tokens": 36369,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b9833052dad08d449b0091",
+      "span_index": 1,
+      "original_frames": 1189,
+      "sampled_frames": 1189,
+      "text_tokens": 12,
+      "tokens": 72724,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b9833052dad08d449b0091",
+      "span_index": 2,
+      "original_frames": 915,
+      "sampled_frames": 913,
+      "text_tokens": 12,
+      "tokens": 55888,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b9ca16192d2ab7670dc0c6",
+      "span_index": 0,
+      "original_frames": 150,
+      "sampled_frames": 149,
+      "text_tokens": 13,
+      "tokens": 9285,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b9ca16192d2ab7670dc0c6",
+      "span_index": 1,
+      "original_frames": 570,
+      "sampled_frames": 569,
+      "text_tokens": 24,
+      "tokens": 34916,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b9ca16192d2ab7670dc0c6",
+      "span_index": 2,
+      "original_frames": 660,
+      "sampled_frames": 657,
+      "text_tokens": 18,
+      "tokens": 40278,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b9ca16192d2ab7670dc0c6",
+      "span_index": 3,
+      "original_frames": 510,
+      "sampled_frames": 509,
+      "text_tokens": 19,
+      "tokens": 31251,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b9ca16192d2ab7670dc0c6",
+      "span_index": 4,
+      "original_frames": 540,
+      "sampled_frames": 537,
+      "text_tokens": 15,
+      "tokens": 32955,
+      "skipped": false
+    },
+    {
+      "episode_hash": "69b9ca16192d2ab7670dc0c6",
+      "span_index": 5,
+      "original_frames": 264,
+      "sampled_frames": 261,
+      "text_tokens": 17,
+      "tokens": 16121,
+      "skipped": false
+    }
+  ]
+}

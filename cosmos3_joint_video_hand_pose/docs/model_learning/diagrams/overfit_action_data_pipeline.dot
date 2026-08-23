@@ -1,0 +1,47 @@
+digraph OverfitActionData {
+  graph [rankdir=TB, bgcolor="#fbfcfe", pad="0.35", nodesep="0.34", ranksep="0.52", splines=ortho,
+         label="overfit_v0.0 Action 数据流  |  raw 3D pose -> 57D/64D action -> recovered pose",
+         labelloc=t, fontsize=26, fontname="Noto Sans CJK SC"];
+  node [shape=box, style="rounded,filled", color="#71869a", fillcolor="white", penwidth=1.5,
+        fontname="Noto Sans CJK SC", fontsize=13, margin="0.16,0.11"];
+  edge [color="#365b7e", penwidth=1.8, arrowsize=0.75, fontname="Noto Sans CJK SC", fontsize=10];
+
+  raw [label="Zarr pose arrays\nhead pose\nleft/right wrist pose\nleft/right 21 keypoints", fillcolor="#f2edfb"];
+  slice [label="Apply segment temporal index\n[T,...]", fillcolor="#fff6e8"];
+  f0 [label="World -> F0\nF0 = first camera frame\ncamera/wrist future pose is F0-anchored", fillcolor="#edf8f0"];
+
+  camera [label="camera pose\ntranslation3 + rot6d6\n9D", fillcolor="#edf8f0"];
+  rwrist [label="right wrist pose\ntranslation3 + rot6d6\n9D", fillcolor="#edf8f0"];
+  rhand [label="right 20 points\nworld -> right-wrist-local\n20x3 = 60D", fillcolor="#edf8f0"];
+  rcodec [label="frozen right MLP-AE\n60D -> 15D", fillcolor="#dff2e5"];
+  lwrist [label="left wrist pose\ntranslation3 + rot6d6\n9D", fillcolor="#edf8f0"];
+  lhand [label="left 20 points\nworld -> left-wrist-local\n20x3 = 60D", fillcolor="#edf8f0"];
+  lcodec [label="frozen left MLP-AE\n60D -> 15D", fillcolor="#dff2e5"];
+
+  raw -> slice -> f0;
+  f0 -> camera; f0 -> rwrist; f0 -> rhand; f0 -> lwrist; f0 -> lhand;
+  rhand -> rcodec; lhand -> lcodec;
+
+  action57 [shape=record, label="{native 57D|camera 9|right wrist 9|right hand latent 15|left wrist 9|left hand latent 15}", fillcolor="#dff2e5", color="#5b9b73", penwidth=2.2];
+  camera -> action57; rwrist -> action57; rcodec -> action57; lwrist -> action57; lcodec -> action57;
+
+  norm [label="Normalize\na0 state stats\nfuture camera/wrist delta stats\nhand codec latent stats", fillcolor="#fff6e8"];
+  pad [label="Append 7 zero channels\n57D -> fixed model 64D", fillcolor="#fff6e8", penwidth=2.2];
+  mask [label="Time role\na0: clean condition\na1:T-1: noisy generation target", fillcolor="#fff6e8"];
+  model [label="Cosmos action data path\naction2llm -> shared WAM -> llm2action\ngenerated action velocity [64D]", fillcolor="#edf6ff", color="#5d91c3", penwidth=2.2];
+  norm -> pad -> mask -> model;
+  action57 -> norm;
+
+  unpad [label="Sampler result [T-1,64]\ntake first 57 channels", fillcolor="#f2edfb"];
+  inv [label="Inverse normalization\nrecover F0 camera/wrist poses", fillcolor="#f2edfb"];
+  decode [label="Per-hand frozen MLP-AE decoder\n15D -> wrist-local 60D", fillcolor="#f2edfb"];
+  compose [label="Compose wrist transform + local points\nfuture headcam + two 21-point hands", fillcolor="#f2edfb", penwidth=2.2];
+  model -> unpad -> inv;
+  unpad -> decode;
+  inv -> compose; decode -> compose;
+
+  visibility [label="palm_in_fov [T,2]\nGT loss metadata only\nNOT part of 57D action", fillcolor="white", color="#bd5f5f", penwidth=2];
+  loss [label="Action loss\ncamera always valid\nright/left group weighted by visibility\npadding [57:64] excluded", fillcolor="white", color="#bd5f5f", penwidth=2];
+  visibility -> loss;
+  model -> loss [style=dashed, label="training velocity target"];
+}

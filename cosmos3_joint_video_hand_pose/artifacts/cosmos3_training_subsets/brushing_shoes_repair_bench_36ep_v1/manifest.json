@@ -1,0 +1,131 @@
+{
+  "artifact_id": "brushing_shoes_repair_bench_36ep_v1",
+  "artifact_version": 1,
+  "created_date": "2026-08-17",
+  "description": "Single-task, single-scene train-only overfit subset for Cosmos3 joint video and hand-pose training.",
+  "selection_contract": {
+    "source": "mecka",
+    "recommended_use": "multimodal_segment_ready",
+    "manifest_task": "brushing_shoes",
+    "scene_id": "repair_bench",
+    "inventory_is_eval": false,
+    "annotation_coverage_min_inclusive": 0.99,
+    "bilateral_all_21_keypoints_in_frame_fraction_min_inclusive": 0.99,
+    "segment_structurally_usable": true,
+    "max_source_segment_frames_inclusive": 1350,
+    "split_assignment": "all_train",
+    "caption_overrides": [
+      {
+        "episode_hash": "69b20b031fa85f581929ee7e",
+        "span_index": 4,
+        "source_text": "turn shoe overscrub shoe with brush",
+        "training_text": "turn shoe over, scrub shoe with brush",
+        "reason": "repair an unambiguous missing separator in the source annotation"
+      }
+    ],
+    "existing_mecka_100h_test_pair_overlap": {
+      "pair_keys": [
+        "user_id",
+        "scene_id"
+      ],
+      "required_count": 0,
+      "actual_count": 0
+    },
+    "ordering": {
+      "episodes.csv": [
+        "episode_hash"
+      ],
+      "segments.csv": [
+        "episode_hash",
+        "span_index"
+      ]
+    },
+    "expected_episode_ids": [
+      "69b1c40f666aa62abc610449",
+      "69b1c8af45b4a60380cdf7af",
+      "69b1ca19e589ef129317715a",
+      "69b1ca2700828a0a0c8690c9",
+      "69b1cad2d013bf6b844674b2",
+      "69b1cc2b5cc42faa9968178c",
+      "69b1f3ea5a0fb3802c89c869",
+      "69b20b031fa85f581929ee7e",
+      "69b218b8bf61da11df3fee35",
+      "69b22224f8447b68e7d50f2a",
+      "69b249225b56e7311fe82725",
+      "69b27270a925bb63fc2f9155",
+      "69b32c036ac3fc90331f7882",
+      "69b34932f16da5f841701dd0",
+      "69b34ef4add7e388ca36c60a",
+      "69b35199cd15daa79db210c1",
+      "69b36b0d97fe745bf06022ed",
+      "69b3743a6ef4b52990dfd951",
+      "69b39d3bce2f88d1a4f809e6",
+      "69b3bbacac9b11a4d5640676",
+      "69b4844c17e3a9ccf08b21ed",
+      "69b49330f0a3602167935f02",
+      "69b495659c40481a89baf665",
+      "69b495e2bceee9fb4ea30d73",
+      "69b49ca78c0e050035cc59f4",
+      "69b4a1b45bb6442829fb4091",
+      "69b4ad5d09ee8318e185a395",
+      "69b4af284f139f5088428a67",
+      "69b4b45af70d1949244a6037",
+      "69b5258608a0268c1c38bf9b",
+      "69b52a14eac64bf65ebcd7d3",
+      "69b547e88c9ffbb680c3cd19",
+      "69b55e544963ef0ac28d5eb8",
+      "69b573b0f3ef6b95c177e304",
+      "69b582d9d673f8a5bdac1002",
+      "69b9caccbb20394db7cb83f4"
+    ]
+  },
+  "counts": {
+    "episodes": 36,
+    "segments": 181,
+    "tasks": 1,
+    "scenes": 1,
+    "users": 18,
+    "train_episodes": 36,
+    "test_episodes": 0
+  },
+  "frame_statistics": {
+    "episode_total_frames_sum": 79640,
+    "episode_total_hours_at_native_fps": 0.7374074074074075,
+    "episode_total_frames_percentiles": {
+      "p0": 1793.0,
+      "p50": 2245.0,
+      "p90": 2695.0,
+      "p95": 2696.0,
+      "p99": 2699.0,
+      "p100": 2699.0
+    },
+    "segment_frames_sum": 79617,
+    "segment_hours_at_30_fps": 0.7371944444444445,
+    "segment_frames_percentiles": {
+      "p0": 30.0,
+      "p50": 297.0,
+      "p90": 1094.0,
+      "p95": 1209.0,
+      "p99": 1349.2,
+      "p100": 1350.0
+    },
+    "percentile_method": "numpy linear interpolation"
+  },
+  "sources": {
+    "episode_training_decisions_csv": "/mnt/lzh/egoVerse/datasets/quality/results/episode_training_decisions.csv",
+    "caption_segments_normalized_csv": "/mnt/lzh/egoVerse/datasets/quality/results/caption_segments_normalized.csv",
+    "inventory_episodes_csv": "/mnt/lzh/egoVerse/datasets/inventories/snapshot_2026-08-01/episodes.csv",
+    "test_pair_reference_episodes_csv": "/mnt/lzh/cosmos/training_manifests/mecka_100h_v1_episodes.csv",
+    "dataset_root": "/mnt/lzh/egoVerse/datasets"
+  },
+  "files": {
+    "episodes.csv": {
+      "rows": 36,
+      "sha256": "8bc6bf4ec6d97bb2531f3b34591f9a3b5d9929dfb71fcee8f85819bf3c7a179d"
+    },
+    "segments.csv": {
+      "rows": 181,
+      "sha256": "0f21030cde9ff232ea309ec021c0d9272a172e89f9e546b77979daeb11e470b8"
+    }
+  }
+}

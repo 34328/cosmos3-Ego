@@ -1,0 +1,18 @@
+experiment: egoverse_it2v_v1
+initialization: /mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464
+dataset:
+  episodes: 36
+  segments: 181
+  canvas: [640, 368]
+  max_sequence_length: 85000
+training:
+  world_size: 8
+  cp: 2
+  fsdp: 4
+  max_iter: 600
+  checkpoints: [300, 600]
+  base_lr: 2.0e-5
+loss:
+  video_only: true
+outputs:
+  train: /mnt/lzh/cosmos/outputs/egoverse_it2v/train/v1

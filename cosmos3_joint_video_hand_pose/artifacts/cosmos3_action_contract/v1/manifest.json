@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "artifact_id": "egoverse_cosmos3_action_contract_v1",
+  "status": "ready",
+  "training_ready": true,
+  "contract": {
+    "domain_name": "hand_pose",
+    "domain_id": 3,
+    "raw_action_dim": 57,
+    "model_action_dim": 64,
+    "pose_convention": "backward_anchored_to_clip_frame_0",
+    "rotation_format": "rot6d_first_two_matrix_columns",
+    "action_layout": [
+      {
+        "name": "camera",
+        "start": 0,
+        "end": 9,
+        "representation": "translation3_plus_rot6d6"
+      },
+      {
+        "name": "right_wrist",
+        "start": 9,
+        "end": 18,
+        "representation": "translation3_plus_rot6d6"
+      },
+      {
+        "name": "right_hand_latent",
+        "start": 18,
+        "end": 33,
+        "representation": "frozen_mlp_ae_15"
+      },
+      {
+        "name": "left_wrist",
+        "start": 33,
+        "end": 42,
+        "representation": "translation3_plus_rot6d6"
+      },
+      {
+        "name": "left_hand_latent",
+        "start": 42,
+        "end": 57,
+        "representation": "frozen_mlp_ae_15"
+      },
+      {
+        "name": "model_padding",
+        "start": 57,
+        "end": 64,
+        "representation": "constant_zero_not_physical_action"
+      }
+    ],
+    "temporal_semantics": {
+      "slot_0": "initial state",
+      "future_slots": "camera and wrists anchored to clip frame 0; hand latent is current-frame wrist-local shape"
+    }
+  },
+  "codec": {
+    "status": "ready",
+    "type": "mlp15",
+    "selection": "canonical_seed_1",
+    "manifest": {
+      "path": "../../cosmos3_hand_codecs/v2_4/manifest.json",
+      "sha256": "c2dd19137d2d1ced0d3a901ab581d45d68847ed3fd11e1f88f1f60af55ce1c3f"
+    },
+    "right": {
+      "path": "../../cosmos3_hand_codecs/v2_4/option_b_mlp15/right_mlp15_primary.pt",
+      "sha256": "1173b50ef35a1d0eab5b36e2c4ba5a0e0a34c7400cbc3043387669e2cfd1f0c3"
+    },
+    "left": {
+      "path": "../../cosmos3_hand_codecs/v2_4/option_b_mlp15/left_mlp15_primary.pt",
+      "sha256": "3e11c7e535a968a08043b7e281b909e7689ed87708eb999126979de6b2be53a2"
+    },
+    "input_contract": "20 non-wrist keypoints in current-frame wrist-local coordinates, flattened to 60D per hand",
+    "normalization_storage": {
+      "input_mean_std": "state_dict.mean and state_dict.std inside each .pt file",
+      "latent_mean_std": "top-level latent_mean and latent_std inside each .pt file"
+    },
+    "applies_to": [
+      "slot_0_hand_latent",
+      "future_hand_latent"
+    ]
+  },
+  "normalizers": {
+    "state": {
+      "status": "ready",
+      "path": "normalizers/state_normalizer.json",
+      "sha256": "32d4b5213c9d57386c447d78ef860a26bf9a362728b25f583ecd423d0539c84e",
+      "fit_split": "train_only",
+      "applies_to_action_blocks": [
+        "camera",
+        "right_wrist",
+        "left_wrist"
+      ],
+      "applies_to_time": "slot_0_only",
+      "method": "piecewise_asinh_rot",
+      "parameters": {"beta": 1.0, "quantiles": [0.01, 0.99], "dimensions": 27, "clamp_after_normalization": false}
+    },
+    "future_delta": {
+      "status": "ready",
+      "path": "normalizers/future_delta_normalizer.json",
+      "sha256": "1263193f23b65dbc07ecaa80f5c68546aea5b4ab4a096eee2e2f807bb8ae4a1f",
+      "fit_split": "train_only",
+      "applies_to_action_blocks": [
+        "camera",
+        "right_wrist",
+        "left_wrist"
+      ],
+      "applies_to_time": "future_slots_only",
+      "method": "piecewise_asinh_rot",
+      "parameters": {"beta": 1.0, "quantiles": [0.01, 0.99], "dimensions": 27, "clamp_after_normalization": false},
+      "clamp_after_normalization": false
+    }
+  },
+  "source_data": {
+    "split_policy": "normalizer statistics must use train episodes only",
+    "episodes_manifest": {
+      "path": "../../../../training_manifests/mecka_100h_v1_episodes.csv",
+      "sha256": "98d8abdff990cc3cf0b39a0d1ac0b0338b8d3be9e7b2ea7ed8757acfdacec41d"
+    },
+    "segments_manifest": {
+      "path": "../../../../training_manifests/mecka_100h_v1_segments.csv",
+      "sha256": "64655579936e40bf2774c0aca50993f1ef6b53c5fc37a44d70cb752950f9be60"
+    }
+  },
+  "legacy_analysis": {
+    "path": "reports/legacy_121_frame_report.json",
+    "sha256": "128565c0687d36e3a936df5d3194d7c94b69d17819e2b10685387689bca9b77e",
+    "status": "analysis_only_not_a_training_artifact",
+    "reason": "The report was computed from one centered 121-frame window per eligible train segment. It does not match the finalized TODO-4 sampler, so its quantiles must not be loaded as final normalizer parameters."
+  },
+  "checkpoint_binding": {
+    "required_metadata_key": "egoverse_action_artifact",
+    "required_fields": [
+      "artifact_id",
+      "schema_version",
+      "manifest_sha256",
+      "codec_manifest_sha256",
+      "right_codec_sha256",
+      "left_codec_sha256",
+      "state_normalizer_sha256",
+      "future_delta_normalizer_sha256"
+    ],
+    "load_policy": "fail_if_any_required_hash_or_contract_field_differs",
+    "resume_policy": "the checkpoint-bound artifact must be reused without replacement"
+  },
+  "blockers": []
+}
