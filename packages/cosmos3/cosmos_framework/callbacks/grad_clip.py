@@ -233,6 +233,13 @@ class GradClip(Callback):
         # actual rescale norm returned by _clip_grad.
         self._states: dict[str, dict[str, _MagnitudeRecord]] = defaultdict(lambda: defaultdict(_MagnitudeRecord))
         self._state_key: str = ""
+        # Keep clipping incidence separate from the averaged pre-clip norm.
+        # ``optim/grad_scale`` is the AMP GradScaler value and must not be used
+        # to infer whether norm clipping actually fired.
+        self._clip_trigger_window: dict[str, int] = defaultdict(int)
+        self._clip_trigger_total: dict[str, int] = defaultdict(int)
+        self._last_clip_trigger: dict[str, int] = defaultdict(int)
+        self._last_applied_scale: dict[str, float] = defaultdict(lambda: 1.0)
 
     def on_training_step_start(
         self,
@@ -304,6 +311,15 @@ class GradClip(Callback):
             cur_state[mesh_str].update(mesh_norm)
         cur_state["global"].update(global_norm)
 
+        norm_value = float(global_norm.detach().float().item())
+        clip_triggered = int(math.isfinite(norm_value) and norm_value > self.clip_norm)
+        self._last_clip_trigger[self._state_key] = clip_triggered
+        self._clip_trigger_window[self._state_key] += clip_triggered
+        self._clip_trigger_total[self._state_key] += clip_triggered
+        self._last_applied_scale[self._state_key] = (
+            min(1.0, self.clip_norm / (norm_value + 1.0e-6)) if math.isfinite(norm_value) else 0.0
+        )
+
         # 7. Log every logging_iter.  The reset is intentionally *outside*
         #    the ``wandb.run`` gate: ``_MagnitudeRecord.get_stat`` is the
         #    consumer that flushes the windowed accumulator, so coupling it
@@ -323,5 +339,14 @@ class GradClip(Callback):
                     log_dict[key] = avg
                     if mesh_str == "global":
                         log.info(f"{key}: {avg:.5f} (iteration {iteration})", rank0_only=False)
+                prefix = f"grad_clip/{modality}" if self.track_per_modality else "grad_clip"
+                log_dict[f"{prefix}/triggered"] = self._last_clip_trigger[modality]
+                log_dict[f"{prefix}/trigger_count_window"] = self._clip_trigger_window[modality]
+                log_dict[f"{prefix}/trigger_count_cumulative"] = self._clip_trigger_total[modality]
+                log_dict[f"{prefix}/applied_scale"] = self._last_applied_scale[modality]
+                self._clip_trigger_window[modality] = 0
             if wandb.run:
-                wandb.log(log_dict, step=iteration)
+                # Optimizer diagnostics are produced before the training-step
+                # end callback.  Stage them on the completed-step index so the
+                # loss callback can commit one row containing every metric.
+                wandb.log(log_dict, step=iteration + 1, commit=False)
