@@ -15,8 +15,11 @@ to ``RankPartitionedDataLoader`` (mirroring how the vision recipe uses
 
 from __future__ import annotations
 
+import random
 from typing import Any
 
+import numpy as np
+import torch
 from torch.utils.data import Dataset, IterableDataset, get_worker_info
 
 from cosmos_framework.data.generator.action.datasets.droid_merged_lerobot_dataset import DROIDMergedLeRobotDataset
@@ -64,29 +67,79 @@ class ActionIterableShuffleDataset(IterableDataset):
         self._seed = int(seed)
         self.shard_world_size = 1
         self.shard_rank = 0
+        self._iteration_state: dict[str, Any] | None = None
 
     def __len__(self) -> int:  # informational only; iteration is infinite
         return len(self._dataset)
 
-    def __iter__(self):
-        import torch
+    def state_dict(self) -> dict[str, Any]:
+        """Return the stream position and worker RNGs for StatefulDataLoader."""
+        return {
+            **(self._iteration_state or {}),
+            "python_rng_state": random.getstate(),
+            "numpy_rng_state": np.random.get_state(),
+            "torch_rng_state": torch.get_rng_state(),
+        }
 
+    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
+        state = dict(state_dict)
+        python_rng_state = state.pop("python_rng_state", None)
+        numpy_rng_state = state.pop("numpy_rng_state", None)
+        torch_rng_state = state.pop("torch_rng_state", None)
+        if python_rng_state is not None:
+            random.setstate(python_rng_state)
+        if numpy_rng_state is not None:
+            np.random.set_state(numpy_rng_state)
+        if torch_rng_state is not None:
+            torch.set_rng_state(torch_rng_state)
+        self._iteration_state = state or None
+
+    def __iter__(self):
         blocks = self._dataset.get_shuffle_blocks()
         wi = get_worker_info()
         wid = wi.id if wi is not None else 0
         nw = wi.num_workers if wi is not None else 1
         global_shard = int(self.shard_rank) * nw + wid
         total_shards = max(1, int(self.shard_world_size) * nw)
-        epoch = 0
+        state = self._iteration_state or {}
+        if state:
+            if state["global_shard"] != global_shard or state["total_shards"] != total_shards:
+                raise RuntimeError(
+                    "Cannot restore ActionIterableShuffleDataset with a different rank/worker topology: "
+                    f"saved=({state['global_shard']}, {state['total_shards']}), "
+                    f"current=({global_shard}, {total_shards})."
+                )
+        epoch = int(state.get("epoch", 0))
+        sample_offset = int(state.get("sample_offset", 0))
         while True:
             g = torch.Generator()
             g.manual_seed(self._seed + epoch)  # same permutation across all (rank,worker) -> disjoint shard
             order = torch.randperm(len(blocks), generator=g).tolist()
-            for b in order[global_shard::total_shards]:
+            assigned_blocks = order[global_shard::total_shards]
+            epoch_size = sum(blocks[b][1] for b in assigned_blocks)
+            remaining = sample_offset
+            for b in assigned_blocks:
                 start, length = blocks[b]
-                for idx in range(start, start + length):
-                    yield self._dataset[idx]
+                if remaining >= length:
+                    remaining -= length
+                    continue
+                for idx in range(start + remaining, start + length):
+                    sample = self._dataset[idx]
+                    sample_offset += 1
+                    if sample_offset >= epoch_size:
+                        next_epoch, next_offset = epoch + 1, 0
+                    else:
+                        next_epoch, next_offset = epoch, sample_offset
+                    self._iteration_state = {
+                        "epoch": next_epoch,
+                        "sample_offset": next_offset,
+                        "global_shard": global_shard,
+                        "total_shards": total_shards,
+                    }
+                    yield sample
+                remaining = 0
             epoch += 1
+            sample_offset = 0
 
 
 def get_action_droid_sft_dataset(

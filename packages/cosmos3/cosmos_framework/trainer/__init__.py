@@ -264,6 +264,12 @@ class ImaginaireTrainer:
         optimizer, scheduler = model.init_optimizer_scheduler(self.config.optimizer, self.config.scheduler)
         grad_scaler = torch.amp.GradScaler("cuda", **self.config.trainer.grad_scaler_args)
         self.callbacks.on_optimizer_init_end()
+        # Dataloader-state callbacks need the instantiated runtime loader before
+        # checkpointer.load() restores their per-rank state.
+        for current_callback in self.callbacks._callbacks:
+            bind_dataloader = getattr(current_callback, "bind_dataloader", None)
+            if bind_dataloader is not None:
+                bind_dataloader(dataloader_train)
         # Load the model checkpoint and get the starting iteration number.
         iteration = self.checkpointer.load(model, optimizer, scheduler, grad_scaler)
         if hasattr(dataloader_train, "set_start_iteration"):

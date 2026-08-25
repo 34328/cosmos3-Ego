@@ -83,6 +83,7 @@ def custom_collate_fn(batch):
         "raw_action_dim",
         "image_size",
         "action_processing_record",
+        "dataset_index",
         *_ACTION_SAMPLER_METADATA_KEYS,
     }
 
@@ -1112,8 +1113,14 @@ class RankPartitionedDataLoader:
         dataset.shard_id = my_dataset_idx
 
         merged_kwargs = {**dataloader_kwargs, **per_dataset_kwargs[my_dataset_idx]}
+        stateful = bool(merged_kwargs.pop("stateful", False))
         merged_kwargs.setdefault("collate_fn", custom_collate_fn)
-        self.dataloader = torch.utils.data.DataLoader(dataset, **merged_kwargs)
+        if stateful:
+            from torchdata.stateful_dataloader import StatefulDataLoader
+
+            self.dataloader = StatefulDataLoader(dataset, **merged_kwargs)
+        else:
+            self.dataloader = torch.utils.data.DataLoader(dataset, **merged_kwargs)
         self.dataset_name = names[my_dataset_idx]
         self.dataset = dataset
 
@@ -1121,7 +1128,17 @@ class RankPartitionedDataLoader:
         return iter(self.dataloader)
 
     def __len__(self) -> int:
+        if isinstance(self.dataset, torch.utils.data.IterableDataset):
+            # This wrapper's action streams are infinite. Calling len() on the
+            # inner DataLoader makes PyTorch warn after one nominal epoch.
+            return 0
         return len(self.dataloader)
+
+    def state_dict(self) -> dict[str, Any]:
+        return self.dataloader.state_dict()
+
+    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
+        self.dataloader.load_state_dict(state_dict)
 
 
 class PackingDataLoader(JointDataLoader):
@@ -1148,6 +1165,8 @@ class PackingDataLoader(JointDataLoader):
         lookahead_limit: int = JointDataLoader._DEFAULT_LOOKAHEAD_LIMIT,
         uniae_chunk_frames: int | Mapping[str, int] | None = None,
         uniae_pad_frames: int | None = None,
+        prewarm: bool = True,
+        lazy_initialize_child_iterators: bool = False,
     ):
         """
         Args:
@@ -1165,6 +1184,8 @@ class PackingDataLoader(JointDataLoader):
             lookahead_limit: Packing-loop look-ahead for the wrapped dataloader.
             uniae_chunk_frames: Optional UniAE full chunk size, or resolution-keyed chunk sizes.
             uniae_pad_frames: Optional UniAE boundary padding frames per chunk.
+            prewarm: Whether to fetch and buffer one sample before training starts.
+            lazy_initialize_child_iterators: Defer workers until checkpoint state has been restored.
         """
         wrapped = {dataset_name: {"dataloader": dataloader, "ratio": 1}}
         super().__init__(
@@ -1179,9 +1200,12 @@ class PackingDataLoader(JointDataLoader):
             lookahead_limits={dataset_name: int(lookahead_limit)},
             uniae_chunk_frames=uniae_chunk_frames,
             uniae_pad_frames=uniae_pad_frames,
+            prewarm=prewarm,
+            lazy_initialize_child_iterators=lazy_initialize_child_iterators,
         )
 
     def __iter__(self):
+        self._initialize_child_iterators_once()
         inner = self.dataloader_list[0]
         ds_name = getattr(inner, "dataset_name", self.dataset_name_list[0])
 
