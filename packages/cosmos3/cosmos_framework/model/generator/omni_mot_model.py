@@ -254,6 +254,8 @@ class OmniMoTModel(ImaginaireModel):
                 action_gen=self.config.action_gen,
                 sound_gen=self.config.sound_gen,
                 joint_attn_implementation=self.config.joint_attn_implementation,
+                video_action_causal_mask=self.config.video_action_causal_mask,
+                video_action_temporal_causal_mask=self.config.video_action_temporal_causal_mask,
                 use_multiview_flex_attention=self.config.flex_attention.enabled,
                 flex_attention_backend=self.config.flex_attention.backend,
                 noisy_attention_scope=self.config.flex_attention.mask.noisy_attention_scope,

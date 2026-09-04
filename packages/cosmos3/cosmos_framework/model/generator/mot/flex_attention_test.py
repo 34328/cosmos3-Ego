@@ -5,6 +5,7 @@ import contextlib
 import dataclasses
 import math
 import unittest.mock
+import warnings
 from collections.abc import Iterator
 from typing import cast
 
@@ -27,9 +28,13 @@ from cosmos_framework.model.generator.mot.flex_attention import (
     _metadata_groups,
     _multiview_mask_mod,
     _to_flex_layout,
+    _video_action_temporal_mask_mod,
+    build_action_temporal_block_mask,
     build_block_mask,
     build_multiview_block_mask,
     build_multiview_flex_metadata,
+    build_video_action_temporal_flex_metadata,
+    causal_video_time_for_action,
     flash_backend_block_size,
     flex_attention,
     resolve_flex_backend,
@@ -72,6 +77,130 @@ _NOISY_SCOPES = pytest.mark.parametrize("noisy_attention_scope", NOISY_ATTENTION
 # block both backends step for the UND prefix.
 _GEN_ALIGNMENT = math.lcm(_TRITON_BACKEND.full_seq_alignment, _FLASH_BACKEND.full_seq_alignment)
 _UND_ALIGNMENT = math.lcm(_TRITON_BACKEND.causal_seq_alignment, _FLASH_BACKEND.causal_seq_alignment)
+
+
+@pytest.mark.L0
+def test_video_action_temporal_mask_visibility() -> None:
+    metadata = build_video_action_temporal_flex_metadata(
+        seq_len=6,
+        full_q_offsets=torch.tensor([0, 6], dtype=torch.int32),
+        full_role_ids=torch.tensor([1, 1, 1, 2, 2, 2]),
+        full_time_ids=torch.tensor([0, 1, 2, 0, 4, 8]),
+        full_video_time_ids=torch.tensor([0, 1, 2, 0, 1, 2]),
+        device=torch.device("cpu"),
+        num_und=2,
+        causal_offsets=torch.tensor([0, 2], dtype=torch.int32),
+    )
+    mask_mod = _video_action_temporal_mask_mod(metadata)
+    q = torch.arange(6).unsqueeze(1)
+    kv = torch.arange(8).unsqueeze(0)
+    got = mask_mod(torch.tensor(0), torch.tensor(0), q, kv)
+    expected = torch.tensor(
+        [
+            [1, 1, 1, 1, 1, 0, 0, 0],
+            [1, 1, 1, 1, 1, 0, 0, 0],
+            [1, 1, 1, 1, 1, 0, 0, 0],
+            [1, 1, 1, 0, 0, 1, 0, 0],
+            [1, 1, 1, 1, 0, 1, 1, 0],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+        ],
+        dtype=torch.bool,
+    )
+    assert torch.equal(got, expected)
+
+
+@pytest.mark.L0
+def test_causal_video_time_for_action_never_exposes_a_future_raw_frame() -> None:
+    action_time = torch.arange(9)
+    got = causal_video_time_for_action(action_time, temporal_compression_factor=4)
+    assert torch.equal(got, torch.tensor([0, 0, 0, 0, 1, 1, 1, 1, 2]))
+    assert bool(((got * 4) <= action_time).all())
+
+
+@pytest.mark.L0
+def test_action_temporal_mask_is_block_diagonal_across_packed_samples() -> None:
+    backend = _get_triton_flex_backend()
+    q_block, _ = backend.block_size
+    roles = torch.tensor([1, 1, 2, 1, 1, 2])
+    times = torch.tensor([0, 0, 1, 0, 0, 1])
+    video_times = torch.tensor([0, 0, 0, 0, 0, 0])
+    block_mask = build_action_temporal_block_mask(
+        seq_len=q_block,
+        full_q_offsets=torch.tensor([0, 3, 6], dtype=torch.int32),
+        action_q_offsets=torch.tensor([0, 1, 2], dtype=torch.int32),
+        full_role_ids=roles,
+        full_time_ids=times,
+        full_video_time_ids=video_times,
+        device=torch.device("cpu"),
+        block_size=backend.block_size,
+        num_und=backend.causal_seq_alignment,
+        causal_offsets=torch.tensor([0, 1, 2], dtype=torch.int32),
+    )
+    q = torch.tensor([[0], [1]])
+    kv = torch.arange(block_mask.shape[-1]).view(1, -1)
+    got = block_mask.mask_mod(torch.tensor(0), torch.tensor(0), q, kv)
+
+    # UND keys 0/1 belong to samples 0/1. GEN keys begin after the padded
+    # UND block; real GEN keys 0..2 and 3..5 belong to samples 0 and 1.
+    gen_start = backend.causal_seq_alignment
+    assert got[0, 0] and not got[0, 1]
+    assert got[1, 1] and not got[1, 0]
+    assert got[0, gen_start : gen_start + 3].any()
+    assert not got[0, gen_start + 3 : gen_start + 6].any()
+    assert got[1, gen_start + 3 : gen_start + 6].any()
+    assert not got[1, gen_start : gen_start + 3].any()
+
+
+@pytest.mark.L0
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="FlexAttention kernels require a GPU.")
+def test_action_temporal_dynamic_kernel_handles_more_than_eight_shapes() -> None:
+    """Dynamic packs must not exhaust Dynamo's static graph cache and fall back to dense attention."""
+    torch.manual_seed(0)
+    torch.compiler.reset()
+    device = torch.device("cuda")
+    backend = _get_triton_flex_backend()
+    und_len = backend.causal_seq_alignment
+    q_block, _ = backend.block_size
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for index in range(1, 11):
+            action_len = q_block * index
+            video_len = q_block * 2
+            gen_len = video_len + action_len
+            roles = torch.cat(
+                (
+                    torch.ones(video_len, dtype=torch.long, device=device),
+                    torch.full((action_len,), 2, dtype=torch.long, device=device),
+                )
+            )
+            times = torch.cat(
+                (
+                    torch.arange(video_len, dtype=torch.long, device=device),
+                    torch.arange(action_len, dtype=torch.long, device=device),
+                )
+            )
+            video_times = times.clone()
+            video_times[-action_len:] = causal_video_time_for_action(times[-action_len:], 4)
+            mask = build_action_temporal_block_mask(
+                seq_len=gen_len,
+                full_q_offsets=torch.tensor([0, gen_len], dtype=torch.int32, device=device),
+                action_q_offsets=torch.tensor([0, action_len], dtype=torch.int32, device=device),
+                full_role_ids=roles,
+                full_time_ids=times,
+                full_video_time_ids=video_times,
+                device=device,
+                block_size=backend.block_size,
+                num_und=und_len,
+                causal_offsets=torch.tensor([0, und_len], dtype=torch.int32, device=device),
+            )
+            q = torch.randn(1, action_len, 2, 32, dtype=torch.bfloat16, device=device)
+            k = torch.randn(1, und_len + gen_len, 2, 32, dtype=torch.bfloat16, device=device)
+            v = torch.randn_like(k)
+            output = flex_attention(q, k, v, mask, backend, dynamic_shapes=True)
+            assert torch.isfinite(output).all()
+
+    assert not any("without torch.compile" in str(item.message) for item in caught)
 
 
 def _metadata_from_tokens(

@@ -274,6 +274,7 @@ class EgoVerseCosmosDataset(Dataset):
 
     def __getitem__(self, index: int) -> dict:
         sample = self.transform(self.dataset[index], resolution=None)
+        sample["dataset_index"] = int(index)
         # Preserve all 23 latent rows from the 368 px padded canvas. Output
         # visualization is responsible for cropping pixels back to 360 px.
         sample["image_size"] = torch.tensor([368, 640, 368, 640], dtype=torch.float32)
@@ -294,6 +295,7 @@ def get_egoverse_cosmos_dataset(
     prompt_mode: str = PROMPT_MODE_SEGMENT_ONLY,
     state_normalizer: str | None = None,
     future_normalizer: str | None = None,
+    rigid_pose_frame_delta: bool = False,
 ):
     from cosmos_framework.data.generator.action.datasets.action_sft_dataset import ActionIterableShuffleDataset
     from cosmos_framework.data.generator.action.transforms import ActionTransformPipeline
@@ -303,6 +305,7 @@ def get_egoverse_cosmos_dataset(
         action_builder_kwargs["state_normalizer"] = state_normalizer
     if future_normalizer is not None:
         action_builder_kwargs["future_normalizer"] = future_normalizer
+    action_builder_kwargs["rigid_pose_frame_delta"] = rigid_pose_frame_delta
     raw = EgoVerseSegmentDataset(
         episodes_manifest,
         segments_manifest,

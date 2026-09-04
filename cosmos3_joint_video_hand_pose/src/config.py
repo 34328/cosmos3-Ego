@@ -12,6 +12,7 @@ from cosmos_framework.utils.lazy_config import LazyCall as L
 from cosmos_framework.utils.lazy_config import LazyDict
 
 from .dataset import get_egoverse_cosmos_dataset
+from .dataloader_state import EgoVerseDataLoaderStateCallback, RecoverablePackingDataLoader
 from .model import EgoVerseOmniMoTModel
 from .wandb_compat import ensure_wandb_generate_id
 from .wandb_metrics import EgoVerseLossWandbCallback, LossOnlyWandBCallback
@@ -40,7 +41,10 @@ def _model_config(action_loss_weight: float = 7.0) -> dict:
     config = copy.deepcopy(NANO_MODEL_CONFIG)
     config["sound_gen"] = False
     config["ema"]["enabled"] = False
-    config["max_num_tokens_after_packing"] = 85_000
+    # Joint action-token layouts are not safe under CP=2 in the current MoT
+    # backward path.  Formal joint recipes use CP=1/FSDP-8 and a conservative
+    # 75K packing cap; keep the dataset and packer limits sourced from here.
+    config["max_num_tokens_after_packing"] = 75_000
     config["resolution"] = "480"
     config["tokenizer"]["vae_path"] = "/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth"
     config["activation_checkpointing"]["mode"] = "full"
@@ -248,6 +252,95 @@ egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["optimizer"]["lr_multipl
     "action_modality_embed": 5.0,
 }
 egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["scheduler"]["warm_up_steps"] = [100]
+egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["model"]["config"][
+    "rectified_flow_training_config"
+].update(loss_scale=1.0, action_loss_weight=0.7)
+egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["dataloader_train"]["_target_"] = RecoverablePackingDataLoader
+egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["dataloader_train"][
+    "lazy_initialize_child_iterators"
+] = True
+egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["dataloader_train"]["dataloader"]["stateful"] = True
+egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["dataloader_train"]["dataloader"]["in_order"] = True
+egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["trainer"]["callbacks"]["dataloader_state"] = L(
+    EgoVerseDataLoaderStateCallback
+)()
+
+
+# Correct the two loss/schedule semantics required by joint video+action
+# training. Keep every optimizer and LR-scheduler setting identical to v0.2 so
+# this run isolates only these requested changes.
+egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action = copy.deepcopy(
+    egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced
+)
+egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action["job"][
+    "name"
+] = "overfit_v0.3_active_norm_independent_action"
+egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action["model"]["config"][
+    "rectified_flow_training_config"
+].update(
+    normalize_loss_by_active=True,
+    independent_action_schedule=True,
+    # The global shift is resolution-keyed; the independent action sampler
+    # requires one explicit scalar.  This experiment is fixed at 480p.
+    shift_action=5,
+)
+
+
+# Video-first joint WAM experiment.  This is an exact clone of the stable
+# CP1/FSDP-8/75K v0.3 baseline above with only the GEN attention visibility
+# changed: future video cannot read future action, while action can still read
+# clean conditions, video, and action.  Keep action loss and shared-backbone
+# gradients enabled so this tests the intended joint causal factorization.
+egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask = copy.deepcopy(
+    egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action
+)
+egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask["job"][
+    "name"
+] = "overfit_v0.4_video_first_causal_mask"
+egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask["model"]["config"][
+    "video_action_causal_mask"
+] = True
+
+
+# B3 rigid-trajectory ablation: preserve the stable CP1/FSDP-8/75K joint
+# training setup, disable attention ablations, and encode future camera and
+# wrist transforms as frame-to-frame SE(3) increments.  This makes v0.5 a
+# representation-only experiment, matching the run that preceded v0.6.
+egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3 = copy.deepcopy(
+    egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask
+)
+egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["job"]["name"] = (
+    "overfit_v0.5_frame_delta_b3"
+)
+_v0_5_dataset = egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3[
+    "dataloader_train"
+]["dataloader"]["datasets"]["egoverse"]["dataset"]
+_v0_5_dataset["rigid_pose_frame_delta"] = True
+_v0_5_dataset["future_normalizer"] = (
+    "/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/"
+    "cosmos3_action_contract/v3_frame_delta/normalizers/future_frame_delta_normalizer.json"
+)
+egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["model"]["config"][
+    "video_action_causal_mask"
+] = False
+
+
+# v0.6 keeps the complete B3 training contract and replaces only the
+# modality-level action visibility with a temporal lower triangle:
+# action frame t reads text, video latents up to t, and action tokens up to t.
+# The first-frame image and future video retain native bidirectional IT2V
+# attention, while every video query is structurally unable to read action.
+egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask = copy.deepcopy(
+    egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3
+)
+egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask["job"]["name"] = (
+    "overfit_v0.6_frame_delta_temporal_mask"
+)
+_v0_6_model = egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask[
+    "model"
+]["config"]
+_v0_6_model["video_action_causal_mask"] = False
+_v0_6_model["video_action_temporal_causal_mask"] = True
 
 
 ConfigStore.instance().store(
@@ -259,8 +352,26 @@ ConfigStore.instance().store(
 ConfigStore.instance().store(
     group="experiment",
     package="_global_",
-    name="egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced",
-    node=egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced,
+    name="egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action",
+    node=egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action,
+)
+ConfigStore.instance().store(
+    group="experiment",
+    package="_global_",
+    name="egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask",
+    node=egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask,
+)
+ConfigStore.instance().store(
+    group="experiment",
+    package="_global_",
+    name="egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3",
+    node=egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3,
+)
+ConfigStore.instance().store(
+    group="experiment",
+    package="_global_",
+    name="egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask",
+    node=egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask,
 )
 
 

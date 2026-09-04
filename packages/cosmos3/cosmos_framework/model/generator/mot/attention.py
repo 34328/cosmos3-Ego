@@ -30,6 +30,7 @@ class SplitInfo:
         action_token_shapes: list[tuple[int, ...]] | None = None,
         num_action_tokens_per_supertoken: int = 0,
         null_action_supertokens: bool = False,
+        video_action_causal_mask: bool = False,
     ):
         """
         Actual len is the actual non-padded length of the packed sequence.
@@ -61,6 +62,25 @@ class SplitInfo:
         self.action_token_shapes = action_token_shapes
         self.num_action_tokens_per_supertoken = num_action_tokens_per_supertoken
         self.null_action_supertokens = null_action_supertokens
+        # Optional joint video/action causal mask.  The network populates the
+        # token masks and varlen offsets once per packed forward, before CP
+        # sharding.  Every decoder layer then reuses them without a host sync.
+        self.video_action_causal_mask = video_action_causal_mask
+        self.video_action_temporal_causal_mask = False
+        self.full_gen_role_ids: torch.Tensor | None = None
+        self.all_gen_role_ids: torch.Tensor | None = None
+        self.clean_query_offsets: torch.Tensor | None = None
+        self.video_query_offsets: torch.Tensor | None = None
+        self.action_query_offsets: torch.Tensor | None = None
+        self.clean_kv_offsets: torch.Tensor | None = None
+        self.video_kv_offsets: torch.Tensor | None = None
+        self.max_clean_query_len = 0
+        self.max_video_query_len = 0
+        self.max_action_query_len = 0
+        self.max_clean_kv_len = 0
+        self.max_video_kv_len = 0
+        self.action_flex_block_mask: BlockMask | None = None
+        self.action_flex_backend: FlexBackend | None = None
 
         # Multi-control transfer fields (set post-construction in cosmos3_vfm_network.py).
         # Gen-relative token ranges for each control stream, one tuple (start, end) per control.
@@ -183,6 +203,7 @@ def two_way_attention(
     packed_key_states_normalized: SequencePack | None = None,
     flex_block_mask: BlockMask | None = None,
     flex_backend: FlexBackend | None = None,
+    attention_meta: SplitInfo | None = None,
 ):
     """
     Performs two-way attention with causal and full attention.
@@ -269,7 +290,172 @@ def two_way_attention(
     # [1,N_und,heads,head_dim] -> [N_und,heads,head_dim] -> [N_und,heads*head_dim]
     causal_out = causal_res.squeeze(0).flatten(-2, -1)  # type: ignore  # [N_und,heads*head_dim]
 
-    if flex_block_mask is not None:
+    if attention_meta is not None and attention_meta.video_action_temporal_causal_mask:
+        required = (
+            "full_gen_role_ids",
+            "all_gen_role_ids",
+            "video_query_offsets",
+            "video_kv_offsets",
+            "action_flex_block_mask",
+            "action_flex_backend",
+        )
+        missing = [name for name in required if getattr(attention_meta, name, None) is None]
+        if missing:
+            raise ValueError(f"video/action temporal metadata is incomplete: {missing}")
+        full_roles = attention_meta.full_gen_role_ids
+        all_roles = attention_meta.all_gen_role_ids
+        assert full_roles is not None and all_roles is not None
+        num_real_full = full_roles.numel()
+        full_q_real = full_q[:num_real_full]
+        all_k = get_all_seq(packed_key_normalized)
+        all_v = get_all_seq(packed_value_states)
+        video_query_mask = full_roles == 1
+        action_query_mask = full_roles == 2
+        video_key_mask = all_roles <= 1
+
+        video_query_offsets = attention_meta.video_query_offsets
+        video_kv_offsets = attention_meta.video_kv_offsets
+        assert video_query_offsets is not None
+        assert video_kv_offsets is not None
+        # This is the native IT2V full-attention block with action keys
+        # removed: I0 and all future-video queries attend UND + all video
+        # tokens bidirectionally.  Only the action query path below is causal.
+        video_res = attention(
+            full_q_real[video_query_mask].unsqueeze(0),
+            all_k[video_key_mask].unsqueeze(0),
+            all_v[video_key_mask].unsqueeze(0),
+            **_varlen_kwargs(
+                video_query_offsets,
+                cumulative_seqlen_Q=video_query_offsets,
+                cumulative_seqlen_KV=video_kv_offsets,
+                max_seqlen_Q=attention_meta.max_video_query_len,
+                max_seqlen_KV=attention_meta.max_video_kv_len,
+            ),
+        )
+
+        action_block_mask = attention_meta.action_flex_block_mask
+        action_backend = attention_meta.action_flex_backend
+        assert action_block_mask is not None and action_backend is not None
+        action_query_real = full_q_real[action_query_mask]
+        action_query = torch.zeros(
+            (action_block_mask.shape[-2], *action_query_real.shape[1:]),
+            device=action_query_real.device,
+            dtype=action_query_real.dtype,
+        )
+        action_query[: action_query_real.shape[0]] = action_query_real
+        und_k, _ = get_causal_seq(packed_key_normalized)
+        und_v, _ = get_causal_seq(packed_value_states)
+        gen_k, _ = get_full_only_seq(packed_key_normalized)
+        gen_v, _ = get_full_only_seq(packed_value_states)
+        action_res = flex_attention(
+            action_query.unsqueeze(0),
+            torch.cat((und_k, gen_k)).unsqueeze(0),
+            torch.cat((und_v, gen_v)).unsqueeze(0),
+            action_block_mask,
+            action_backend,
+            dynamic_shapes=True,
+        ).squeeze(0)[: action_query_real.shape[0]]
+
+        full_res = torch.zeros_like(full_q).unsqueeze(0)
+        real_res = torch.zeros_like(full_q_real)
+        real_res[video_query_mask] = video_res.squeeze(0)
+        real_res[action_query_mask] = action_res
+        full_res[:, :num_real_full] = real_res.unsqueeze(0)
+    elif attention_meta is not None and attention_meta.video_action_causal_mask:
+        if flex_block_mask is not None:
+            raise ValueError("video_action_causal_mask and flex_block_mask cannot be enabled together")
+        required = (
+            "full_gen_role_ids",
+            "all_gen_role_ids",
+            "clean_query_offsets",
+            "video_query_offsets",
+            "action_query_offsets",
+            "clean_kv_offsets",
+            "video_kv_offsets",
+        )
+        missing = [name for name in required if getattr(attention_meta, name, None) is None]
+        if missing:
+            raise ValueError(f"video_action_causal_mask metadata is incomplete: {missing}")
+
+        full_roles = attention_meta.full_gen_role_ids
+        all_roles = attention_meta.all_gen_role_ids
+        assert full_roles is not None and all_roles is not None
+        num_real_full = full_roles.numel()
+        full_q_real = full_q[:num_real_full]
+        all_k = get_all_seq(packed_key_normalized)
+        all_v = get_all_seq(packed_value_states)
+        assert all_k.shape[0] == all_roles.numel() == all_v.shape[0]
+        clean_query_mask = full_roles == 0
+        video_query_mask = full_roles == 1
+        action_query_mask = full_roles == 2
+        assert clean_query_mask.any() and video_query_mask.any() and action_query_mask.any(), (
+            "video_action_causal_mask requires clean C, future video V, and future action A tokens"
+        )
+        clean_key_mask = all_roles <= 0  # UND=-1 plus clean C=0
+        video_key_mask = all_roles <= 1  # UND + C + future video V
+
+        # Video-first WAM role triangle:
+        #   clean C query       -> UND + C
+        #   future video V query-> UND + C + V
+        #   future action A query-> UND + C + V + A
+        # Separate varlen calls preserve FlashAttention and the per-sample
+        # block diagonal contract without materialising a dense SxS mask.
+        clean_query_offsets = attention_meta.clean_query_offsets
+        video_query_offsets = attention_meta.video_query_offsets
+        action_query_offsets = attention_meta.action_query_offsets
+        clean_kv_offsets = attention_meta.clean_kv_offsets
+        video_kv_offsets = attention_meta.video_kv_offsets
+        assert clean_query_offsets is not None
+        assert video_query_offsets is not None
+        assert action_query_offsets is not None
+        assert clean_kv_offsets is not None
+        assert video_kv_offsets is not None
+        clean_res = attention(
+            full_q_real[clean_query_mask].unsqueeze(0),
+            all_k[clean_key_mask].unsqueeze(0),
+            all_v[clean_key_mask].unsqueeze(0),
+            **_varlen_kwargs(
+                clean_query_offsets,
+                cumulative_seqlen_Q=clean_query_offsets,
+                cumulative_seqlen_KV=clean_kv_offsets,
+                max_seqlen_Q=attention_meta.max_clean_query_len,
+                max_seqlen_KV=attention_meta.max_clean_kv_len,
+            ),
+        )
+        video_res = attention(
+            full_q_real[video_query_mask].unsqueeze(0),
+            all_k[video_key_mask].unsqueeze(0),
+            all_v[video_key_mask].unsqueeze(0),
+            **_varlen_kwargs(
+                video_query_offsets,
+                cumulative_seqlen_Q=video_query_offsets,
+                cumulative_seqlen_KV=video_kv_offsets,
+                max_seqlen_Q=attention_meta.max_video_query_len,
+                max_seqlen_KV=attention_meta.max_video_kv_len,
+            ),
+        )
+        action_res = attention(
+            full_q_real[action_query_mask].unsqueeze(0),
+            all_k.unsqueeze(0),
+            all_v.unsqueeze(0),
+            **_varlen_kwargs(
+                action_query_offsets,
+                cumulative_seqlen_Q=action_query_offsets,
+                cumulative_seqlen_KV=sample_offsets,
+                max_seqlen_Q=attention_meta.max_action_query_len,
+                max_seqlen_KV=packed_query_states["max_sample_len"],
+            ),
+        )
+        # Explicitly zero trailing pack padding.  Varlen kernels do not write
+        # query rows outside their cumulative offsets; allowing those rows to
+        # contain undefined values can poison projection-weight gradients.
+        full_res = torch.zeros_like(full_q).unsqueeze(0)
+        real_res = torch.zeros_like(full_q_real)
+        real_res[clean_query_mask] = clean_res.squeeze(0)
+        real_res[video_query_mask] = video_res.squeeze(0)
+        real_res[action_query_mask] = action_res.squeeze(0)
+        full_res[:, :num_real_full] = real_res.unsqueeze(0)
+    elif flex_block_mask is not None:
         if flex_backend is None:
             raise ValueError(
                 "flex_block_mask needs the FlexBackend it was built for: which kernels run the mask "
@@ -684,6 +870,7 @@ def dispatch_attention(
             # predates these fields.
             flex_block_mask=getattr(attention_mask, "flex_block_mask", None),
             flex_backend=getattr(attention_mask, "flex_backend", None),
+            attention_meta=attention_mask,
         )
     return output, None
 

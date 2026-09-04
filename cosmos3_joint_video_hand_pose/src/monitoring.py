@@ -218,6 +218,7 @@ def _prepare_one(
         "source_resolution": [640, 360],
         "model_canvas": [640, 368],
         "bottom_padding_pixels": 8,
+        "rigid_pose_frame_delta": action_builder.rigid_pose_frame_delta,
         "initial_action_path": str(initial_action_path.resolve()),
         "reference_action_path": str(reference_action_path.resolve()),
         "reference_video_path": str(reference_video_path.resolve()),
@@ -287,6 +288,7 @@ def prepare(args: argparse.Namespace) -> None:
     builder = Action57Builder(
         state_normalizer=args.state_normalizer,
         future_normalizer=args.future_normalizer,
+        rigid_pose_frame_delta=args.rigid_pose_frame_delta,
     )
     inputs = []
     for split, rows, episodes in split_rows:
@@ -473,6 +475,7 @@ def render(args: argparse.Namespace) -> None:
     builder = Action57Builder(
         state_normalizer=state_normalizer,
         future_normalizer=future_normalizer,
+        rigid_pose_frame_delta=bool(metadata.get("rigid_pose_frame_delta", False)),
     )
     decoded = builder.decode(_load_prediction(args.sample_outputs))
     reference_action = torch.tensor(
@@ -593,6 +596,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_FUTURE_NORMALIZER,
     )
+    prepare_parser.add_argument("--rigid-pose-frame-delta", action="store_true")
     prepare_parser.set_defaults(func=prepare)
     render_parser = subparsers.add_parser("render")
     render_parser.add_argument("--video", type=Path, required=True)

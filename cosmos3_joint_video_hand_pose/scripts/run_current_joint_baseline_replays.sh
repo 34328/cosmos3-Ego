@@ -5,8 +5,8 @@ cd /mnt/lzh/cosmos
 readonly PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 readonly TORCHRUN=/home/lzh/miniconda3/envs/cosmos3/bin/torchrun
 readonly ROOT=/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose
-readonly TRAIN_ROOT=/mnt/lzh/cosmos/outputs/joint_video_hand_pose/overfit/overfit_v0.2_lr_balanced
-readonly INFERENCE_ROOT=/mnt/lzh/cosmos/outputs/joint_video_hand_pose/inference/overfit_v0.2_lr_balanced
+readonly TRAIN_ROOT=/mnt/lzh/cosmos/outputs/joint_video_hand_pose/overfit/overfit_v0.2_lr_balanced_cp1_75k_repro
+readonly INFERENCE_ROOT=/mnt/lzh/cosmos/outputs/joint_video_hand_pose/inference/overfit_v0.2_lr_balanced_cp1_75k_repro
 readonly INPUT_ROOT="$INFERENCE_ROOT/monitor_inputs"
 readonly V2="$ROOT/artifacts/cosmos3_action_contract/v2/normalizers"
 
@@ -28,7 +28,10 @@ fi
 if (($#)); then
   iterations=("$@")
 else
-  mapfile -t iterations < <(find "$TRAIN_ROOT/checkpoints" -mindepth 1 -maxdepth 1 -type d -name 'iter_*' -printf '%f\n' | sed 's/^iter_//' | sort -n | xargs -r -n1 printf '%09d\n')
+  mapfile -t iterations < <(
+    find "$TRAIN_ROOT/checkpoints" -mindepth 1 -maxdepth 1 -type d -name 'iter_*' -printf '%f\n' \
+      | sed 's/^iter_//' | sort -n | xargs -r -n1 printf '%09d\n'
+  )
 fi
 [[ ${#iterations[@]} -gt 0 ]] || { echo "no checkpoints under $TRAIN_ROOT/checkpoints" >&2; exit 3; }
 
@@ -49,7 +52,8 @@ for iteration in "${iterations[@]}"; do
     -m cosmos3_joint_video_hand_pose.src.inference --parallelism-preset=throughput \
     --no-guardrails --no-use-ema-weights --sampler=unipc --num-steps=30 --shift=5 \
     -i "$output/inference_inputs/*.json" -o "$output/generated" \
-    --checkpoint-path "$checkpoint" --experiment egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced --seed 0
+    --checkpoint-path "$checkpoint" \
+    --experiment egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action --seed 0
   for metadata in "$output"/inputs/*/metadata.json; do
     name=$(basename "$(dirname "$metadata")")
     "$PYTHON" -m cosmos3_joint_video_hand_pose.src.monitoring render \

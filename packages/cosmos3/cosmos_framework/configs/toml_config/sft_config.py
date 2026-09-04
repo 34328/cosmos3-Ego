@@ -334,6 +334,20 @@ class ModelConfig(BaseModel):
             "[job].task='vfm'; skipped on VLM."
         ),
     )
+    video_action_causal_mask: bool = Field(
+        default=False,
+        description=(
+            "Enable the video-first joint WAM C/V/A attention triangle. "
+            "Requires two_way joint attention with vision+action and no sound."
+        ),
+    )
+    video_action_temporal_causal_mask: bool = Field(
+        default=False,
+        description=(
+            "Enable B3 video-first temporal visibility: video remains bidirectional "
+            "without future action, while action t reads only video/action at or before t."
+        ),
+    )
     attn_implementation: str = Field(
         default="cosmos",
         description=(

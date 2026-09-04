@@ -38,8 +38,15 @@ def pose27_from_streams(
     head_pose: np.ndarray,
     right_wrist_pose: np.ndarray,
     left_wrist_pose: np.ndarray,
+    *,
+    rigid_pose_frame_delta: bool = False,
 ) -> np.ndarray:
-    """Build the physical camera/right/left pose values before normalization."""
+    """Build physical camera/right/left values before normalization.
+
+    The legacy representation stores every future rigid pose relative to its
+    first frame. The optional B3 representation keeps the clean a0 state
+    unchanged but stores each future pose as T[t-1]^-1 @ T[t].
+    """
     head = pose_matrices(head_pose)
     right = pose_matrices(right_wrist_pose)
     left = pose_matrices(left_wrist_pose)
@@ -54,9 +61,14 @@ def pose27_from_streams(
     right9[0] = pose9((np.linalg.inv(head[0]) @ right[0])[None])[0]
     left9[0] = pose9((np.linalg.inv(head[0]) @ left[0])[None])[0]
     if length > 1:
-        camera9[1:] = pose9(np.linalg.inv(head[0]) @ head[1:])
-        right9[1:] = pose9(np.linalg.inv(right[0]) @ right[1:])
-        left9[1:] = pose9(np.linalg.inv(left[0]) @ left[1:])
+        if rigid_pose_frame_delta:
+            camera9[1:] = pose9(np.linalg.inv(head[:-1]) @ head[1:])
+            right9[1:] = pose9(np.linalg.inv(right[:-1]) @ right[1:])
+            left9[1:] = pose9(np.linalg.inv(left[:-1]) @ left[1:])
+        else:
+            camera9[1:] = pose9(np.linalg.inv(head[0]) @ head[1:])
+            right9[1:] = pose9(np.linalg.inv(right[0]) @ right[1:])
+            left9[1:] = pose9(np.linalg.inv(left[0]) @ left[1:])
     return np.concatenate((camera9, right9, left9), axis=-1).astype(np.float32)
 
 
@@ -92,6 +104,15 @@ def _transform_points(transform: torch.Tensor, points: torch.Tensor) -> torch.Te
     return torch.einsum("tij,tnj->tni", transform[:, :3, :3], points) + transform[:, None, :3, 3]
 
 
+def _integrate_rigid_increments(values: torch.Tensor) -> torch.Tensor:
+    """Interpret pose9[0] as state and pose9[1:] as right-composable increments."""
+    increments = _pose9_matrices(values)
+    integrated = increments.clone()
+    for frame in range(1, len(integrated)):
+        integrated[frame] = integrated[frame - 1] @ increments[frame]
+    return integrated
+
+
 @dataclass(frozen=True)
 class DecodedAction57:
     headcam_f0: torch.Tensor
@@ -111,11 +132,13 @@ class Action57Builder:
         future_normalizer: str | Path = DEFAULT_FUTURE_NORMALIZER,
         right_codec: str | Path = CODEC_ROOT / "right_mlp15_primary.pt",
         left_codec: str | Path = CODEC_ROOT / "left_mlp15_primary.pt",
+        rigid_pose_frame_delta: bool = False,
     ):
         self.state_normalizer = PiecewiseAsinhNormalizer(state_normalizer)
         self.future_normalizer = PiecewiseAsinhNormalizer(future_normalizer)
         self.right_codec = FrozenHandMLPAE15(right_codec)
         self.left_codec = FrozenHandMLPAE15(left_codec)
+        self.rigid_pose_frame_delta = bool(rigid_pose_frame_delta)
 
     def build(
         self,
@@ -126,7 +149,14 @@ class Action57Builder:
         right_keypoints: np.ndarray,
         left_keypoints: np.ndarray,
     ) -> torch.Tensor:
-        pose27 = torch.from_numpy(pose27_from_streams(head_pose, right_wrist_pose, left_wrist_pose))
+        pose27 = torch.from_numpy(
+            pose27_from_streams(
+                head_pose,
+                right_wrist_pose,
+                left_wrist_pose,
+                rigid_pose_frame_delta=self.rigid_pose_frame_delta,
+            )
+        )
         length = len(pose27)
         normalized27 = torch.empty_like(pose27)
         normalized27[0] = self.state_normalizer.normalize(pose27[0])
@@ -160,14 +190,19 @@ class Action57Builder:
         if len(action) > 1:
             pose27[1:] = self.future_normalizer.denormalize(normalized27[1:])
 
-        headcam_f0 = _pose9_matrices(pose27[:, 0:9])
-        right_relative = _pose9_matrices(pose27[:, 9:18])
-        left_relative = _pose9_matrices(pose27[:, 18:27])
-        right_wrist_f0 = right_relative.clone()
-        left_wrist_f0 = left_relative.clone()
-        if len(action) > 1:
-            right_wrist_f0[1:] = right_relative[0] @ right_relative[1:]
-            left_wrist_f0[1:] = left_relative[0] @ left_relative[1:]
+        if self.rigid_pose_frame_delta:
+            headcam_f0 = _integrate_rigid_increments(pose27[:, 0:9])
+            right_wrist_f0 = _integrate_rigid_increments(pose27[:, 9:18])
+            left_wrist_f0 = _integrate_rigid_increments(pose27[:, 18:27])
+        else:
+            headcam_f0 = _pose9_matrices(pose27[:, 0:9])
+            right_relative = _pose9_matrices(pose27[:, 9:18])
+            left_relative = _pose9_matrices(pose27[:, 18:27])
+            right_wrist_f0 = right_relative.clone()
+            left_wrist_f0 = left_relative.clone()
+            if len(action) > 1:
+                right_wrist_f0[1:] = right_relative[0] @ right_relative[1:]
+                left_wrist_f0[1:] = left_relative[0] @ left_relative[1:]
 
         wrist_origin = torch.zeros((len(action), 1, 3), dtype=action.dtype, device=action.device)
         right_local = torch.cat((wrist_origin, self.right_codec.decode(action[:, 18:33])), dim=1)

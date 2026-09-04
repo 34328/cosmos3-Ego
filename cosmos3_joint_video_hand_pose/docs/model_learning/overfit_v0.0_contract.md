@@ -1,14 +1,19 @@
-# EgoVerse x Cosmos 3：overfit_v0.0 模型学习合同
+# EgoVerse × Cosmos 3：Joint Video–Action 模型/数据合同
 
-> 版本：overfit_v0.0（原生 57D、冻结 MLP-AE-15、camera action、visibility 与平衡子块 loss）  
+> 文件名保留历史版本号；当前运行基线见
+> [当前 Joint Overfit 基线](../training/current_joint_overfit_baseline.md)。
 > 日期：2026-08-21  
-> 状态：当前唯一有效的 joint overfit 模型学习合同；历史 V1–V6 不再作为配置、实现或实验解释依据。训练运行参数见独立文档。  
+> 状态：57D action、坐标、normalizer、visibility、loss 与 replay 的语义合同仍有效；
+> 并行、token cap、noise schedule 和 LR 以当前运行基线为准。历史 V1–V6 以及
+> CP2/85K 运行参数不再作为启动依据。
 > overfit 数据：`brushing_shoes / repair_bench`，36 episodes / 181 segments。Mecka 100h train split 只用于冻结 codec/normalizer 统计，并作为后续正式训练母集。  
 > 模型：从 `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464` 初始化，不修改 Cosmos Generator 主干结构。
 
 > 讲解用总流程图与 action 子流程图见 [Data Pipeline](pipeline.md)；该图不替代本文的实现合同。
 
-> 本文只保留最终 overfit 基线，不再维护 V1–V6 的实验继承关系。历史迭代最终收敛为：MLP-AE-15、`lambda_out_of_fov=0`、`640x368`、`T=4n+1`、85K token cap、translation-scale action contract v2、八个 action 子块等权和 video/action `10:7`。
+> 稳定语义为：MLP-AE-15、`lambda_out_of_fov=0`、`640x368`、`T=4n+1`、
+> translation-scale action contract v2 与八个 action 子块等权。当前运行值为 75K、
+> video/action `1.0:0.7`、CP1/FSDP8；这些运行 guardrail 不改变 57D 表示或坐标合同。
 
 ## 0. 当前结论
 
@@ -64,15 +69,20 @@ Cosmos 的 clean/noisy 语义必须严格按源码理解：整段数据是加噪
 
 <h3 style="color:#2e7d32">TODO-4（adapter/config 已实现，基础 smoke 已验收）：数据到 Cosmos 的视频训练链路</h3>
 
-> 唯一详细规范见 [TODO-4：EgoVerse 视频训练链路 v1](../specs/todo4_video_training_pipeline_v1.md)。已锁定：原始 `640x360` 底部 pad 8 px 为 `640x368`；每个 sample 显式满足 `T=4n+1`；85K exact-token cap；超限 segment 按原片段的 80/70/60/50% 分档同步均匀采样，50% 仍超限则丢弃；合法完整 samples 交给 Cosmos 原生 `PackingDataLoader` 动态 packing；所有视频、action、camera、pose、visibility 和 metadata 使用同一时间索引。
+> 唯一详细规范见 [TODO-4：EgoVerse 视频训练链路 v1](../specs/todo4_video_training_pipeline_v1.md)。已锁定：原始 `640x360` 底部 pad 8 px 为 `640x368`；每个 sample 显式满足 `T=4n+1`；当前 75K exact-token cap；超限 segment 按原片段的 80/70/60/50% 分档同步均匀采样，50% 仍超限则丢弃；合法完整 samples 交给 Cosmos 原生 `PackingDataLoader` 动态 packing；所有视频、action、camera、pose、visibility 和 metadata 使用同一时间索引。
 
 <h3 style="color:#2e7d32">TODO-5（已实现并通过单元测试）：Cosmos 原生 Flow Loss 与 Visibility Mask</h3>
 
-> 视频生成 loss 完整复用 Cosmos 原生 flow-matching loss，不增加像素重建或 decoded-pose geometry loss。action loss 仍使用原生 flow-matching velocity MSE，只取前 `raw_action_dim=57`；`[57:64]` padding 永不参与 loss。camera translation/rotation、左右 wrist translation/rotation、左右 hand latent 共八个 active 子块等权；每只手的三个子块共享该侧 GT palm visibility mask，camera 两块始终有效。每个 sample 的分母只统计 active 子块，再走 Cosmos 原生跨 rank sample-level averaging。`lambda_out_of_fov=0`，video/action 系数固定为 `10:7`。
+> 视频生成 loss 完整复用 Cosmos 原生 flow-matching loss，不增加像素重建或 decoded-pose geometry loss。action loss 仍使用原生 flow-matching velocity MSE，只取前 `raw_action_dim=57`；`[57:64]` padding 永不参与 loss。camera translation/rotation、左右 wrist translation/rotation、左右 hand latent 共八个 active 子块等权；每只手的三个子块共享该侧 GT palm visibility mask，camera 两块始终有效。每个 sample 的分母只统计 active 子块，再走 Cosmos 原生跨 rank sample-level averaging。`lambda_out_of_fov=0`，当前 video/action 系数为 `1.0:0.7`。
 
 <h3 style="color:#2e7d32">TODO-6（artifact 已完成，自动 checkpoint 绑定待决定）：最终 Normalizer 统计与冻结</h3>
 
-> 已按最终 85K sampler 遍历 train split 并冻结 `cosmos3_action_contract/v2`。state normalizer 保持 v1 字节一致；future camera/right-wrist/left-wrist translation 使用零中心、train-only std scale，18 个 rotation 通道保持 v1 q01/q99 参数不变；继续使用不 clamp 的可逆 `PiecewiseAsinhNormalizer(beta=1)`。训练和 replay 启动脚本均先执行 v2 manifest/hash validator。
+> 已遍历 train split 并冻结 `cosmos3_action_contract/v2`。该统计来自原始训练分布，
+> 不因 pack cap 从历史 85K 收紧到当前 75K 而重新拟合。state normalizer 保持 v1
+> 字节一致；future camera/right-wrist/left-wrist translation 使用零中心、train-only
+> std scale，18 个 rotation 通道保持 v1 q01/q99 参数不变；继续使用不 clamp 的可逆
+> `PiecewiseAsinhNormalizer(beta=1)`。训练和 replay 启动脚本均先执行 v2
+> manifest/hash validator。
 
 TODO-1、TODO-2、TODO-3、TODO-4 和 TODO-5 已完成设计；TODO-6 已完成 artifact 统计与手动校验，但自动 checkpoint 绑定尚未接入。TODO-3 的预测/GT 四格 replay 已实现并通过真实推理样本验收；TODO-4 的 adapter/config 已实现并通过 8 卡三步基础 smoke。
 
@@ -165,7 +175,10 @@ train segments: 32355
 test segments: 1180
 ```
 
-当前 overfit_v0.0 不直接训练全部 32,355 个 train segments，而是只使用冻结清单 `brushing_shoes_repair_bench_36ep_v1` 的 36 episodes / 181 train segments；不另划 validation split，也不使用 test 数据。后续 100h 正式训练仍沿用同一模型、adapter、normalizer 和 loss 合同，但训练规模与超参数另行冻结。
+当前 joint overfit 不直接训练全部 32,355 个 train segments，而是只使用冻结清单
+`brushing_shoes_repair_bench_36ep_v1` 的 36 episodes / 181 train segments；
+不另划 validation split，也不使用 test 数据。后续 100h 正式训练仍沿用同一模型、
+adapter、normalizer 和 loss 合同，但训练规模与超参数另行冻结。
 
 正式清单：
 
@@ -199,7 +212,7 @@ overfit_v0.0 固定使用 `prompt_mode="episode_context_and_segment"`：当两�
 
 ### 3.3 TODO-4：数据与视频训练接口
 
-详细实现合同只维护在 [TODO-4：EgoVerse 视频训练链路 v1](../specs/todo4_video_training_pipeline_v1.md)。简要结论：adapter 读取完整 manifest segment，显式对齐到 `T=4n+1`，超 85K 时按 80/70/60/50% 分档保留首帧并对 future 同步均匀采样；Cosmos 原生 packer 只负责动态组合已经合法且未超 cap 的 samples，不负责切分或修复单个 sample。
+详细实现合同只维护在 [TODO-4：EgoVerse 视频训练链路 v1](../specs/todo4_video_training_pipeline_v1.md)。简要结论：adapter 读取完整 manifest segment，显式对齐到 `T=4n+1`，超 75K 时按 80/70/60/50% 分档保留首帧并对 future 同步均匀采样；Cosmos 原生 packer 只负责动态组合已经合法且未超 cap 的 samples，不负责切分或修复单个 sample。
 
 #### 3.3.1 Domain-3 action projection 加载合同（P0 已锁定）
 
@@ -394,20 +407,22 @@ Action 端：`x0_tokens_action[0]` 是 clean initial-state condition，`x0_token
 
 ### 5.2 Flow matching
 
-视频和 action 使用 Cosmos Nano 官方共享 noise schedule（`independent_action_schedule=False`）：
+当前稳定 baseline 使用独立模态 noise schedule（`independent_action_schedule=True`）：
 
 $$
-x_{v,\sigma}=\sigma\epsilon_v+(1-\sigma)z_v,
+x_{v,\sigma_v}=\sigma_v\epsilon_v+(1-\sigma_v)z_v,
 $$
 
 $$
-x_{a,\sigma}=\sigma\epsilon_a+(1-\sigma)a.
+x_{a,\sigma_a}=\sigma_a\epsilon_a+(1-\sigma_a)a.
 $$
 
-同一个 sample 的 video/action 复用 sampled sigma；各模态再用自己的 condition mask 将 clean slot 的 sigma 置零。Cosmos 对 action 使用：
+同一个 sample 的 video/action 分别采样 `sigma_v` 与 `sigma_a`；各模态再用自己的
+condition mask 将 clean slot 的 sigma 置零。独立 schedule 是当前 baseline 的固定
+组成，不是 Video-First mask 额外改变的变量。Cosmos 对 action 使用：
 
 ```text
-sigma_action[t] = sampled_sigma * (1 - condition_mask_action[t])
+sigma_action[t] = sampled_sigma_action * (1 - condition_mask_action[t])
 ```
 
 因此首帧 action 不加噪；future action 加噪。所有 action token 走 `action2llm`；只有 noisy action 走 `llm2action` 输出 `v_action`。
@@ -419,7 +434,7 @@ sigma_action[t] = sampled_sigma * (1 - condition_mask_action[t])
 3. **Action 分组**：camera `[0:9]` 单独计算；right group `[9:33]`、left group `[33:57]` 分别包含 wrist 9D 和 hand latent 15D。
 4. **Visibility mask**：future action 的 camera loss 始终计算；每侧 hand group 使用 GT palm visibility 权重。overfit_v0.0 默认 `lambda_out_of_fov=0`，画外侧不计该侧 pose loss；有效 group 的分子和分母同步重算，不能因屏蔽画外帧而人为降低 loss 尺度。首帧 `a0` 为 clean condition，不计 action flow loss。
 5. **Action 子块**：camera translation/rotation、左右 wrist translation/rotation、左右 hand latent 共八块等权；某侧在该 segment 完全无有效 future frame时跳过该侧三个子块，分母按实际 active 子块重算。
-6. **总权重与跨 rank 归一化**：`loss_scale=10`、`action_loss_weight=7`。rank 内对 segments 等权平均，并启用 `sample_level_loss_averaging=True`，由 Cosmos 按各 rank 的本地 sample 数校正整个 video+action loss，得到跨 rank 全局 sample mean。
+6. **总权重与跨 rank 归一化**：`loss_scale=1.0`、`action_loss_weight=0.7`。rank 内对 segments 等权平均，并启用 `sample_level_loss_averaging=True`，由 Cosmos 按各 rank 的本地 sample 数校正整个 video+action loss，得到跨 rank 全局 sample mean。
 7. **时间权重**：visibility/noisy mask 同时进入分子和分母；Cosmos `train_time_weight` 只乘分子，严格保持官方 flow-matching 语义。当前 `train_time_weight="uniform"`，数值恒为 1。
 
 当前实现只在 Cosmos 原生 action flow loss 外增加逐时间、逐 hand group 的 GT 权重；Generator 架构和 video loss 保持不变。
@@ -469,7 +484,7 @@ visibility_gt       = palm_cam.z > 0
 - 验证 RGB、segment start/end、caption 和 Pose 使用同一帧索引；
 - 完成 TODO-1 的 codec 重建报告；
 - 验收 TODO-2 的掌心投影 overlay、全量统计和 loss 单元测试；
-- 验收 TODO-4 的 `4n+1`、85K cap、五档同步索引、单长样本和多短样本 packing；
+- 验收 TODO-4 的 `4n+1`、75K cap、五档同步索引、单长样本和多短样本 packing；
 - clean：首帧 RGB、文本、`a0`；
 - noisy：future video latent、future hand action `a1:T-1`；
 - 复用原生 `action2llm`、`llm2action`、joint flow-matching 和 `PackingDataLoader`；
@@ -545,7 +560,7 @@ overfit_v0.0 的 36-episode 单任务实验在每个原生 checkpoint 保存点�
 | 当前 Zarr 训练帧 | 640x360（横屏，W x H；数组 shape 为 360x640x3） |
 | RGB/Pose | 30 FPS / 30 Hz |
 | 视频输入/VAE | 原始 640x360 不 resize；底部 reflection-pad 8 px 到 640x368；`T=4n+1` |
-| Window / packing | 完整 manifest segment；85K cap；超限按 80/70/60/50% 同步均匀采样，仍超限则丢弃；Cosmos 原生 dynamic packing |
+| Window / packing | 完整 manifest segment；75K cap；超限按 80/70/60/50% 同步均匀采样，仍超限则丢弃；Cosmos 原生 dynamic packing |
 | Action width | 原生 57D，Cosmos 尾部 padding 到固定 64D |
 | Action condition | slot 0 clean，`condition_mask=[1,0,...,0]` |
 | Pose input/output | 模型外 native adapter；双手 20 点固定使用 canonical seed-1 `mlp15`；PCA-15 仅作后续 ablation |
@@ -575,16 +590,16 @@ TODO-2/5 已完成实现与单元测试，TODO-4 基础 smoke 已通过，但下
 
 | 优先级 | 项目 | 当前缺口 | 建议的冻结标准 |
 |:---:|:---|:---|:---|
-| P0 已锁定 | Overfit 数据与监控协议 | overfit_v0.0 使用 brushing-shoes 36 episodes / 181 segments | 每 300 step 保存可恢复 checkpoint，2000 step 收尾；每个保存点生成固定四个长 train segment 的四格 replay；不计算 test loss |
+| P0 已锁定 | Overfit 数据与监控协议 | 当前 joint overfit 使用 brushing-shoes 36 episodes / 181 segments | 每 300 step 保存可恢复 checkpoint；至少运行并验收到 1200 step，是否延长到 2000 由曲线和 replay 决定；不计算 test loss |
 | P0 已锁定 | Hand codec | 主 run 使用冻结 MLP-AE-15，PCA-15 仅作后续 ablation | 固定 `hand_codec.type=mlp15` 和 canonical seed-1 左右权重 SHA256；checkpoint 同时绑定输入/latent normalization；训练与推理不允许替换 codec |
-| TODO-4（85K 待长程验收） | Window sampler / temporal packing / VAE / batch schema | `640x368`、`4n+1`、85K cap、80/70/60/50% 同步超长采样和原生 dynamic packing 已锁定；90K 在第 39 步 OOM | 重新审计 85K packed 吞吐并完成长程 8 卡训练；不得改动 TODO-5 loss 合同 |
-| TODO-5（已实现并通过单元测试） | Loss 函数与权重 | Cosmos 原生 video loss 不变；action 只取 57D，八个 active 子块等权并跨 rank 做全局 sample mean | overfit_v0.0 使用 `loss_scale=10`、`action_loss_weight=7`、`lambda_out_of_fov=0`；padding/condition/visibility/sample 等权测试必须持续通过；不新增额外 loss |
+| TODO-4（75K 已进入长程） | Window sampler / temporal packing / VAE / batch schema | `640x368`、`4n+1`、75K cap、80/70/60/50% 同步超长采样和原生 dynamic packing 已锁定；历史 CP2/90K 在第 39 步 OOM | 保持 CP1/FSDP8 与 expandable allocator；扩展 100h 前重新做 75K 全量审计 |
+| TODO-5（已实现并通过单元测试） | Loss 函数与权重 | Cosmos 原生 video loss 不变；action 只取 57D，八个 active 子块等权并跨 rank 做全局 sample mean | 当前使用 `loss_scale=1.0`、`action_loss_weight=0.7`、`lambda_out_of_fov=0`；padding/condition/visibility/sample 等权测试必须持续通过；不新增额外 loss |
 | P0 已锁定；checkpoint audit 已通过 | Domain/action projection compatibility | domain 3 是真实预训练行；本项目只复用 57D 宽度、槽位和 projection，MLP latent/anchored delta 并非原始 action 数值语义 | 按 3.3.1 节加载 regular `action2llm/llm2action` 及其 bias、`action_modality_embed`；不重置；跳过 base EMA，关闭新 EMA，直接保存和推理 `net.*` |
 | P0 已锁定 | EgoVerse canonical `hand_pose` raw width | 训练侧 `ActionProcessor` 会从官方 57D action shape 自动记录 `raw_action_dim=57`；缺口仅在通用 inverse/WAM inference helper 不会从全局 `domain_utils.py` 推断本项目的 canonical 宽度 | 保持全局 `domain_utils.py` 不变；EgoVerse inference 入口显式传入 `raw_action_dim=57`，并让 helper 遵循“显式 override 优先于 domain 默认表”。该 override 只用于 unpad/round-trip 的尺寸元数据，不改变 action 数值、padding、noise、flow target、loss 或模型权重；用一次 inference round-trip 验收 |
 | TODO-6（normalizer 已冻结；checkpoint 自动绑定未接入） | Final normalizer artifacts | 全部 32,355 个 train samples 已按 TODO-4 统计；state/future-delta 文件、方法、参数和 SHA256 已冻结。当前启动 validator 自动校验两个 normalizer、report hash 和 translation-scale 合同，但尚未把完整 artifact metadata 写入 checkpoint | 自动绑定接入后，训练、resume 和 inference 必须核对 artifact manifest、codec、两个 normalizer 和 source manifests 的 SHA256；旧 121 帧报告不得复用 |
 | ⚠️ 实现阶段 Warning | Base checkpoint/tokenizer smoke test | 当前不是已发现的 checkpoint 问题，仅用于防止实现配置误加载或误训练 | 加载 `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/` 后确认 Reasoner/LLM 与 video VAE 冻结，保留并加载预训练 generation/action 参数；使用一批数据成功完成 forward 和 backward，并确认冻结模块无梯度、待训练模块有有效梯度即可 |
 | 已锁定 | Single-stage checkpoint inheritance | 不采用 Stage 1/2/3 分阶段训练 | 直接从 `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/` 启动一次 joint video + hand-pose fine-tuning；完整继承预训练 generation/action 参数，不重置 domain-3 action projection；Reasoner/LLM 和 video VAE 冻结 |
-| P0 已锁定 | overfit optimizer/training schedule | 8 卡 `CP=2/FSDP=4`、BF16、full activation checkpoint、base LR `2e-5`、action projection `5x`、warmup 20、cosine 2000 steps、grad accumulation 1、EMA off | 运行配置以 `configs/overfit_v0_0.toml` 为准；每 300 step staged 保存、释放 GPU、推理，再完整恢复训练状态，最终 step 2000 |
+| P0 已锁定 | overfit optimizer/training schedule | 8 卡 `CP=1/FSDP=8`、BF16、full activation checkpoint、base LR `2e-5`、shared/video `4x`、action projection `5x`、warmup 100、cosine 2000 steps、grad accumulation 1、EMA off | 运行配置以当前 CP1 TOML 为准；每 300 step 保存完整 DCP 与 dataloader 状态；正式 run 持续记录 raw non-finite 与 grad clip |
 | P1（暂缓） | Data quality audit | 数值有效性、异常跳变和坏帧尚未做完整批量审计 | 正式 100h 训练前做最低限度的 NaN/Inf、长度、Pose jump 和 RGB decode 检查；当前不展开复杂过滤规则 |
 | P1（暂缓） | Geometric augmentation | crop、flip、颜色增强暂不锁定 | 第一版不做会改变几何关系的增强；后续若启用必须同步更新 pose、camera、visibility 和 intrinsics |
 | P1（100h 正式训练前处理） | Task/text sampling | overfit_v0.0 是单任务数据，不用于判断 100h 多任务频次是否均衡 | 扩展到 100h 时单独审计 task/segment 频次和 caption 长尾；不得反向改变当前 overfit 抽样合同 |

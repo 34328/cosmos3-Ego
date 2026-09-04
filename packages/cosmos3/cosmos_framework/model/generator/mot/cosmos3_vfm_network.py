@@ -23,7 +23,9 @@ from cosmos_framework.model.generator.mot.context_parallel_utils import (
 from cosmos_framework.model.generator.mot.domain_aware_linear import DomainAwareLinear
 from cosmos_framework.model.generator.mot.flex_attention import (
     FlexBackend,
+    build_action_temporal_block_mask,
     build_multiview_block_mask,
+    causal_video_time_for_action,
     resolve_flex_backend,
 )
 from cosmos_framework.model.generator.mot.modeling_utils import TimestepEmbedder, has_noisy_tokens
@@ -56,6 +58,8 @@ class Cosmos3VFMNetworkConfig(PretrainedConfig):
         timestep_scale=0.001,
         predict_text_tokens=False,
         joint_attn_implementation="two_way",
+        video_action_causal_mask: bool = False,
+        video_action_temporal_causal_mask: bool = False,
         use_multiview_flex_attention: bool = False,
         flex_attention_backend: FlexBackendPreference = "auto",
         noisy_attention_scope: NoisyAttentionScope = "all_views",
@@ -91,6 +95,8 @@ class Cosmos3VFMNetworkConfig(PretrainedConfig):
         self.timestep_scale = timestep_scale
         self.predict_text_tokens = predict_text_tokens
         self.joint_attn_implementation = joint_attn_implementation
+        self.video_action_causal_mask = video_action_causal_mask
+        self.video_action_temporal_causal_mask = video_action_temporal_causal_mask
         self.use_multiview_flex_attention = use_multiview_flex_attention
         self.flex_attention_backend = flex_attention_backend
         self.noisy_attention_scope = noisy_attention_scope
@@ -152,6 +158,26 @@ class Cosmos3VFMNetwork(PreTrainedModel):
                 f"video_temporal_causal=True requires joint_attn_implementation='three_way', "
                 f"but got {config.joint_attn_implementation!r}."
             )
+        if config.video_action_causal_mask:
+            if config.joint_attn_implementation != "two_way":
+                raise ValueError("video_action_causal_mask=True requires joint_attn_implementation='two_way'.")
+            if not config.action_gen or not config.vision_gen or config.sound_gen:
+                raise ValueError(
+                    "video_action_causal_mask currently requires joint video+action generation with sound disabled."
+                )
+        if config.video_action_causal_mask and config.video_action_temporal_causal_mask:
+            raise ValueError(
+                "video_action_causal_mask and video_action_temporal_causal_mask are mutually exclusive"
+            )
+        if config.video_action_temporal_causal_mask:
+            if config.joint_attn_implementation != "two_way":
+                raise ValueError(
+                    "video_action_temporal_causal_mask=True requires joint_attn_implementation='two_way'."
+                )
+            if not config.action_gen or not config.vision_gen or config.sound_gen:
+                raise ValueError(
+                    "video_action_temporal_causal_mask requires joint video+action generation with sound disabled."
+                )
         self.video_temporal_causal = config.video_temporal_causal
         self.pad_for_cuda_graphs = False
 
@@ -159,7 +185,7 @@ class Cosmos3VFMNetwork(PreTrainedModel):
         # forces. Resolved here rather than per forward because the answer depends on the host
         # and not on the batch, so a run's log records it once.
         self.flex_backend: FlexBackend | None = None
-        if config.use_multiview_flex_attention:
+        if config.use_multiview_flex_attention or config.video_action_temporal_causal_mask:
             # The device is only read for the GPU architecture the FlashAttention-4 block size
             # follows from, which is the same for every device in this process, so the local one
             # stands in for the one the batch will arrive on.
@@ -167,12 +193,16 @@ class Cosmos3VFMNetwork(PreTrainedModel):
                 torch.device("cuda", torch.cuda.current_device()) if torch.cuda.is_available() else torch.device("cpu")
             )
             self.flex_backend = resolve_flex_backend(device, config.flex_attention_backend)
+            mask_name = (
+                "video-action temporal"
+                if config.video_action_temporal_causal_mask
+                else "multiview"
+            )
             log.info(
-                f"Multiview FlexAttention is running on the {self.flex_backend.name} backend "
+                f"{mask_name} FlexAttention is running on the {self.flex_backend.name} backend "
                 f"(flex_attention_backend={config.flex_attention_backend!r}), with a "
                 f"{self.flex_backend.block_size} block mask over a GEN stream padded to "
-                f"{self.flex_backend.full_seq_alignment} tokens. Noisy tokens attend to the "
-                f"noisy tokens of their sample under scope {config.noisy_attention_scope!r}."
+                f"{self.flex_backend.full_seq_alignment} tokens."
             )
 
         if config.vision_gen:
@@ -1050,6 +1080,18 @@ class Cosmos3VFMNetwork(PreTrainedModel):
         sequence_shard_world_size = (
             1 if replicated_attention_io_cp else (self.parallel_dims.cp_size if self.parallel_dims else 1)
         )
+        if (
+            (
+                self.config.video_action_causal_mask
+                or self.config.video_action_temporal_causal_mask
+            )
+            and self.parallel_dims is not None
+            and self.parallel_dims.cp_size != 1
+        ):
+            raise ValueError(
+                "video/action causal masks currently require CP=1; "
+                f"got CP={self.parallel_dims.cp_size}"
+            )
         prepared_sequence_pack_metadata = packed_seq.get_sequence_pack_metadata()
 
         input_pack, attention_meta, natten_metadata_list = build_packed_sequence(
@@ -1079,8 +1121,278 @@ class Cosmos3VFMNetwork(PreTrainedModel):
             prepared_metadata=prepared_sequence_pack_metadata,
         )
 
+        if self.config.video_action_causal_mask:
+            if packed_seq.action is None:
+                raise ValueError("video_action_causal_mask=True but this packed batch has no action tokens")
+            if not isinstance(attention_meta, SplitInfo) or attention_meta.is_three_way:
+                raise ValueError("video_action_causal_mask requires two-way SplitInfo metadata")
+
+            if packed_seq.vision is None:
+                raise ValueError("video_action_causal_mask=True but this packed batch has no vision tokens")
+
+            # get_all_seq is in original packed order, while full_only_seq is
+            # selected by _full_indices. Build exact C/V/A role IDs from the
+            # packer's authoritative modality indexes and condition masks:
+            # UND=-1, clean I0/a0 C=0, future video V=1, future action A=2.
+            num_all_tokens = sum(packed_seq.sample_lens)
+            all_roles = torch.full((num_all_tokens,), -1, dtype=torch.int8, device=packed_sequence.device)
+
+            vision_condition_parts = []
+            for token_shape, condition_mask in zip(
+                packed_seq.vision.token_shapes, packed_seq.vision.condition_mask, strict=True
+            ):
+                t, h, w = token_shape
+                vision_condition_parts.append(
+                    condition_mask.to(device=packed_sequence.device, dtype=torch.bool)
+                    .expand(t, h, w)
+                    .reshape(-1)
+                )
+            vision_is_clean = torch.cat(vision_condition_parts)
+            if vision_is_clean.numel() != packed_seq.vision.sequence_indexes.numel():
+                raise ValueError("Expanded vision condition mask does not match packed vision token count")
+            all_roles[packed_seq.vision.sequence_indexes.long()] = torch.where(
+                vision_is_clean,
+                torch.zeros_like(vision_is_clean, dtype=torch.int8),
+                torch.ones_like(vision_is_clean, dtype=torch.int8),
+            )
+
+            action_is_clean = torch.cat(
+                [mask.to(device=packed_sequence.device, dtype=torch.bool).reshape(-1) for mask in packed_seq.action.condition_mask]
+            )
+            if action_is_clean.numel() != packed_seq.action.sequence_indexes.numel():
+                raise ValueError("Action condition mask does not match packed action token count")
+            all_roles[packed_seq.action.sequence_indexes.long()] = torch.where(
+                action_is_clean,
+                torch.zeros_like(action_is_clean, dtype=torch.int8),
+                torch.full_like(action_is_clean, 2, dtype=torch.int8),
+            )
+
+            full_indices = input_pack["_full_indices"].long()
+            full_roles = all_roles[full_indices]
+            if bool((full_roles < 0).any()):
+                raise ValueError("Every GEN token must have exactly one C/V/A role")
+
+            num_samples = len(packed_seq.sample_lens)
+            full_sample_ids = input_pack["_full_only_sample_ids"][: full_roles.numel()].long()
+            role_counts = []
+            for role_id in range(3):
+                role_counts.append(
+                    torch.bincount(full_sample_ids[full_roles == role_id], minlength=num_samples).to(dtype=torch.int32)
+                )
+            clean_counts, video_counts, action_counts = role_counts
+            sample_counts = torch.tensor(
+                packed_seq.sample_lens, dtype=torch.int32, device=packed_sequence.device
+            )
+            clean_kv_counts = sample_counts - video_counts - action_counts
+            video_kv_counts = sample_counts - action_counts
+            if any(bool((counts <= 0).any()) for counts in role_counts):
+                raise ValueError(
+                    "video_action_causal_mask requires every sample to contain clean C, future video V, and future action A"
+                )
+
+            def _offsets(lengths: torch.Tensor) -> torch.Tensor:
+                # torch.cumsum promotes int32 inputs to int64 by default, but
+                # varlen attention requires CUDA cumulative offsets to remain
+                # int32.  Preserve the packer's offset dtype explicitly.
+                return torch.cat(
+                    (
+                        lengths.new_zeros(1),
+                        torch.cumsum(lengths, dim=0, dtype=lengths.dtype),
+                    )
+                )
+
+            attention_meta.video_action_causal_mask = True
+            attention_meta.full_gen_role_ids = full_roles
+            attention_meta.all_gen_role_ids = all_roles
+            attention_meta.clean_query_offsets = _offsets(clean_counts)
+            attention_meta.video_query_offsets = _offsets(video_counts)
+            attention_meta.action_query_offsets = _offsets(action_counts)
+            attention_meta.clean_kv_offsets = _offsets(clean_kv_counts)
+            attention_meta.video_kv_offsets = _offsets(video_kv_counts)
+            attention_meta.max_clean_query_len = int(clean_counts.max().item())
+            attention_meta.max_video_query_len = int(video_counts.max().item())
+            attention_meta.max_action_query_len = int(action_counts.max().item())
+            attention_meta.max_clean_kv_len = int(clean_kv_counts.max().item())
+            attention_meta.max_video_kv_len = int(video_kv_counts.max().item())
+
+        if self.config.video_action_temporal_causal_mask:
+            if self.flex_backend is None:
+                raise RuntimeError("Temporal video/action mask requires a resolved FlexAttention backend")
+            if not isinstance(attention_meta, SplitInfo) or attention_meta.is_three_way:
+                raise ValueError("Temporal video/action mask requires two-way SplitInfo metadata")
+            if packed_seq.vision is None or packed_seq.action is None or packed_seq.sound is not None:
+                raise ValueError("Temporal video/action mask requires vision and action without sound")
+            if self.natten_parameter_list:
+                raise ValueError("Temporal video/action FlexAttention and NATTEN cannot be enabled together")
+
+            # This experimental temporal contract is deliberately narrow:
+            # one WAM video and one same-length action stream per sample, both
+            # conditioned only at raw frame 0. Reject other layouts instead
+            # of silently assigning them an incorrect temporal meaning.
+            if len(packed_seq.vision.token_shapes) != len(packed_seq.action.token_shapes):
+                raise ValueError(
+                    "Temporal video/action mask requires one vision item per action stream"
+                )
+            temporal_compression = int(self.config.temporal_compression_factor_vision)
+            if temporal_compression < 1:
+                raise ValueError(f"Invalid vision temporal compression factor: {temporal_compression}")
+            for sample_idx, (vision_shape, action_shape, vision_condition, action_condition) in enumerate(
+                zip(
+                    packed_seq.vision.token_shapes,
+                    packed_seq.action.token_shapes,
+                    packed_seq.vision.condition_mask,
+                    packed_seq.action.condition_mask,
+                    strict=True,
+                )
+            ):
+                latent_t, _, _ = vision_shape
+                (action_t,) = action_shape
+                expected_action_t = 1 + (latent_t - 1) * temporal_compression
+                if action_t != expected_action_t:
+                    raise ValueError(
+                        "Temporal video/action mask requires aligned Case-B streams: "
+                        f"sample {sample_idx} has latent_t={latent_t}, action_t={action_t}, "
+                        f"expected action_t={expected_action_t}"
+                    )
+                vision_clean_frames = torch.nonzero(
+                    vision_condition.to(dtype=torch.bool).reshape(latent_t, -1).any(dim=1),
+                    as_tuple=False,
+                ).flatten()
+                action_clean_frames = torch.nonzero(
+                    action_condition.to(dtype=torch.bool).reshape(action_t, -1).any(dim=1),
+                    as_tuple=False,
+                ).flatten()
+                expected_clean = torch.zeros(1, dtype=torch.long, device=vision_clean_frames.device)
+                if not torch.equal(vision_clean_frames, expected_clean):
+                    raise ValueError(
+                        "Temporal video/action mask requires only vision frame 0 to be clean; "
+                        f"sample {sample_idx} has {vision_clean_frames.tolist()}"
+                    )
+                if not torch.equal(
+                    action_clean_frames,
+                    expected_clean.to(device=action_clean_frames.device),
+                ):
+                    raise ValueError(
+                        "Temporal video/action mask requires only action frame 0 to be clean; "
+                        f"sample {sample_idx} has {action_clean_frames.tolist()}"
+                    )
+
+            num_all_tokens = sum(packed_seq.sample_lens)
+            all_roles = torch.full(
+                (num_all_tokens,),
+                -1,
+                dtype=torch.long,
+                device=packed_sequence.device,
+            )
+            all_times = torch.full_like(all_roles, -1)
+            all_video_times = torch.full_like(all_roles, -1)
+
+            vision_time_parts: list[torch.Tensor] = []
+            for token_shape, condition_mask in zip(
+                packed_seq.vision.token_shapes,
+                packed_seq.vision.condition_mask,
+                strict=True,
+            ):
+                del condition_mask
+                latent_t, patch_h, patch_w = token_shape
+                spatial_tokens = patch_h * patch_w
+                vision_time_parts.append(
+                    torch.arange(latent_t, device=packed_sequence.device).repeat_interleave(spatial_tokens)
+                )
+            vision_times = torch.cat(vision_time_parts)
+            vision_indexes = packed_seq.vision.sequence_indexes.long()
+            if vision_times.numel() != vision_indexes.numel():
+                raise ValueError("Vision temporal metadata does not match packed vision tokens")
+            # Preserve the native IT2V attention exactly: the first-frame image
+            # and every future-video token form one bidirectional video stream.
+            # Video queries may read UND + every video token, but no action.
+            all_roles[vision_indexes] = torch.ones_like(vision_times)
+            all_times[vision_indexes] = vision_times
+            all_video_times[vision_indexes] = vision_times
+
+            action_time_parts: list[torch.Tensor] = []
+            for token_shape, condition_mask in zip(
+                packed_seq.action.token_shapes,
+                packed_seq.action.condition_mask,
+                strict=True,
+            ):
+                del condition_mask
+                (action_t,) = token_shape
+                action_time_parts.append(torch.arange(action_t, device=packed_sequence.device))
+            action_times = torch.cat(action_time_parts)
+            action_indexes = packed_seq.action.sequence_indexes.long()
+            if action_times.numel() != action_indexes.numel():
+                raise ValueError("Action temporal metadata does not match packed action tokens")
+            # a0 is still an action token.  It obeys the t=0 action rule rather
+            # than joining the video/conditioning stream.
+            all_roles[action_indexes] = torch.full_like(action_times, 2)
+            all_times[action_indexes] = action_times
+            action_video_times = causal_video_time_for_action(
+                action_times,
+                temporal_compression,
+            )
+            all_video_times[action_indexes] = action_video_times
+
+            full_indices = input_pack["_full_indices"].long()
+            full_roles = all_roles[full_indices]
+            full_times = all_times[full_indices]
+            full_video_times = all_video_times[full_indices]
+            if bool((full_roles < 0).any()):
+                raise ValueError("Every temporal-mask GEN token must be assigned a video/action role")
+
+            num_samples = len(packed_seq.sample_lens)
+            full_sample_ids = input_pack["_full_only_sample_ids"][: full_roles.numel()].long()
+            video_counts = torch.bincount(
+                full_sample_ids[full_roles == 1], minlength=num_samples
+            ).to(torch.int32)
+            action_counts = torch.bincount(
+                full_sample_ids[full_roles == 2], minlength=num_samples
+            ).to(torch.int32)
+            sample_counts = torch.tensor(
+                packed_seq.sample_lens,
+                dtype=torch.int32,
+                device=packed_sequence.device,
+            )
+            video_kv_counts = sample_counts - action_counts
+            if bool((video_counts <= 0).any()) or bool((action_counts <= 0).any()):
+                raise ValueError("Every temporal-mask sample needs video and action tokens")
+
+            def _temporal_offsets(lengths: torch.Tensor) -> torch.Tensor:
+                return torch.cat(
+                    (
+                        lengths.new_zeros(1),
+                        torch.cumsum(lengths, dim=0, dtype=lengths.dtype),
+                    )
+                )
+
+            attention_meta.video_action_temporal_causal_mask = True
+            attention_meta.full_gen_role_ids = full_roles
+            attention_meta.all_gen_role_ids = all_roles
+            attention_meta.video_query_offsets = _temporal_offsets(video_counts)
+            attention_meta.action_query_offsets = _temporal_offsets(action_counts)
+            attention_meta.video_kv_offsets = _temporal_offsets(video_kv_counts)
+            attention_meta.max_video_query_len = int(video_counts.max().item())
+            attention_meta.max_action_query_len = int(action_counts.max().item())
+            attention_meta.max_video_kv_len = int(video_kv_counts.max().item())
+
+            full_only_seq, full_q_offsets = get_full_only_seq(input_pack)
+            causal_seq, causal_offsets = get_causal_seq(input_pack)
+            attention_meta.action_flex_block_mask = build_action_temporal_block_mask(
+                seq_len=full_only_seq.shape[0],
+                full_q_offsets=full_q_offsets,
+                action_q_offsets=attention_meta.action_query_offsets,
+                full_role_ids=full_roles,
+                full_time_ids=full_times,
+                full_video_time_ids=full_video_times,
+                device=full_only_seq.device,
+                block_size=self.flex_backend.block_size,
+                num_und=causal_seq.shape[0],
+                causal_offsets=causal_offsets,
+            )
+            attention_meta.action_flex_backend = self.flex_backend
+
         # Non-None exactly when use_multiview_flex_attention is on, per the resolution in __init__.
-        if self.flex_backend is not None:
+        if self.flex_backend is not None and not self.config.video_action_temporal_causal_mask:
             if self.config.joint_attn_implementation != "two_way":
                 raise ValueError("Multiview FlexAttention requires joint_attn_implementation='two_way'.")
             # natten_metadata_list is always None here (only the three-way packer builds it), so the
@@ -1180,7 +1492,6 @@ class Cosmos3VFMNetwork(PreTrainedModel):
             position_ids=packed_seq.position_ids,
             parallel_dims=sequence_shard_parallel_dims,
         )
-
         packed_outputs, lbl_metadata = self.language_model(
             input_pack,
             attention_mask=attention_meta,

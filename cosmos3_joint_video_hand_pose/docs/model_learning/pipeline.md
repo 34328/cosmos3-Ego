@@ -1,6 +1,8 @@
-# overfit_v0.0 Data Pipeline
+# EgoVerse Joint Video–Action Data Pipeline
 
-`overfit_v0.0` 是最终的 brushing-shoes 小数据过拟合基线。这里两张图只用于说明数据如何流动，不另行定义实现语义。
+这里两张图说明当前 CP1 / FSDP8 / 75K joint baseline 的数据流；57D action、首帧
+condition、visibility 与动态 packing 的语义没有因 CP2 guardrail 或 Video-First
+mask 改变。图片只作讲解，精确定义仍以模型/数据合同和运行配置为准。
 
 ## Full data pipeline
 

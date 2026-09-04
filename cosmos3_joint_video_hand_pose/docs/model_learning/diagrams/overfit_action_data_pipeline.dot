@@ -1,6 +1,6 @@
 digraph OverfitActionData {
   graph [rankdir=TB, bgcolor="#fbfcfe", pad="0.35", nodesep="0.34", ranksep="0.52", splines=ortho,
-         label="overfit_v0.0 Action 数据流  |  raw 3D pose -> 57D/64D action -> recovered pose",
+         label="EgoVerse Joint Action 数据流  |  raw 3D pose -> 57D/64D action -> recovered pose",
          labelloc=t, fontsize=26, fontname="Noto Sans CJK SC"];
   node [shape=box, style="rounded,filled", color="#71869a", fillcolor="white", penwidth=1.5,
         fontname="Noto Sans CJK SC", fontsize=13, margin="0.16,0.11"];

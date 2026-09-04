@@ -215,6 +215,14 @@ class OmniMoTModelConfig:
     # "three_way" must only be used when introducing sparsity
     joint_attn_implementation: str = "two_way"  # "two_way" or "three_way"
 
+    # Video-first joint WAM role triangle for two-way attention:
+    # clean C -> UND+C, future video V -> UND+C+V, future action A -> all.
+    # Disabled by default so existing checkpoints and dense runs are unchanged.
+    video_action_causal_mask: bool = False
+    # Temporal refinement: action at raw frame t may read only video latents
+    # aligned at or before t and action tokens at or before t.
+    video_action_temporal_causal_mask: bool = False
+
     # Whether the within-sample GEN attention runs as one masked FlexAttention call, and under
     # what mask and kernels.
     flex_attention: FlexAttentionConfig = FlexAttentionConfig()

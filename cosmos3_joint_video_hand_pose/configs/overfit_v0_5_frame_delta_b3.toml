@@ -1,9 +1,9 @@
 [job]
 task       = "vfm"
-experiment = "egoverse_joint_video_hand_pose_overfit_v0_0"
+experiment = "egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3"
 project    = "joint_video_hand_pose"
 group      = "overfit"
-name       = "overfit_v0.0"
+name       = "overfit_v0.5_frame_delta_b3"
 wandb_mode = "online"
 
 [model]
@@ -20,23 +20,20 @@ mode = "full"
 [model.compile]
 enabled = false
 
-[model.tokenizer]
-vae_path = "${oc.env:WAN_VAE_PATH}"
-
 [optimizer]
 lr = 2.0e-5
 
 [scheduler]
-warm_up_steps = [20]
-cycle_lengths = [2000]
-f_start = [0.0]
-f_max = [1.0]
-f_min = [0.1]
+warm_up_steps = [100]
+cycle_lengths = [1200]
+f_start       = [0.0]
+f_max         = [1.0]
+f_min         = [0.1]
 
 [trainer]
-max_iter     = 2000
+max_iter     = 1200
 logging_iter = 1
 
 [checkpoint]
-load_path = "${oc.env:BASE_CHECKPOINT_PATH}"
+load_path = "${oc.env:BASE_CHECKPOINT_PATH,/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464}"
 save_iter = 300

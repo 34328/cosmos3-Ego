@@ -1,6 +1,6 @@
 digraph OverfitDataPipeline {
   graph [rankdir=TB, bgcolor="#fbfcfe", pad="0.35", nodesep="0.34", ranksep="0.52", splines=ortho,
-         label="overfit_v0.0 数据流  |  EgoVerse data -> aligned sample -> Cosmos batch -> replay",
+         label="EgoVerse Joint 数据流  |  EgoVerse data -> aligned sample -> Cosmos batch -> replay",
          labelloc=t, fontsize=26, fontname="Noto Sans CJK SC"];
   node [shape=box, style="rounded,filled", color="#71869a", fillcolor="white", penwidth=1.5,
         fontname="Noto Sans CJK SC", fontsize=13, margin="0.16,0.11"];
@@ -58,7 +58,7 @@ digraph OverfitDataPipeline {
   action64 -> sample;
   pose_slice -> sample [label="GT loss metadata"];
 
-  packing [label="Cosmos native dynamic packing\ncombine complete valid samples\nkeep sample boundaries | cap = 85K tokens", fillcolor="#edf6ff", color="#5d91c3", penwidth=2.2];
+  packing [label="Cosmos native dynamic packing\ncombine complete valid samples\nkeep sample boundaries | cap = 75K tokens", fillcolor="#edf6ff", color="#5d91c3", penwidth=2.2];
   noise [label="Create training x_t\nslot 0 stays clean\nfuture video + action receive noise", fillcolor="#fff6e8", color="#dfa759", penwidth=2.2];
   cosmos [label="Cosmos 3 WAM forward / sampler\njoint future video + action flow", fillcolor="#dff2e5", color="#66a17b", penwidth=2.2];
   sample -> packing -> noise -> cosmos;

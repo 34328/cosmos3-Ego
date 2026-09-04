@@ -417,6 +417,129 @@ def test_varlen_kwargs_stays_varlen_for_several_samples_without_grad() -> None:
 
 
 @pytest.mark.L0
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA attention kernels")
+def test_two_way_attention_video_action_causal_mask_directionality() -> None:
+    """The C/V/A split blocks action->video but preserves video->action.
+
+    Use two variable-length packed samples and the real CUDA attention backend.
+    This covers the exact boolean gathers and varlen offsets used by production,
+    including cross-sample isolation.
+    """
+    device = torch.device("cuda")
+    dtype = torch.bfloat16
+    num_heads = 2
+    head_dim = 32
+    sample_lens = [8, 7]
+    split_lens = [2, 6, 1, 6]
+    attn_modes = ["causal", "full", "causal", "full"]
+    und_indexes = torch.tensor([0, 1, 8], device=device, dtype=torch.long)
+    gen_indexes = torch.tensor([2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14], device=device, dtype=torch.long)
+    # Per sample: UND, clean vision, future video, clean action, future action.
+    all_roles = torch.tensor(
+        [-1, -1, 0, 1, 1, 0, 2, 2, -1, 0, 1, 1, 1, 0, 2],
+        device=device,
+        dtype=torch.int8,
+    )
+    full_roles = all_roles[gen_indexes]
+
+    def make_pack(x: torch.Tensor) -> tuple[SequencePack, attention.SplitInfo]:
+        pack, meta, _ = build_packed_sequence(
+            "two_way",
+            packed_sequence=x,
+            attn_modes=attn_modes,
+            split_lens=split_lens,
+            sample_lens=sample_lens,
+            packed_und_token_indexes=und_indexes,
+            packed_gen_token_indexes=gen_indexes,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            num_layers=1,
+        )
+        assert isinstance(meta, attention.SplitInfo)
+        return pack, meta
+
+    torch.manual_seed(123)
+    query = torch.randn(sum(sample_lens), num_heads, head_dim, device=device, dtype=dtype)
+    key = torch.randn_like(query, requires_grad=True)
+    value = torch.randn_like(query, requires_grad=True)
+    query_pack, meta = make_pack(query)
+    key_pack, _ = make_pack(key)
+    value_pack, _ = make_pack(value)
+
+    full_sample_ids = query_pack["_full_only_sample_ids"][: full_roles.numel()].long()
+    num_samples = len(sample_lens)
+    clean_counts = torch.bincount(full_sample_ids[full_roles == 0], minlength=num_samples).to(torch.int32)
+    video_counts = torch.bincount(full_sample_ids[full_roles == 1], minlength=num_samples).to(torch.int32)
+    action_counts = torch.bincount(full_sample_ids[full_roles == 2], minlength=num_samples).to(torch.int32)
+    sample_counts = torch.tensor(sample_lens, device=device, dtype=torch.int32)
+
+    def offsets(lengths: torch.Tensor) -> torch.Tensor:
+        return torch.cat(
+            (
+                lengths.new_zeros(1),
+                torch.cumsum(lengths, dim=0, dtype=lengths.dtype),
+            )
+        )
+
+    meta.video_action_causal_mask = True
+    meta.full_gen_role_ids = full_roles
+    meta.all_gen_role_ids = all_roles
+    meta.clean_query_offsets = offsets(clean_counts)
+    meta.video_query_offsets = offsets(video_counts)
+    meta.action_query_offsets = offsets(action_counts)
+    meta.clean_kv_offsets = offsets(sample_counts - video_counts - action_counts)
+    meta.video_kv_offsets = offsets(sample_counts - action_counts)
+    meta.max_clean_query_len = int(clean_counts.max().item())
+    meta.max_video_query_len = int(video_counts.max().item())
+    meta.max_action_query_len = int(action_counts.max().item())
+    meta.max_clean_kv_len = int((sample_counts - video_counts - action_counts).max().item())
+    meta.max_video_kv_len = int((sample_counts - action_counts).max().item())
+
+    output = attention.two_way_attention(
+        query_pack,
+        key_pack,
+        value_pack,
+        attention_meta=meta,
+    )
+    video_output = get_all_seq(output)[all_roles == 1]
+    assert torch.isfinite(video_output).all()
+    video_output.float().square().sum().backward()
+    torch.testing.assert_close(key.grad[all_roles == 2], torch.zeros_like(key.grad[all_roles == 2]))
+    torch.testing.assert_close(value.grad[all_roles == 2], torch.zeros_like(value.grad[all_roles == 2]))
+
+    key_perturbed = key.detach().clone()
+    value_perturbed = value.detach().clone()
+    key_perturbed[all_roles == 2] += 8
+    value_perturbed[all_roles == 2] -= 8
+    perturbed_output = attention.two_way_attention(
+        query_pack,
+        make_pack(key_perturbed)[0],
+        make_pack(value_perturbed)[0],
+        attention_meta=meta,
+    )
+    torch.testing.assert_close(
+        get_all_seq(perturbed_output)[all_roles == 1],
+        video_output.detach(),
+        atol=0,
+        rtol=0,
+    )
+
+    video_key = key.detach().clone().requires_grad_(True)
+    video_value = value.detach().clone().requires_grad_(True)
+    action_output = get_all_seq(
+        attention.two_way_attention(
+            query_pack,
+            make_pack(video_key)[0],
+            make_pack(video_value)[0],
+            attention_meta=meta,
+        )
+    )[all_roles == 2]
+    action_output.float().square().sum().backward()
+    assert video_key.grad[all_roles == 1].abs().sum() > 0
+    assert video_value.grad[all_roles == 1].abs().sum() > 0
+
+
+@pytest.mark.L0
 def test_build_packed_sequence_rejects_flex():
     device = torch.device("cpu")
     packed_sequence = torch.randn(4, 8, device=device)  # [N,D]

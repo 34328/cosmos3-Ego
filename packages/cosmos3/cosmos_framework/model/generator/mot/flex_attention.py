@@ -85,6 +85,32 @@ from cosmos_framework.configs.base.defaults.flex_attention import (
 # trigger recompilation. torch's entry point is imported under an alias because this
 # module's own, :func:`flex_attention`, takes that name.
 _COMPILED_FLEX_ATTENTION = torch.compile(torch_flex_attention, dynamic=False)
+# Dynamic packing changes the action-query and fused key lengths from one
+# optimizer step to the next. Keep that workload on its own shape-polymorphic
+# graph: sharing the static wrapper above would specialize one graph per pack
+# and eventually hit Dynamo's recompile limit, whose eager fallback
+# materializes the dense QxK scores matrix.
+def _dynamic_flex_attention_impl(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    block_mask: BlockMask,
+    enable_gqa: bool,
+    kernel_options: dict[str, int | bool | str] | None,
+) -> torch.Tensor:
+    return torch_flex_attention(
+        q,
+        k,
+        v,
+        block_mask=block_mask,
+        enable_gqa=enable_gqa,
+        kernel_options=kernel_options,
+    )
+
+
+# A distinct Python code object keeps this dynamic graph/cache isolated from
+# the original static wrapper above.
+_COMPILED_DYNAMIC_FLEX_ATTENTION = torch.compile(_dynamic_flex_attention_impl, dynamic=True)
 
 # A FlexAttention mask predicate: (b, h, q_idx, kv_idx) -> bool tensor.
 MaskMod = Callable[[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
@@ -168,6 +194,44 @@ class FlexMetadata:
     def q_len(self) -> int:
         """Query count: the GEN tail of the key stream."""
         return self.seq_len - self.num_und
+
+
+@dataclass
+class VideoActionTemporalFlexMetadata:
+    """Packed metadata for the video-first temporal WAM mask.
+
+    The key stream is UND followed by GEN and the query stream is the GEN
+    tail. Runtime role ids are -1 for UND, 1 for every video token (the
+    first-frame image and future video), 2 for every action token (including
+    a0), and -2 for GEN padding. Time ids are latent-frame indices for video
+    and raw-frame indices for action. Each action token also stores its aligned
+    latent-video frame in video_time_id.
+    """
+
+    seq_len: int
+    num_und: int
+    sample_id: torch.Tensor
+    role_id: torch.Tensor
+    time_id: torch.Tensor
+    video_time_id: torch.Tensor
+
+    @property
+    def q_len(self) -> int:
+        return self.seq_len - self.num_und
+
+
+@dataclass
+class ActionTemporalFlexMetadata:
+    """Action-only query metadata against a padded UND+GEN key stream."""
+
+    q_len: int
+    kv_len: int
+    q_sample_id: torch.Tensor
+    q_time_id: torch.Tensor
+    q_video_time_id: torch.Tensor
+    kv_sample_id: torch.Tensor
+    kv_role_id: torch.Tensor
+    kv_time_id: torch.Tensor
 
 
 def _to_flex_layout(x: torch.Tensor) -> torch.Tensor:
@@ -848,6 +912,363 @@ def _ordered_blocks(dense_blocks: torch.Tensor) -> tuple[torch.Tensor, torch.Ten
     return counts.contiguous(), indices.contiguous()
 
 
+def _video_action_temporal_pair_allowed(
+    q_sample: torch.Tensor,
+    q_role: torch.Tensor,
+    q_time: torch.Tensor,
+    q_video_time: torch.Tensor,
+    kv_sample: torch.Tensor,
+    kv_role: torch.Tensor,
+    kv_time: torch.Tensor,
+) -> torch.Tensor:
+    """Elementwise visibility predicate for the temporal video-first factorization."""
+    padding_pair = (q_sample < 0) & (kv_sample < 0)
+    same_real_sample = (q_sample >= 0) & (q_sample == kv_sample)
+    kv_is_und = kv_role == -1
+    kv_is_clean = kv_role == 0
+    kv_is_video = kv_role == 1
+    kv_is_action = kv_role == 2
+
+    clean_query = q_role == 0
+    video_query = q_role == 1
+    action_query = q_role == 2
+    clean_visible = clean_query & (kv_is_und | kv_is_clean)
+    video_visible = video_query & (kv_is_und | kv_is_clean | kv_is_video)
+    action_visible = action_query & (
+        kv_is_und
+        | kv_is_clean
+        | (kv_is_video & (kv_time <= q_video_time))
+        | (kv_is_action & (kv_time <= q_time))
+    )
+    return padding_pair | (same_real_sample & (clean_visible | video_visible | action_visible))
+
+
+def causal_video_time_for_action(
+    action_time: torch.Tensor,
+    temporal_compression_factor: int,
+) -> torch.Tensor:
+    """Map raw-frame action time to the newest causally complete video latent.
+
+    A causal VAE latent at index i may use raw frames through
+    i * temporal_compression_factor. Therefore an action at raw frame
+    t may only read latent indices through floor(t / factor). Using ceil
+    here would leak later raw frames from the same compressed chunk.
+    """
+    if temporal_compression_factor < 1:
+        raise ValueError(
+            f"temporal_compression_factor must be positive, got {temporal_compression_factor}"
+        )
+    return torch.div(
+        action_time,
+        temporal_compression_factor,
+        rounding_mode="floor",
+    )
+
+
+def _video_action_temporal_mask_mod(metadata: VideoActionTemporalFlexMetadata) -> MaskMod:
+    q_sample = metadata.sample_id[metadata.num_und :].clone()
+    q_role = metadata.role_id[metadata.num_und :].clone()
+    q_time = metadata.time_id[metadata.num_und :].clone()
+    q_video_time = metadata.video_time_id[metadata.num_und :].clone()
+    kv_sample = metadata.sample_id
+    kv_role = metadata.role_id
+    kv_time = metadata.time_id
+
+    def mask_mod(
+        b: torch.Tensor,
+        h: torch.Tensor,
+        q_idx: torch.Tensor,
+        kv_idx: torch.Tensor,
+    ) -> torch.Tensor:
+        del b, h
+        return _video_action_temporal_pair_allowed(
+            q_sample[q_idx],
+            q_role[q_idx],
+            q_time[q_idx],
+            q_video_time[q_idx],
+            kv_sample[kv_idx],
+            kv_role[kv_idx],
+            kv_time[kv_idx],
+        )
+
+    return mask_mod
+
+
+def build_video_action_temporal_flex_metadata(
+    *,
+    seq_len: int,
+    full_q_offsets: torch.Tensor,
+    full_role_ids: torch.Tensor,
+    full_time_ids: torch.Tensor,
+    full_video_time_ids: torch.Tensor,
+    device: torch.device,
+    num_und: int,
+    causal_offsets: torch.Tensor,
+) -> VideoActionTemporalFlexMetadata:
+    """Build padded UND+GEN metadata from real packed GEN token fields."""
+    real_gen_tokens = int(full_q_offsets[-1])
+    fields = (full_role_ids, full_time_ids, full_video_time_ids)
+    if any(field.numel() != real_gen_tokens for field in fields):
+        raise ValueError(
+            "Temporal mask fields must match the real packed GEN length: "
+            f"expected {real_gen_tokens}, got {[field.numel() for field in fields]}"
+        )
+    if real_gen_tokens > seq_len:
+        raise ValueError(f"Real GEN length {real_gen_tokens} exceeds padded length {seq_len}")
+
+    gen_sample = _build_stream_sample_ids(full_q_offsets, seq_len, device)
+    pad = seq_len - real_gen_tokens
+    if pad:
+        padding = torch.full((pad,), -2, dtype=torch.long, device=device)
+        full_role_ids = torch.cat((full_role_ids.to(device=device, dtype=torch.long), padding))
+        time_padding = torch.full((pad,), -1, dtype=torch.long, device=device)
+        full_time_ids = torch.cat((full_time_ids.to(device=device, dtype=torch.long), time_padding))
+        full_video_time_ids = torch.cat(
+            (full_video_time_ids.to(device=device, dtype=torch.long), time_padding)
+        )
+    else:
+        full_role_ids = full_role_ids.to(device=device, dtype=torch.long)
+        full_time_ids = full_time_ids.to(device=device, dtype=torch.long)
+        full_video_time_ids = full_video_time_ids.to(device=device, dtype=torch.long)
+
+    und_sample = _build_stream_sample_ids(causal_offsets, num_und, device)
+    und_role = torch.full((num_und,), -1, dtype=torch.long, device=device)
+    und_time = torch.full((num_und,), -1, dtype=torch.long, device=device)
+    return VideoActionTemporalFlexMetadata(
+        seq_len=num_und + seq_len,
+        num_und=num_und,
+        sample_id=torch.cat((und_sample, gen_sample)),
+        role_id=torch.cat((und_role, full_role_ids)),
+        time_id=torch.cat((und_time, full_time_ids)),
+        video_time_id=torch.cat((und_time, full_video_time_ids)),
+    )
+
+
+def build_video_action_temporal_block_mask(
+    *,
+    seq_len: int,
+    full_q_offsets: torch.Tensor,
+    full_role_ids: torch.Tensor,
+    full_time_ids: torch.Tensor,
+    full_video_time_ids: torch.Tensor,
+    device: torch.device,
+    block_size: tuple[int, int],
+    num_und: int,
+    causal_offsets: torch.Tensor,
+) -> BlockMask:
+    """Build the packed B3 temporal mask without materializing a token-square mask."""
+    metadata = build_video_action_temporal_flex_metadata(
+        seq_len=seq_len,
+        full_q_offsets=full_q_offsets,
+        full_role_ids=full_role_ids,
+        full_time_ids=full_time_ids,
+        full_video_time_ids=full_video_time_ids,
+        device=device,
+        num_und=num_und,
+        causal_offsets=causal_offsets,
+    )
+    q_block_size, kv_block_size = block_size
+    _check_block_aligned(metadata.q_len, "GEN", q_block_size)
+    _check_block_aligned(metadata.num_und, "UND", kv_block_size)
+    num_q_blocks = metadata.q_len // q_block_size
+    num_kv_blocks = metadata.seq_len // kv_block_size
+
+    fields = torch.stack(
+        (metadata.sample_id, metadata.role_id, metadata.time_id, metadata.video_time_id),
+        dim=1,
+    )
+    starts_run = torch.ones(metadata.seq_len, dtype=torch.bool, device=device)
+    starts_run[1:] = (fields[1:] != fields[:-1]).any(dim=1)
+    group_id = torch.cumsum(starts_run, dim=0) - 1
+    representatives = torch.nonzero(starts_run, as_tuple=False).squeeze(1)
+    q_rep = representatives.unsqueeze(1)
+    kv_rep = representatives.unsqueeze(0)
+    allowed = _video_action_temporal_pair_allowed(
+        metadata.sample_id[q_rep],
+        metadata.role_id[q_rep],
+        metadata.time_id[q_rep],
+        metadata.video_time_id[q_rep],
+        metadata.sample_id[kv_rep],
+        metadata.role_id[kv_rep],
+        metadata.time_id[kv_rep],
+    ).to(torch.float32)
+
+    num_groups = representatives.numel()
+    presence_q = _block_presence(
+        group_id[metadata.num_und :],
+        num_q_blocks,
+        q_block_size,
+        num_groups,
+        device,
+    )
+    presence_kv = _block_presence(
+        group_id,
+        num_kv_blocks,
+        kv_block_size,
+        num_groups,
+        device,
+    )
+    allowed_hits = (presence_q @ allowed) @ presence_kv.t()
+    blocked_hits = (presence_q @ (1.0 - allowed)) @ presence_kv.t()
+    full_blocks = blocked_hits == 0.0
+    partial_blocks = (allowed_hits > 0.0) & ~full_blocks
+    kv_num_blocks, kv_indices = _ordered_blocks(partial_blocks.view(1, 1, num_q_blocks, num_kv_blocks))
+    full_kv_num_blocks, full_kv_indices = _ordered_blocks(
+        full_blocks.view(1, 1, num_q_blocks, num_kv_blocks)
+    )
+    return BlockMask.from_kv_blocks(
+        kv_num_blocks,
+        kv_indices,
+        full_kv_num_blocks,
+        full_kv_indices,
+        BLOCK_SIZE=block_size,
+        mask_mod=_video_action_temporal_mask_mod(metadata),
+        seq_lengths=(metadata.q_len, metadata.seq_len),
+    )
+
+
+def build_action_temporal_block_mask(
+    *,
+    seq_len: int,
+    full_q_offsets: torch.Tensor,
+    action_q_offsets: torch.Tensor,
+    full_role_ids: torch.Tensor,
+    full_time_ids: torch.Tensor,
+    full_video_time_ids: torch.Tensor,
+    device: torch.device,
+    block_size: tuple[int, int],
+    num_und: int,
+    causal_offsets: torch.Tensor,
+) -> BlockMask:
+    """Build the action-query mask while leaving native IT2V attention on FlashAttention."""
+    key_metadata = build_video_action_temporal_flex_metadata(
+        seq_len=seq_len,
+        full_q_offsets=full_q_offsets,
+        full_role_ids=full_role_ids,
+        full_time_ids=full_time_ids,
+        full_video_time_ids=full_video_time_ids,
+        device=device,
+        num_und=num_und,
+        causal_offsets=causal_offsets,
+    )
+    action_mask = full_role_ids == 2
+    real_action_tokens = int(action_q_offsets[-1])
+    if int(action_mask.sum()) != real_action_tokens:
+        raise ValueError(
+            f"Action offsets describe {real_action_tokens} queries but roles contain {int(action_mask.sum())}"
+        )
+    q_block_size, kv_block_size = block_size
+    q_len = ((real_action_tokens + q_block_size - 1) // q_block_size) * q_block_size
+    q_sample = _build_stream_sample_ids(action_q_offsets, q_len, device)
+    q_time = full_time_ids[action_mask].to(device=device, dtype=torch.long)
+    q_video_time = full_video_time_ids[action_mask].to(device=device, dtype=torch.long)
+    q_pad = q_len - real_action_tokens
+    if q_pad:
+        padding = torch.full((q_pad,), -1, dtype=torch.long, device=device)
+        q_time = torch.cat((q_time, padding))
+        q_video_time = torch.cat((q_video_time, padding))
+    metadata = ActionTemporalFlexMetadata(
+        q_len=q_len,
+        kv_len=key_metadata.seq_len,
+        q_sample_id=q_sample,
+        q_time_id=q_time,
+        q_video_time_id=q_video_time,
+        kv_sample_id=key_metadata.sample_id,
+        kv_role_id=key_metadata.role_id,
+        kv_time_id=key_metadata.time_id,
+    )
+    _check_block_aligned(metadata.q_len, "GEN", q_block_size)
+    _check_block_aligned(num_und, "UND", kv_block_size)
+    num_q_blocks = metadata.q_len // q_block_size
+    num_kv_blocks = metadata.kv_len // kv_block_size
+
+    q_fields = torch.stack(
+        (metadata.q_sample_id, metadata.q_time_id, metadata.q_video_time_id),
+        dim=1,
+    )
+    q_starts = torch.ones(metadata.q_len, dtype=torch.bool, device=device)
+    q_starts[1:] = (q_fields[1:] != q_fields[:-1]).any(dim=1)
+    q_group_id = torch.cumsum(q_starts, dim=0) - 1
+    q_representatives = torch.nonzero(q_starts, as_tuple=False).squeeze(1)
+
+    kv_fields = torch.stack(
+        (metadata.kv_sample_id, metadata.kv_role_id, metadata.kv_time_id),
+        dim=1,
+    )
+    kv_starts = torch.ones(metadata.kv_len, dtype=torch.bool, device=device)
+    kv_starts[1:] = (kv_fields[1:] != kv_fields[:-1]).any(dim=1)
+    kv_group_id = torch.cumsum(kv_starts, dim=0) - 1
+    kv_representatives = torch.nonzero(kv_starts, as_tuple=False).squeeze(1)
+
+    q_rep = q_representatives.unsqueeze(1)
+    kv_rep = kv_representatives.unsqueeze(0)
+    allowed = _video_action_temporal_pair_allowed(
+        metadata.q_sample_id[q_rep],
+        torch.full_like(metadata.q_time_id[q_rep], 2),
+        metadata.q_time_id[q_rep],
+        metadata.q_video_time_id[q_rep],
+        metadata.kv_sample_id[kv_rep],
+        metadata.kv_role_id[kv_rep],
+        metadata.kv_time_id[kv_rep],
+    ).to(torch.float32)
+    q_presence = _block_presence(
+        q_group_id,
+        num_q_blocks,
+        q_block_size,
+        q_representatives.numel(),
+        device,
+    )
+    kv_presence = _block_presence(
+        kv_group_id,
+        num_kv_blocks,
+        kv_block_size,
+        kv_representatives.numel(),
+        device,
+    )
+    allowed_hits = (q_presence @ allowed) @ kv_presence.t()
+    blocked_hits = (q_presence @ (1.0 - allowed)) @ kv_presence.t()
+    full_blocks = blocked_hits == 0.0
+    partial_blocks = (allowed_hits > 0.0) & ~full_blocks
+    kv_num_blocks, kv_indices = _ordered_blocks(partial_blocks.view(1, 1, num_q_blocks, num_kv_blocks))
+    full_kv_num_blocks, full_kv_indices = _ordered_blocks(
+        full_blocks.view(1, 1, num_q_blocks, num_kv_blocks)
+    )
+
+    q_sample = metadata.q_sample_id
+    q_time = metadata.q_time_id
+    q_video_time = metadata.q_video_time_id
+    kv_sample = metadata.kv_sample_id
+    kv_role = metadata.kv_role_id
+    kv_time = metadata.kv_time_id
+
+    def mask_mod(
+        b: torch.Tensor,
+        h: torch.Tensor,
+        q_idx: torch.Tensor,
+        kv_idx: torch.Tensor,
+    ) -> torch.Tensor:
+        del b, h
+        return _video_action_temporal_pair_allowed(
+            q_sample[q_idx],
+            torch.full_like(q_time[q_idx], 2),
+            q_time[q_idx],
+            q_video_time[q_idx],
+            kv_sample[kv_idx],
+            kv_role[kv_idx],
+            kv_time[kv_idx],
+        )
+
+    return BlockMask.from_kv_blocks(
+        kv_num_blocks,
+        kv_indices,
+        full_kv_num_blocks,
+        full_kv_indices,
+        BLOCK_SIZE=block_size,
+        mask_mod=mask_mod,
+        seq_lengths=(metadata.q_len, metadata.kv_len),
+    )
+
+
 def build_block_mask(
     metadata: FlexMetadata,
     device: torch.device,
@@ -1002,6 +1423,7 @@ def flex_attention(
     block_mask: BlockMask,
     backend: FlexBackend,
     return_lse: bool = False,
+    dynamic_shapes: bool = False,
 ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
     """The generator's attention over its own sample, via a single FlexAttention call.
 
@@ -1095,6 +1517,8 @@ def flex_attention(
     v = _to_flex_layout(full_v)  # [1,num_kv_heads,N_und+N_full,head_dim]
 
     if return_lse:
+        if dynamic_shapes:
+            raise ValueError("dynamic-shape FlexAttention does not expose LSE; the action path does not request it")
         # return_aux rather than the deprecated return_lse: the latter records a
         # FutureWarning in a module-level set, which Dynamo rejects as an unsafe
         # side effect inside the activation-checkpointing HOP.
@@ -1111,13 +1535,23 @@ def flex_attention(
         # expects, and that a caller merging this output would need.
         return _from_flex_layout(attn_out), _from_flex_layout(aux.lse)  # [1,N_full,heads,head_dim], [1,N_full,heads]
 
-    attn_out = _COMPILED_FLEX_ATTENTION(
-        q,
-        k,
-        v,
-        block_mask=block_mask,
-        enable_gqa=num_q_heads != num_kv_heads,
-        kernel_options=backend.kernel_options,
-    )  # attn_out: [1,num_q_heads,N_full,head_dim]
+    if dynamic_shapes:
+        attn_out = _COMPILED_DYNAMIC_FLEX_ATTENTION(
+            q,
+            k,
+            v,
+            block_mask,
+            num_q_heads != num_kv_heads,
+            backend.kernel_options,
+        )
+    else:
+        attn_out = _COMPILED_FLEX_ATTENTION(
+            q,
+            k,
+            v,
+            block_mask=block_mask,
+            enable_gqa=num_q_heads != num_kv_heads,
+            kernel_options=backend.kernel_options,
+        )
     # Convert to the heads-last layout ([1,S,H,D]) that from_mode_splits expects.
     return _from_flex_layout(attn_out)  # [1,N_full,heads,head_dim]
