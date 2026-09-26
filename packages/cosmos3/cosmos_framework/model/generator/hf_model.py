@@ -8,8 +8,6 @@ Responsibilities:
     AutoClass (``AutoModelForImageTextToText`` / ``AutoModel`` /
     ``AutoModelForCausalLM`` — see ``HFModel`` for selection rules);
     no weights are loaded.
-  - ``apply_gradient_checkpointing``: wraps HF's standard
-    ``gradient_checkpointing_enable`` API.
   - ``tie_embeddings``: re-establishes the input/output embedding tie after
     FSDP wrapping + meta-materialization.
   - ``load_weights``: dispatches to ``load_vlm_model`` (VLM) or
@@ -18,10 +16,13 @@ Responsibilities:
   - ``forward``: pass-through returning logits.
 
 FSDP wrapping lives in ``vfm/models/parallelize_vlm.py::parallelize()``,
-NOT here.
+NOT here — as does activation checkpointing, which ``parallelize_vlm.apply_ac``
+owns via ``ptd_checkpoint_wrapper`` rather than HF's
+``gradient_checkpointing_enable`` (see that function for why).
 """
 
 import inspect
+from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 import torch
@@ -31,7 +32,13 @@ from transformers import AutoConfig, AutoModel, AutoModelForCausalLM, AutoModelF
 
 import cosmos_framework.model.generator.reasoner.cosmos3_edge  # noqa: F401  registers cosmos3_edge with transformers Auto classes
 from cosmos_framework.utils import log
+from cosmos_framework.model.generator.reasoner.qwen35_caption import (
+    Qwen35CaptionLoss,
+    configure_qwen35_caption_model,
+    named_parameters_with_qwen35_decay,
+)
 from cosmos_framework.model.generator.utils.safetensors_loader import load_language_model, load_vlm_model
+from cosmos_framework.utils.generator.input_probe import maybe_dump_pre_forward
 from cosmos_framework.utils.generator.parallelism import ParallelDims
 
 if TYPE_CHECKING:
@@ -93,6 +100,11 @@ class HFModel(nn.Module):
     ``vfm/models/parallelize_vlm.py``.
     """
 
+    def named_parameters(
+        self, prefix: str = "", recurse: bool = True, remove_duplicate: bool = True
+    ) -> Iterator[tuple[str, nn.Parameter]]:
+        return named_parameters_with_qwen35_decay(self, prefix, recurse, remove_duplicate)
+
     def __init__(
         self,
         model_name_or_path: str,
@@ -102,6 +114,9 @@ class HFModel(nn.Module):
         sound_und: bool = False,
         sound_und_config: "SoundUnderstandingConfig | None" = None,
         configured_model_name_or_path: str | None = None,
+        qwen35_fp32_recurrent_a_log: bool = False,
+        enable_fused_weighted_ce: bool = False,
+        weighted_ce_exponent: float = 0.5,
     ):
         super().__init__()
         self.model_name_or_path = model_name_or_path
@@ -115,6 +130,8 @@ class HFModel(nn.Module):
             raise ValueError("sound_und_config is required when sound_und=True")
         hf_config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=trust_remote_code)
         self.hf_config = hf_config
+        if (qwen35_fp32_recurrent_a_log or enable_fused_weighted_ce) and hf_config.model_type != "qwen3_5":
+            raise ValueError("Caption FP32/fused loss options require dense qwen3_5")
 
         # Register cosmos before from_config validates it. Gated so non-cosmos
         # paths don't import cosmos_framework.model.attention.
@@ -230,16 +247,53 @@ class HFModel(nn.Module):
         if n_cast:
             log.info(f"HFModel: normalized {n_cast} param(s) to {dtype} post-from_config")
 
-        # Patch Qwen3-VL forward for text-only batches (no pixel_values / image_grid_thw).
-        # Required to avoid errors when a batch contains only text: every FSDP rank must
-        # call visual() each step for all-gather sync; the patch runs a lightweight dummy
-        # image and slices the output to [0:0] so it contributes no features.
+        if hf_config.model_type == "qwen3_5":
+            configure_qwen35_caption_model(
+                self.model,
+                fp32_recurrent_a_log=qwen35_fp32_recurrent_a_log,
+                fused_weighted_ce=enable_fused_weighted_ce,
+                weighted_ce_exponent=weighted_ce_exponent,
+            )
+
+        # Patch Qwen3-VL / Qwen3-VL-MoE forward for text-only batches (no pixel_values /
+        # image_grid_thw). Required to avoid errors when a batch contains only text: every
+        # FSDP rank must call visual() each step for all-gather sync; the patch runs a
+        # lightweight dummy image and slices the output to [0:0] so it contributes no features.
+        # Both backbones share the same patch (see patch_qwen3_vl_forward).
         # Must happen BEFORE parallelize() so FSDP captures the patched forward.
-        if hf_config.model_type == "qwen3_vl" and hasattr(self.model, "model"):
+        if hf_config.model_type in ("qwen3_vl", "qwen3_vl_moe") and hasattr(self.model, "model"):
             from cosmos_framework.utils.generator.monkey_patch import patch_qwen3_vl_forward
 
             patch_qwen3_vl_forward(self.model.model)
-            log.info("HFModel: applied patch_qwen3_vl_forward for text-only batch support")
+            log.info(f"HFModel: applied patch_qwen3_vl_forward ({hf_config.model_type}) for text-only batch support")
+
+        # Swap HF's per-expert Python loop for the fused grouped_mm expert kernel. HF's loop
+        # is never the faster choice on the GPUs this trains on, and the patch reuses the
+        # existing expert parameters as-is, so there is nothing to trade off and no knob:
+        # checkpoint and FSDP layouts are unchanged. Also must precede parallelize().
+        if hf_config.model_type == "qwen3_vl_moe":
+            from cosmos_framework.utils.generator.monkey_patch import patch_qwen3_vl_moe_grouped_mm_experts
+
+            n_moe_blocks = patch_qwen3_vl_moe_grouped_mm_experts(self.model)
+            log.info(f"HFModel: applied grouped_mm experts to {n_moe_blocks} MoE block(s)")
+
+        # Give the vision tower a single varlen attention call per block. HF only does that for
+        # flash_attention_2 and otherwise splits the packed patches per image, which costs a
+        # device-to-host sync (and a graph break) in every block; cosmos_framework.model.attention takes the
+        # packed layout directly. Only the cosmos adapter reaches it, so the other
+        # implementations keep HF's split path. Also must precede parallelize().
+        if hf_config.model_type in ("qwen3_vl", "qwen3_vl_moe") and attn_implementation == "cosmos":
+            from cosmos_framework.utils.generator.monkey_patch import patch_qwen3_vl_vision_varlen_attention
+
+            n_vision_attns = patch_qwen3_vl_vision_varlen_attention(self.model)
+            log.info(f"HFModel: applied varlen attention to {n_vision_attns} vision attention module(s)")
+
+        if torch.are_deterministic_algorithms_enabled():
+            from cosmos_framework.utils.generator.monkey_patch import patch_siglip2_pos_embed_antialias_off
+
+            for m in self.model.modules():
+                if type(m).__name__ == "Siglip2VisionTransformer":
+                    patch_siglip2_pos_embed_antialias_off(m)
 
     def train(self, mode: bool = True) -> "HFModel":
         """Keep immutable audio modules in eval mode while training the Reasoner."""
@@ -256,11 +310,6 @@ class HFModel(nn.Module):
         ``OmniMoTModel`` exposes, so ``vfm/utils/optimizer.py`` can iterate
         ``model.net.named_parameters()`` uniformly across model families."""
         return self.model
-
-    def apply_gradient_checkpointing(self) -> None:
-        """Enable gradient checkpointing via HF's standard API."""
-        self.model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
-        log.info("HFModel: gradient checkpointing enabled")
 
     def tie_embeddings(self) -> None:
         """Tie output embedding weight to input embedding, matching post_to_empty_hook behavior.
@@ -400,7 +449,18 @@ class HFModel(nn.Module):
     # MoE load-balancing bookkeeping. Both arrive as a tensor or a bool, so the guards
     # torch.compile installs on them are cheap shape/dtype guards rather than the per-sample
     # value guards that make the stray string keys ruinous (see forward()).
-    _FORWARD_KWARGS_PASSTHROUGHS: frozenset[str] = frozenset({"second_per_grid_ts", "output_router_logits"})
+    _FORWARD_KWARGS_PASSTHROUGHS: frozenset[str] = frozenset(
+        {
+            "second_per_grid_ts",
+            "output_router_logits",
+            # Standard HF varlen-attention metadata. The monkey-patched Qwen text
+            # forward consumes these from **kwargs and threads them to every decoder layer.
+            "cu_seq_lens_q",
+            "cu_seq_lens_k",
+            "max_length_q",
+            "max_length_k",
+        }
+    )
 
     # Both set once and read every step. Class-level defaults rather than __init__
     # assignments because the test suite builds instances through __new__:
@@ -440,7 +500,7 @@ class HFModel(nn.Module):
             self._forward_keys_cache = frozenset(declared | self._FORWARD_KWARGS_PASSTHROUGHS)
         return self._forward_keys_cache
 
-    def forward(self, **kwargs) -> torch.Tensor:
+    def forward(self, **kwargs) -> torch.Tensor | Qwen35CaptionLoss:
         """Pass-through forward. Returns logits (B, T, V).
 
         Forwards only the keys in :attr:`_forward_keys` and drops the rest, logging the
@@ -464,20 +524,24 @@ class HFModel(nn.Module):
         Forces use_cache=False for training, applied after filtering because not every HF
         forward names use_cache in its signature (Qwen3-VL takes it via ``**kwargs``).
 
-        For nemotron_vl: attention_mask is also dropped. NemotronVLModel.get_rope_index
-        strips padding positions when attention_mask is present, returning position_ids
-        shorter than inputs_embeds (padded_len). With right-padding + causal attention,
-        valid tokens never attend to padding tokens regardless, so dropping attention_mask
-        is equivalent and avoids the shape mismatch.
+        For Nemotron VL (``nemotron_vl`` or its remote-code name
+        ``nemotron_siglip2``): attention_mask is also dropped.
+        NemotronVLModel.get_rope_index strips padding positions when attention_mask is
+        present, returning position_ids shorter than inputs_embeds (padded_len). With
+        right-padding + causal attention, valid tokens never attend to padding tokens
+        regardless, so dropping attention_mask is equivalent and avoids the shape mismatch.
         """
+        probe_step = kwargs.pop("_probe_step", None)
+        probe_tag = kwargs.pop("_probe_tag", None)
         forward_keys = self._forward_keys
         filtered = {k: v for k, v in kwargs.items() if k in forward_keys}
         if not self._logged_dropped_forward_keys and len(filtered) != len(kwargs):
             dropped = sorted(set(kwargs) - forward_keys)
             log.info(f"HFModel: dropping non-forward batch keys {dropped} before {type(self.model).__name__}.forward")
             self._logged_dropped_forward_keys = True
-        if self.hf_config.model_type == "nemotron_vl":
+        if self.hf_config.model_type in {"nemotron_vl", "nemotron_siglip2"}:
             filtered.pop("attention_mask", None)
         filtered["use_cache"] = False
+        maybe_dump_pre_forward(self.model, filtered, probe_step, probe_tag)
         out = self.model(**filtered)
-        return out.logits
+        return out if isinstance(out, Qwen35CaptionLoss) else out.logits

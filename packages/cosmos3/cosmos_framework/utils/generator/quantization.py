@@ -48,6 +48,13 @@ class _ModelOptFloat8Linear(nn.Linear):
     _modelopt_high_precision_dtype: torch.dtype | None = None
     # True once real checkpoint data has been installed.
     _modelopt_weight_loaded: bool = False
+    # Mixed-precision diffusion steps (see utils/generator/mixed_precision.py).
+    # None until install_mixed_precision_runtime tags this module.
+    _mixed_precision_runtime = None
+    _mixed_precision_path: str = "generation"
+    # A (N, K) dense view staged by the block provider for the current decoder
+    # layer, or None. Read here, written only by the provider hooks.
+    _mixed_precision_staged_weight: torch.Tensor | None = None
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         output_shape = (*inputs.shape[:-1], self.out_features)
@@ -58,6 +65,21 @@ class _ModelOptFloat8Linear(nn.Linear):
         # PrototypeFloat8Tensor requires the input and its static (1, 1) activation
         # scale to have equal rank, so flatten token dimensions before dispatch.
         flat_inputs = inputs.reshape(-1, inputs.shape[-1])
+        runtime = self._mixed_precision_runtime
+        if runtime is not None and runtime.use_high_precision(self._mixed_precision_path):
+            # W8A16: dense GEMM against the dequantized FP8 weight; the
+            # activation stays in the compute dtype. The resolved weight is
+            # in the runtime's configured activation_dtype, which normally
+            # matches the live activations -- but defensively cast both
+            # operands to the weight's dtype and cast the result back to the
+            # input dtype when they differ (e.g. a fp16-activation model run
+            # against a bf16-configured runtime), instead of crashing.
+            weight = runtime.resolve_w8a16_weight(self)
+            if weight.dtype != flat_inputs.dtype:
+                output = F.linear(flat_inputs.to(weight.dtype), weight, self.bias).to(inputs.dtype)
+            else:
+                output = F.linear(flat_inputs, weight, self.bias)
+            return output.reshape(output_shape)
         flat_outputs = F.linear(flat_inputs, self.weight, self.bias)
         return flat_outputs.reshape(output_shape)
 
@@ -112,9 +134,7 @@ def install_torchao_float8_fsdp_support() -> None:
     @implements([aten.view.default, aten._unsafe_view.default, aten.reshape.default])
     def _(func, types, args, kwargs):
         self, size = args[0], args[1]
-        return return_and_correct_aliasing(
-            func, args, kwargs, _rewrap_float8(self, self.qdata.reshape(*size))
-        )
+        return return_and_correct_aliasing(func, args, kwargs, _rewrap_float8(self, self.qdata.reshape(*size)))
 
     @implements(aten.split.Tensor)
     def _(func, types, args, kwargs):
@@ -152,9 +172,7 @@ def install_torchao_float8_fsdp_support() -> None:
         # meta tensor. Real scale values arrive with the checkpoint weights.
         scale = torch.empty_like(self.scale, device=device) if device is not None else self.scale
         act_quant_scale = (
-            torch.empty_like(self.act_quant_scale, device=device)
-            if device is not None
-            else self.act_quant_scale
+            torch.empty_like(self.act_quant_scale, device=device) if device is not None else self.act_quant_scale
         )
         return self.__class__(
             qdata,
@@ -180,9 +198,7 @@ def install_torchao_float8_fsdp_support() -> None:
         # E4M3 payload to the compute dtype would silently undo the quantization.
         self = args[0]
         forwarded = {key: value for key, value in kwargs.items() if key != "dtype"}
-        return return_and_correct_aliasing(
-            func, args, kwargs, _rewrap_float8(self, func(self.qdata, **forwarded))
-        )
+        return return_and_correct_aliasing(func, args, kwargs, _rewrap_float8(self, func(self.qdata, **forwarded)))
 
     @implements(aten.copy_.default)
     def _(func, types, args, kwargs):
@@ -628,9 +644,7 @@ def apply_modelopt_fp8_checkpoint_inplace(
     if missing_conversions:
         raise ValueError(f"ModelOpt FP8 weights were not converted: {sorted(missing_conversions)}")
     converted_fqns.sort()
-    sharded_count = sum(
-        1 for fqn in converted_fqns if isinstance(model.get_submodule(fqn).weight.data, DTensor)
-    )
+    sharded_count = sum(1 for fqn in converted_fqns if isinstance(model.get_submodule(fqn).weight.data, DTensor))
     log.info(
         f"Loaded {len(converted_fqns)} calibrated ModelOpt FP8 weights into TorchAO "
         f"({sharded_count} sharded / {len(converted_fqns) - sharded_count} replicated)"

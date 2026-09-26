@@ -29,13 +29,18 @@ OPTIMIZER_KWARGS: dict[str, Any] = dict(
     # Whether to disable weight decay for one-dimensional params such as norm weights and biases.
     # Default is False to preserve historical optimizer behavior.
     disable_weight_decay_for_1d_params=False,
+    # Regex-to-multiplier mapping for layer-wise weight decay on one-dimensional params.
+    weight_decay_multipliers_for_1d_params={},
 )
 
 # Muon / Dion2 share the standard factory knobs (keys_to_select, lr_multipliers,
-# disable_weight_decay_for_1d_params) plus their own orthogonalization
-# hyperparameters. ``fused`` is required by the factory; the AdamW side is fused
-# by construction, ``capturable`` is forced on, and ``master_weights`` is derived
-# from the parameter dtypes (see ``_needs_master_weights`` in utils/optimizer.py).
+# disable_weight_decay_for_1d_params, weight_decay_multipliers_for_1d_params)
+# plus their own orthogonalization hyperparameters. ``fused`` is required by the
+# factory; the AdamW side is fused by construction and ``capturable`` is forced
+# on. Both optimizers require FP32 params and update them in place, so they take
+# no ``master_weights`` (unlike FusedAdam, which derives it from the parameter
+# dtypes -- see
+# ``_needs_master_weights`` in utils/optimizer.py).
 MUON_OPTIMIZER_KWARGS: dict[str, Any] = dict(
     # Base learning rate. Muon scales matrix params by muon_lr_scale*sqrt(max(A,B));
     # the AdamW side and the per-param-group lr_multipliers use it directly.
@@ -47,6 +52,7 @@ MUON_OPTIMIZER_KWARGS: dict[str, Any] = dict(
     keys_to_select=[],
     lr_multipliers={},
     disable_weight_decay_for_1d_params=False,
+    weight_decay_multipliers_for_1d_params={},
     # Name substrings for stacked MoE expert params ([E, M, N]) to orthogonalize
     # per expert slice. Empty = experts stay on AdamW (no behavior change).
     # e.g. ["gate_up_proj", "down_proj"] for grouped-MM MoE experts.
@@ -79,6 +85,7 @@ DION2_OPTIMIZER_KWARGS: dict[str, Any] = dict(
     keys_to_select=[],
     lr_multipliers={},
     disable_weight_decay_for_1d_params=False,
+    weight_decay_multipliers_for_1d_params={},
     # Name substrings for stacked MoE expert params ([E, M, N]) to orthogonalize
     # per expert slice. Empty = experts stay on AdamW (no behavior change).
     # e.g. ["gate_up_proj", "down_proj"] for grouped-MM MoE experts.
@@ -97,7 +104,7 @@ DION2_OPTIMIZER_KWARGS: dict[str, Any] = dict(
     max_dion2_megabatch_width=25,
     # Opt-in Torch/NVTX annotations for forward/NS/reverse/apply phases.
     dion2_profile_phases=False,
-    # MoE expert gate/up split and multi-layer NS megabatching.
+    # Shared and routed MoE expert gate/up splitting, plus multi-layer NS megabatching.
     split_expert_gate_up=False,
     batch_split_expert_ns=False,
     max_moe_expert_ns_matrices=0,
@@ -218,6 +225,16 @@ def register_schedulers(lambdacosine_kwargs: dict[str, Any]) -> None:
             f_max=1.0,
             f_cooldown_start=0.9,
             f_min=0.1,
+        ),
+    )
+    # Constant scheduler: multiplier is always 1 (no-op) for the entire run.
+    cs.store(
+        group="scheduler",
+        package="scheduler",
+        name="constant",
+        node=L(build_lr_scheduler)(
+            optimizer=PLACEHOLDER,
+            lr_scheduler_type="constant",
         ),
     )
 

@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 
 import torch
 
+from cosmos_framework.data.generator.sequence_packing.runtime import to_device_nonblocking
+
 
 def _empty_long_tensor() -> torch.Tensor:
     return torch.empty(0, dtype=torch.long)  # [0]
@@ -55,6 +57,10 @@ class ModalityDataBuilder:
             and 0 indicates noised/supervised tokens.
         noisy_frame_indexes: Per-payload indexes of noised frames. These are constructed
             during packing to avoid GPU-to-CPU synchronization later.
+        seconds_per_frame: Per-payload real-world seconds between two consecutive latent
+            frames of this item (``temporal_compression_factor / fps``), or ``1.0`` when
+            the item's fps is unknown. Vision and LiDAR items typically disagree here even
+            when both share a frame index, since the two sensors run at different rates.
     """
 
     spans: list[ModalitySpan] = field(default_factory=list)
@@ -66,6 +72,7 @@ class ModalityDataBuilder:
     tokens: list[torch.Tensor] = field(default_factory=list)
     condition_mask: list[torch.Tensor] = field(default_factory=list)
     noisy_frame_indexes: list[torch.Tensor] = field(default_factory=list)
+    seconds_per_frame: list[float] = field(default_factory=list)
 
 
 @dataclass
@@ -89,6 +96,9 @@ class ModalityData:
         condition_mask: Per-payload masks where 1 indicates clean/conditioning tokens
             and 0 indicates noised/supervised tokens.
         noisy_frame_indexes: Per-payload indexes of noised frames.
+        seconds_per_frame: Per-payload real-world seconds between two consecutive latent
+            frames of this item, or ``1.0`` when the item's fps is unknown. See
+            ``ModalityDataBuilder.seconds_per_frame``.
         domain_id: Domain IDs for multi-domain training. Only used for action.
         raw_action_dim: Raw action dimensions. Only used for action-channel masking.
     """
@@ -102,8 +112,10 @@ class ModalityData:
     tokens: list[torch.Tensor] = field(default_factory=list)
     condition_mask: list[torch.Tensor] = field(default_factory=list)
     noisy_frame_indexes: list[torch.Tensor] = field(default_factory=list)
+    seconds_per_frame: list[float] = field(default_factory=list)
     domain_id: list[torch.Tensor] = field(default_factory=list)
     raw_action_dim: list[torch.Tensor | None] | None = field(default_factory=list)
+    action_valid_mask: list[torch.Tensor | None] | None = field(default_factory=list)
 
     def __post_init__(self) -> None:
         assert isinstance(self.sequence_indexes, torch.Tensor), "ModalityData.sequence_indexes must be finalized"
@@ -111,17 +123,23 @@ class ModalityData:
         assert isinstance(self.mse_loss_indexes, torch.Tensor), "ModalityData.mse_loss_indexes must be finalized"
 
     def to_cuda(self) -> None:
-        """Move all tensor fields to CUDA in-place."""
-        self.sequence_indexes = self.sequence_indexes.cuda()
-        self.timesteps = self.timesteps.cuda()
-        self.mse_loss_indexes = self.mse_loss_indexes.cuda()
-        self.tokens = [token.cuda() for token in self.tokens]
-        self.condition_mask = [cm.cuda() for cm in self.condition_mask]
-        self.noisy_frame_indexes = [ni.cuda() for ni in self.noisy_frame_indexes]
-        self.domain_id = [d.cuda() for d in self.domain_id]
+        """Move all tensor fields to CUDA in-place (asynchronous pinned copies, identical values)."""
+        self.sequence_indexes = to_device_nonblocking(self.sequence_indexes, "cuda")
+        self.timesteps = to_device_nonblocking(self.timesteps, "cuda")
+        self.mse_loss_indexes = to_device_nonblocking(self.mse_loss_indexes, "cuda")
+        self.tokens = [to_device_nonblocking(token, "cuda") for token in self.tokens]
+        self.condition_mask = [to_device_nonblocking(cm, "cuda") for cm in self.condition_mask]
+        self.noisy_frame_indexes = [to_device_nonblocking(ni, "cuda") for ni in self.noisy_frame_indexes]
+        self.domain_id = [to_device_nonblocking(d, "cuda") for d in self.domain_id]
         # raw_action_dim is optional (e.g., when action-channel masking is disabled).
         if self.raw_action_dim is not None:
-            self.raw_action_dim = [d.cuda() if d is not None else None for d in self.raw_action_dim]
+            self.raw_action_dim = [
+                to_device_nonblocking(d, "cuda") if d is not None else None for d in self.raw_action_dim
+            ]
+        if self.action_valid_mask is not None:
+            self.action_valid_mask = [
+                to_device_nonblocking(m, "cuda") if m is not None else None for m in self.action_valid_mask
+            ]
 
 
 def prepare_attention_mask_per_sample(split_lens, attn_modes, device="cpu"):

@@ -43,8 +43,11 @@ import dataclasses
 import enum
 import multiprocessing
 import os
+import queue
 import re
+import socket
 import time
+from datetime import timedelta
 from multiprocessing import get_context
 from typing import Any, Dict, Optional, Protocol, Tuple, Union, runtime_checkable
 
@@ -69,6 +72,10 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.distributed.tensor import DTensor, Replicate
 from torch.nn.modules.module import _IncompatibleKeys
 
+from cosmos_framework.checkpoint.background_store import (
+    build_background_store,
+    reserve_background_store_socket,
+)
 from cosmos_framework.checkpoint.base import AbstractCheckpointer, CheckpointLoadSource
 from cosmos_framework.checkpoint.s3_filesystem import S3StorageReader, S3StorageWriter
 from cosmos_framework.utils.config import CheckpointConfig, JobConfig
@@ -159,6 +166,20 @@ class AsyncMode(str, enum.Enum):
     ASYNC_WITH_PINNED_MEM = "async_with_pinned_mem"
 
 
+# Ceiling on a single async save, enforced by the background process group. This is a budget for the
+# whole write phase rather than for any one rank: ranks that own no unique shard finish in ~1s and
+# then block in DCP's post-write gather, so their timeout starts almost as soon as the write begins
+# and expires while the ranks holding real shards are still uploading. On a 768-node 235B run a
+# healthy save takes 2-3 minutes end to end, but object-store slowdowns have stretched the model
+# shards alone past 40 minutes, so the ceiling is sized for a degraded store, not the expected case.
+BACKGROUND_SAVE_TIMEOUT = timedelta(minutes=60)
+
+# Ceiling on the main process waiting for a result from the background process. Must stay above
+# BACKGROUND_SAVE_TIMEOUT so that a stuck save is reported by the background process (which knows
+# why it failed) instead of surfacing here as an opaque queue timeout.
+SAVE_RESULT_TIMEOUT = timedelta(minutes=70)
+
+
 class Terminate:
     pass
 
@@ -178,6 +199,8 @@ def save_checkpoint_in_background(
     sender_queue: multiprocessing.Queue,
     config_checkpoint: CheckpointConfig,
     config_job: JobConfig,
+    listen_socket: Optional[socket.socket],
+    port: int,
 ) -> None:
     """
     Handles model checkpoint saving in a separate background process using PyTorch's distributed functionality.
@@ -188,6 +211,9 @@ def save_checkpoint_in_background(
         sender_queue: Queue to send completion signals back to the main process
         config_checkpoint: Configuration settings for checkpoint saving behavior
         config_job: Configuration settings for the training job
+        listen_socket: On rank 0, the socket reserved by the parent for this process group's
+            TCPStore; ``None`` on every other rank
+        port: Port ``listen_socket`` is bound to, broadcast to every rank by the parent
 
     Flow:
         1. Initializes distributed processing environment
@@ -200,19 +226,19 @@ def save_checkpoint_in_background(
         AssertionError: If received object is neither Terminate signal nor valid state dict tuple
 
     Note:
-        - Uses a different port than the main process to avoid conflicts
-        - Disables TorchElastic agent store for checkpoint operations
+        - Serves its store on a port reserved by the parent, so it never competes for one
         - Automatically cleans up distributed process group on exit
     """
-    # Configure distributed environment
-    os.environ["MASTER_PORT"] = str(int(os.environ["MASTER_PORT"]) + 2)
-    os.environ["TORCHELASTIC_USE_AGENT_STORE"] = "False"
-
     # Set up GPU device and distributed processing
     torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
-    if dist.is_initialized():
-        dist.destroy_process_group()
-    dist.init_process_group(backend="gloo")
+    store = build_background_store(listen_socket, port)
+    dist.init_process_group(
+        backend="gloo",
+        store=store,
+        rank=int(os.environ["RANK"]),
+        world_size=int(os.environ["WORLD_SIZE"]),
+        timeout=BACKGROUND_SAVE_TIMEOUT,
+    )
 
     # Initialize checkpointing mechanism
     checkpoint_handler = DistributedCheckpointer(
@@ -244,7 +270,10 @@ def save_checkpoint_in_background(
             checkpoint_handler.save_state_dict_worker(state_dict, checkpoint_path)
             succeeded = True
         except Exception as e:
-            log.error(f"Error saving checkpoint to {checkpoint_path}: {e}")
+            # Logged from every rank: the ranks that own no unique shard are usually the first to
+            # hit the process group timeout, and rank 0 is typically still inside the collective
+            # with nothing to report, so a rank0-only log loses the only record of why a save died.
+            log.error(f"Error saving checkpoint to {checkpoint_path}: {e}", rank0_only=False)
             # continue because if the thread exits, the main thread keeps on adding to the queue
         finally:
             elapsed_time = time.monotonic() - start_time
@@ -354,8 +383,11 @@ class CustomLoadPlanner(dcp.DefaultLoadPlanner):
         self.dedup = dedup
         self._global_rank = global_rank
 
-        if len(self.keys_to_skip_loading) > 0:
-            log.info(f"Skipping loading of keys that match the following patterns: {self.keys_to_skip_loading}")
+        if self.keys_to_skip_loading:
+            log.warning(
+                f"keys_to_skip_loading={self.keys_to_skip_loading}; checkpoint parameters matching these patterns "
+                "will not be loaded. Set keys_to_skip_loading=[] to load all matching modules."
+            )
 
     def set_up_planner(
         self,
@@ -689,6 +721,16 @@ class DistributedCheckpointer(AbstractCheckpointer):
             self.async_mode = AsyncMode.DISABLED
 
         if self.async_mode == AsyncMode.ASYNC_WITH_PINNED_MEM:
+            # The background process group's TCPStore server lives on rank 0's node. Rank 0
+            # reserves the port here and keeps it bound until its background process adopts the
+            # socket, so nothing on the node can take the port in between; the port number is
+            # broadcast so every background process knows where to connect.
+            self.background_listen_socket = None
+            background_port = [0]
+            if dist.get_rank() == 0:
+                self.background_listen_socket, background_port[0] = reserve_background_store_socket()
+            dist.broadcast_object_list(background_port, src=0)
+
             ctx = get_context("spawn")
             self.mp_queue_send = ctx.Queue()
             self.mp_queue_recv = ctx.Queue()
@@ -699,6 +741,8 @@ class DistributedCheckpointer(AbstractCheckpointer):
                     self.mp_queue_recv,
                     config_checkpoint,
                     config_job,
+                    self.background_listen_socket,
+                    background_port[0],
                 ),
                 daemon=True,
             )
@@ -707,6 +751,9 @@ class DistributedCheckpointer(AbstractCheckpointer):
             self.staging_ckpt_file = None
             self.staging_stream = torch.cuda.Stream()
             self.checkpoint_in_progress = False
+            # A failed result that the per-step poll took off the queue and deliberately did
+            # not act on, held for the blocking wait to raise. See poll_async_save().
+            self.deferred_save_failure: SaveDone | None = None
 
     def keys_to_resume_during_load(self) -> tuple[set[str], CheckpointLoadSource | None]:
         """
@@ -764,12 +811,8 @@ class DistributedCheckpointer(AbstractCheckpointer):
                 if self.only_load_scheduler_state:
                     resume_keys.append("scheduler")
 
-        if len(self.keys_not_to_resume) > 0:
-            for key in self.keys_not_to_resume:
-                assert key in self.CHECKPOINT_KEYS, f"Invalid key to resume: {key} not in {self.CHECKPOINT_KEYS}"
-            resume_keys = [key for key in resume_keys if key not in self.keys_not_to_resume]
-
-        return set(resume_keys), source
+        resume_keys = self._filter_resume_keys(set(resume_keys), self.CHECKPOINT_KEYS, source)
+        return resume_keys, source
 
     @misc.timer("checkpoint loading")
     def load(
@@ -981,10 +1024,92 @@ class DistributedCheckpointer(AbstractCheckpointer):
         self.checkpoint_in_progress = True
         log.info(f"Submitted checkpoint to background process")
 
+    def _report_save_result(self, save_done: SaveDone) -> bool:
+        """Hand a finished background save to the callbacks, and report whether it succeeded.
+
+        Clearing ``checkpoint_in_progress`` here is what makes the two paths that can pick up
+        a result interchangeable: whichever of :meth:`poll_async_save` and
+        :meth:`_wait_for_previous_async_checkpoint` reaches the queue first consumes the
+        result and dispatches it, and the other then has nothing left to do.
+        """
+        log.info(f"Received checkpoint save result: {save_done}")
+
+        if self.callbacks is not None and save_done.succeeded:
+            self.callbacks.on_save_checkpoint_success(
+                iteration=save_done.iteration, elapsed_time=save_done.elapsed_time
+            )
+        self.checkpoint_in_progress = False
+        return save_done.succeeded
+
+    def poll_async_save(self) -> None:
+        """Confirm a background save that has already finished, without waiting for one that has not.
+
+        A save is only confirmed once its result is taken off the queue, and that is what
+        dispatches ``on_save_checkpoint_success`` -- which drives OneLogger's
+        ``train_iterations_productive_end`` and lets wall-clock retention advance. Left to
+        :meth:`_wait_for_previous_async_checkpoint` alone, the confirmation waits for the
+        *next* save to drain this one, or for :meth:`finalize` on a graceful exit. A job
+        killed abnormally in between -- preemption, cancellation, timeout, node failure --
+        therefore threw away credit for a checkpoint that had been durable on disk for as
+        long as the gap between saves. Job 1881483 wrote iteration 58500 successfully at
+        10:52:04 and was preempted at 11:32:56 having reached 58856, yet still reported
+        58000 as its last productive iteration.
+
+        Polling once per optimizer step narrows that window to the write itself plus one
+        iteration.
+
+        Unlike the blocking wait, this never adjudicates a result that has not arrived: an
+        empty queue means the write is still running, and a queue that cannot be read is
+        left to the blocking wait at the next save, which has the timeout needed to tell a
+        slow save from a dead background process.
+
+        Nor does it ever end the job -- only success is acted on here. Every rank runs its
+        own background writer and reads its own queue, so a failed save surfaces at a
+        different step on each rank, and a rank that raised while its peers were still
+        writing would drop out of the next collective and hang them rather than bring the
+        job down coherently. The writers' own process group tolerates a stalled save for
+        ``BACKGROUND_SAVE_TIMEOUT``, so the spread between two ranks' results can be most
+        of an hour. A failure is therefore logged here for promptness and left in
+        ``deferred_save_failure`` for :meth:`_wait_for_previous_async_checkpoint`, which
+        every rank reaches together at the next save or at :meth:`finalize` -- the same
+        place, and the same iteration, as before this poll existed.
+        """
+        if (
+            self.async_mode != AsyncMode.ASYNC_WITH_PINNED_MEM
+            or not self.checkpoint_in_progress
+            or self.deferred_save_failure is not None
+        ):
+            return
+
+        try:
+            save_done: SaveDone = self.mp_queue_recv.get_nowait()
+        except queue.Empty:
+            return
+        except Exception as e:
+            log.error(f"Error polling for checkpoint save result: {e}", rank0_only=False)
+            return
+
+        if save_done.succeeded:
+            self._report_save_result(save_done)
+            return
+
+        # Leaving ``checkpoint_in_progress`` set is what keeps the blocking wait engaged, so
+        # the verdict is still reached -- just where all ranks reach it at once.
+        log.error(
+            f"Checkpoint save failed in the background process: {save_done}. "
+            f"Training will stop at the next checkpoint milestone.",
+            rank0_only=False,
+        )
+        self.deferred_save_failure = save_done
+
     def _wait_for_previous_async_checkpoint(self) -> None:
         """
         Gets the results of previously submitted checkpoints.
         Pass them to callbacks if checkpoint succeeded.
+
+        Also the single place a failed save is allowed to stop the job, because every rank
+        arrives here at the same iteration; :meth:`poll_async_save` defers failures it
+        picked up mid-step rather than raising off-step.
         """
         assert self.async_mode == AsyncMode.ASYNC_WITH_PINNED_MEM, "Async mode must be AsyncMode.ASYNC_WITH_PINNED_MEM"
 
@@ -993,24 +1118,20 @@ class DistributedCheckpointer(AbstractCheckpointer):
 
         success = False
         try:
-            log.info(f"Waiting for checkpoint save result")
+            if self.deferred_save_failure is not None:
+                save_done: SaveDone = self.deferred_save_failure
+                self.deferred_save_failure = None
+            else:
+                log.info(f"Waiting for checkpoint save result")
 
-            # Note that we set a timeout of 1 hour to avoid blocking the main process
-            # indefinitely. Gloo and NCCL timeouts are ~30 minutes, so this timeout
-            # should typically be sufficient.
-            save_done: SaveDone = self.mp_queue_recv.get(timeout=3600)
+                # Bounded so the main process never blocks indefinitely. Kept above
+                # BACKGROUND_SAVE_TIMEOUT so the background process reports the real failure first.
+                save_done = self.mp_queue_recv.get(timeout=SAVE_RESULT_TIMEOUT.total_seconds())
 
-            log.info(f"Received checkpoint save result: {save_done}")
-
-            if self.callbacks is not None and save_done.succeeded:
-                self.callbacks.on_save_checkpoint_success(
-                    iteration=save_done.iteration, elapsed_time=save_done.elapsed_time
-                )
-            self.checkpoint_in_progress = False
-            success = save_done.succeeded
+            success = self._report_save_result(save_done)
 
         except Exception as e:
-            log.error(f"Error waiting for checkpoint save result: {e}")
+            log.error(f"Error waiting for checkpoint save result: {e}", rank0_only=False)
 
         if not success:
             # Terminate training execution upon a failed checkpoint save attempt.
@@ -1157,3 +1278,9 @@ class DistributedCheckpointer(AbstractCheckpointer):
 
                 self.mp_queue_send.put(Terminate())
                 self.mp.join()
+
+            # Release rank 0's copy of the store socket; the background process owns the fd it
+            # adopted, so this only drops the parent's now-unused reference.
+            if self.background_listen_socket is not None:
+                self.background_listen_socket.close()
+                self.background_listen_socket = None

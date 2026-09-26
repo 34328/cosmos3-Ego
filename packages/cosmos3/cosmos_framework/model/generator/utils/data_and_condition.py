@@ -16,7 +16,7 @@ import torch
 class GenerationDataClean:
     """
     Container for tokenized states and conditioning info (clean states)
-    for the multi-modal (vision, sound, action) MoT training.
+    for the multi-modal (vision, lidar, sound, action) MoT training.
     Used for the VFM generation model.
     """
 
@@ -40,6 +40,14 @@ class GenerationDataClean:
     # num_views * frames_per_view. None when per-camera VAE encoding is disabled.
     num_views_per_vision_item: list[int] | None = None
 
+    # LiDAR (list of per-item range-view latents, flattened over samples the way
+    # x0_tokens_vision is). A range clip is its own modality with its own VAE and its own
+    # sweep rate, so it never appears among the vision items.
+    raw_state_lidar: list[torch.Tensor] | None = None
+    x0_tokens_lidar: list[torch.Tensor] | None = None
+    fps_lidar: torch.Tensor | None = None
+    num_lidar_items_per_sample: list[int] | None = None
+
     # Audio (Sound)
     raw_state_sound: torch.Tensor | None = None
     x0_tokens_sound: torch.Tensor | None = None
@@ -50,7 +58,9 @@ class GenerationDataClean:
     x0_tokens_action: list[torch.Tensor] | None = None
     fps_action: torch.Tensor | None = None
     action_domain_id: list[torch.Tensor] | None = None  # per-sample domain IDs, None when no action samples
+    action_family: list[str] | None = None  # dataset names aligned with the dense action rows
     raw_action_dim: list[torch.Tensor] | None = None  # raw action dimension, used adding masks to loss calculation
+    action_valid_mask: list[torch.Tensor] | None = None  # per-slot semantic validity for action loss/noise
 
     # Multi-control transfer: per-sample list of per-control weights.
     # Shape: [num_samples], each element is a list of floats (one per control stream).
@@ -62,7 +72,7 @@ class GenerationDataClean:
 class GenerationDataNoised:
     """Container for states after noise addition, along with other
     helper attributes for the flow-matching (gt velocity and noise)
-    for the multi-modal (vision, sound, action) MoT training.
+    for the multi-modal (vision, lidar, sound, action) MoT training.
     Used for the VFM generation model.
     """
 
@@ -72,6 +82,12 @@ class GenerationDataNoised:
     xt_tokens_vision: torch.Tensor  # tokens added with noise level t per flow-matching formulation
     vt_target_vision: torch.Tensor  # gt rectified flow field
     sigmas_vision: torch.Tensor | None = None  # SNR to add to the vision tokens
+
+    # LiDAR
+    epsilon_lidar: torch.Tensor | None = None
+    xt_tokens_lidar: torch.Tensor | None = None
+    vt_target_lidar: torch.Tensor | None = None
+    sigmas_lidar: torch.Tensor | None = None
 
     # Audio (Sound)
     epsilon_sound: torch.Tensor | None = None
@@ -85,6 +101,7 @@ class GenerationDataNoised:
     vt_target_action: torch.Tensor | None = None
     sigmas_action: torch.Tensor | None = None
     raw_action_dim: list[torch.Tensor] | None = None  # raw action dimension, used adding masks to loss calculation
+    action_valid_mask: list[torch.Tensor] | None = None  # per-slot semantic validity for action states
 
 
 def unwrap_and_densify(raw: list | torch.Tensor | None, to_kwargs: dict) -> list[torch.Tensor] | None:
@@ -153,6 +170,10 @@ def _expand_per_sample_to_per_vision_item(
             num_items
         ):  # torch.stack(tensor[idx].repeat(num_vision_items_per_sample[idx]) for idx in range(len(num_vision_items_per_sample)))
             expanded.append(tensor[sample_idx])  # [...]
+    if not expanded:
+        # No sample owns a vision item, as in the LiDAR-only recipe. Slicing rather than
+        # stacking keeps the trailing dims, which torch.stack cannot infer from nothing.
+        return tensor[:0]  # [0,...]
     return torch.stack(expanded)  # [N_vision_items,...]
 
 
@@ -180,3 +201,41 @@ def build_dense_sound_schedule(
 
     idx_sound = torch.tensor(sound_sample_indices, dtype=torch.long, device=timesteps.device)  # [n_sound]
     return timesteps[idx_sound], sigmas[idx_sound]  # [n_sound,...], [n_sound,...]
+
+
+def select_target_image_sizes(
+    image_sizes: list[torch.Tensor],
+    num_vision_items_per_sample: list[int] | None,
+    batch_size: int,
+) -> list[torch.Tensor]:
+    """Pick one ``image_size`` per sample, the size of the generated (last) vision item.
+
+    Single-item batches carry one ``image_size`` per sample. Multi-item samples (transfer, SR) carry
+    one entry per vision item, flattened by the joint dataloader in item order. Resolution-dependent
+    settings such as the rectified-flow shift must follow the target item, not the conditioning
+    item, so this selects the last item of each sample.
+
+    Args:
+        image_sizes: flattened list of ``[4]`` or ``[1,4]`` tensors ``[target_h, target_w, orig_h, orig_w]``.
+        num_vision_items_per_sample: items per sample, or None for one item per sample.
+        batch_size: number of samples.
+
+    Returns:
+        list of ``batch_size`` tensors.
+    """
+    if num_vision_items_per_sample is None or len(image_sizes) == batch_size:
+        return list(image_sizes[:batch_size])
+    if len(num_vision_items_per_sample) != batch_size:
+        raise ValueError(
+            f"num_vision_items_per_sample has {len(num_vision_items_per_sample)} entries for batch_size {batch_size}"
+        )
+    if sum(num_vision_items_per_sample) != len(image_sizes):
+        raise ValueError(
+            f"image_size has {len(image_sizes)} entries but samples declare {sum(num_vision_items_per_sample)} items"
+        )
+    selected: list[torch.Tensor] = []
+    offset = 0
+    for num_items in num_vision_items_per_sample:
+        offset += num_items
+        selected.append(image_sizes[offset - 1])
+    return selected

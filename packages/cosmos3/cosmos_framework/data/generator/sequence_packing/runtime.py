@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, List, Tuple
 
 import torch
+from torch.fx.experimental.symbolic_shapes import guard_or_true
 
 from cosmos_framework.utils import log
 
@@ -50,6 +51,17 @@ class SequencePackMetadata:
     full_only_sample_ids: torch.Tensor  # [N_full_tokens]
     num_causal_tokens: int
     num_full_tokens: int
+    # Per-view captions: the causal stream's varlen boundaries subdivided one range per
+    # caption instead of one per sample, so each caption attends causally over itself and no
+    # further. None whenever every sample packs a single caption, which leaves the causal
+    # pass on the per-sample causal_seq_offsets exactly as before.
+    caption_seq_offsets: torch.Tensor | None  # [N_captions+1]
+    max_caption_len: int
+    # The caption subdivision these offsets were built from, normalized so that "one caption per
+    # sample" and "no caption layout" are the same value -- they produce identical metadata.
+    # Kept alongside the offsets so ``matches_layout`` can compare a layout the offsets alone
+    # cannot: two packs can agree on every split length and still subdivide a split differently.
+    caption_lens: tuple[tuple[int, ...], ...] | None
 
     def matches_layout(
         self,
@@ -57,13 +69,21 @@ class SequencePackMetadata:
         split_lens: list[int],
         attn_modes: list[str],
         device: torch.device,
+        text_caption_lens: list[list[int]] | None = None,
     ) -> bool:
-        """Return whether this metadata describes the supplied layout."""
+        """Return whether this metadata describes the supplied layout.
+
+        ``text_caption_lens`` is part of the layout, not a detail of it: a 100-token causal
+        split subdivided ``[50, 50]`` and one subdivided ``[30, 70]`` agree on ``sample_lens``,
+        ``split_lens`` and ``attn_modes`` while placing every caption boundary differently, so
+        reusing one pack's metadata for the other would attend the wrong ranges.
+        """
         return (
             self.sample_lens == tuple(sample_lens)
             and self.split_lens == tuple(split_lens)
             and self.attn_modes == tuple(attn_modes)
             and self.device == device
+            and self.caption_lens == _normalize_caption_layout(text_caption_lens)
         )
 
     def as_sequence_pack_fields(self) -> dict[str, Any]:
@@ -83,6 +103,8 @@ class SequencePackMetadata:
             "_num_full_tokens": self.num_full_tokens,
             "split_lens": list(self.split_lens),
             "attn_modes": list(self.attn_modes),
+            "_caption_seq_offsets": self.caption_seq_offsets,
+            "max_caption_len": self.max_caption_len,
         }
 
 
@@ -116,6 +138,23 @@ def _find_non_causal_text_token_idx(
     return out
 
 
+def to_device_nonblocking(tensor: torch.Tensor, device: torch.device | str) -> torch.Tensor:
+    """Move ``tensor`` to ``device`` without stalling the host.
+
+    A pageable host->device copy (``tensor.cuda()`` / ``torch.tensor(list, device="cuda")``)
+    blocks the CPU until every kernel already queued on the device has finished, which keeps
+    the CPU from running ahead of the GPU in per-frame inference loops.  Staging the bytes
+    through pinned memory makes the same copy asynchronous; the values are identical and the
+    caching host allocator keeps the staging block alive until the copy has completed.
+    """
+    target = torch.device(device)
+    if tensor.device == target or tensor.numel() == 0:
+        return tensor.to(target)
+    if target.type == "cuda" and tensor.device.type == "cpu" and not tensor.is_pinned():
+        tensor = tensor.pin_memory()
+    return tensor.to(target, non_blocking=True)
+
+
 def _compute_mode_indices_and_offsets(
     split_lens: torch.Tensor | List[int], attn_modes: List[str], mode: str, device: torch.device
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -138,8 +177,8 @@ def _compute_mode_indices_and_offsets(
         start += split_len
 
     return (
-        torch.tensor(indices, dtype=torch.int32, device=device),
-        torch.tensor(offsets, dtype=torch.int32, device=device),
+        to_device_nonblocking(torch.tensor(indices, dtype=torch.int32), device),
+        to_device_nonblocking(torch.tensor(offsets, dtype=torch.int32), device),
     )  # [N_mode_tokens], [N_mode_splits+1]
 
 
@@ -184,19 +223,6 @@ def _pad_to_size(size: int, x: torch.Tensor, pad_value: int | float = 0) -> torc
     return padded
 
 
-def _pad_stream_and_sample_ids(
-    sequence: torch.Tensor,  # [N,...]
-    sample_ids: torch.Tensor,  # [N]
-    padded_len: int,
-    padding_sample_id: int,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Pad one token stream and its per-token sample IDs to the same length."""
-    assert sequence.shape[0] == sample_ids.shape[0]
-    sequence = _pad_to_size(padded_len, sequence)  # [N_padded,...]
-    sample_ids = _pad_to_size(padded_len, sample_ids, pad_value=padding_sample_id)  # [N_padded]
-    return sequence, sample_ids
-
-
 def _append_pad_segment(offsets: torch.Tensor, padded_len: int) -> torch.Tensor:
     """Return ``offsets`` with ``padded_len`` appended, adding a final segment for the padding.
 
@@ -207,11 +233,26 @@ def _append_pad_segment(offsets: torch.Tensor, padded_len: int) -> torch.Tensor:
 
 
 def _pad(
-    causal_seq: torch.Tensor, full_only_seq: torch.Tensor, padded_causal_len: int, padded_full_len: int
+    causal_seq: torch.Tensor,
+    full_only_seq: torch.Tensor,
+    padded_causal_len: int,
+    padded_full_len: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     causal_seq = _pad_to_size(padded_causal_len, causal_seq)
     full_only_seq = _pad_to_size(padded_full_len, full_only_seq)
     return causal_seq, full_only_seq
+
+
+def _pad_sample_ids(
+    causal_sample_ids: torch.Tensor,
+    full_only_sample_ids: torch.Tensor,
+    padded_causal_len: int,
+    padded_full_len: int,
+    padding_sample_id: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    causal_sample_ids = _pad_to_size(padded_causal_len, causal_sample_ids, pad_value=padding_sample_id)
+    full_only_sample_ids = _pad_to_size(padded_full_len, full_only_sample_ids, pad_value=padding_sample_id)
+    return causal_sample_ids, full_only_sample_ids
 
 
 def _ensure_core_metadata(pack: SequencePack) -> None:
@@ -231,20 +272,72 @@ def _ensure_core_metadata(pack: SequencePack) -> None:
             raise KeyError(f"Missing required pack field: {key}")
 
 
+def _normalize_caption_layout(
+    text_caption_lens: list[list[int]] | None,
+) -> tuple[tuple[int, ...], ...] | None:
+    """The caption layout as a comparable value, or ``None`` when it subdivides nothing.
+
+    One caption per sample subdivides the causal stream exactly as the per-sample offsets
+    already do, so it and an absent layout describe the same pack and have to compare equal.
+    """
+    if not text_caption_lens or all(len(sample_lens) <= 1 for sample_lens in text_caption_lens):
+        return None
+    return tuple(tuple(sample_lens) for sample_lens in text_caption_lens)
+
+
+def _build_caption_offsets(
+    text_caption_lens: list[list[int]] | None,
+    causal_seq_offsets: torch.Tensor,
+    device: torch.device,
+) -> tuple[torch.Tensor | None, int]:
+    """``(caption_seq_offsets, max_caption_len)`` subdividing the causal stream per caption.
+
+    Returns ``(None, 0)`` unless some sample packs more than one caption: with one caption per
+    sample the subdivision is exactly ``causal_seq_offsets``, and returning it would only give
+    the attention path a second tensor meaning the same thing.
+
+    The lengths are checked against ``causal_seq_offsets`` rather than trusted: they come from
+    the builder's own bookkeeping while the offsets come from ``split_lens``, and a caption
+    layout that disagreed with the split it lives in would silently move every varlen boundary
+    after the first mismatch.
+    """
+    if _normalize_caption_layout(text_caption_lens) is None:
+        return None, 0
+    assert text_caption_lens is not None  # narrowed by the normalization above
+
+    causal_split_lens = torch.diff(causal_seq_offsets).tolist()
+    if len(text_caption_lens) != len(causal_split_lens):
+        raise ValueError(
+            f"The caption layout describes {len(text_caption_lens)} causal splits but the pack holds "
+            f"{len(causal_split_lens)}; every sample with text owns exactly one causal split."
+        )
+    for sample_idx, (caption_lens, split_len) in enumerate(zip(text_caption_lens, causal_split_lens)):
+        if sum(caption_lens) != split_len:
+            raise ValueError(
+                f"Sample {sample_idx}'s captions cover {sum(caption_lens)} tokens but its causal split "
+                f"holds {split_len}; the captions must tile the split exactly."
+            )
+
+    flat_caption_lens = [length for caption_lens in text_caption_lens for length in caption_lens]
+    offsets = torch.tensor([0] + flat_caption_lens, device=device, dtype=torch.int32)  # [N_captions+1]
+    return torch.cumsum(offsets, dim=0, dtype=torch.int32), max(flat_caption_lens)
+
+
 def _build_sequence_pack_metadata(
     sample_lens: list[int],
     split_lens: list[int],
     attn_modes: list[str],
     device: torch.device,
+    text_caption_lens: list[list[int]] | None = None,
 ) -> SequencePackMetadata:
     """Build device tensors and scalar metadata for one sequence layout."""
     _max_sample_len = max(sample_lens)
     _max_causal_len = max((split_lens[i] for i in range(len(split_lens)) if attn_modes[i] == "causal"), default=0)
     _max_full_len = max((split_lens[i] for i in range(len(split_lens)) if attn_modes[i] == "full"), default=0)
 
-    sample_lens_cu = torch.tensor([0] + sample_lens, device=device, dtype=torch.int32)  # [N_samples+1]
+    sample_lens_cu = to_device_nonblocking(torch.tensor([0] + sample_lens, dtype=torch.int32), device)  # [N_samples+1]
     _sample_offsets = torch.cumsum(sample_lens_cu, dim=0, dtype=torch.int32)  # [N_samples+1]
-    sample_lens_tensor = torch.tensor(sample_lens, device=device, dtype=torch.int64)  # [N_samples]
+    sample_lens_tensor = to_device_nonblocking(torch.tensor(sample_lens, dtype=torch.int64), device)  # [N_samples]
     sample_ids = torch.repeat_interleave(
         torch.arange(len(sample_lens), device=device, dtype=torch.int64),
         sample_lens_tensor,
@@ -255,6 +348,7 @@ def _build_sequence_pack_metadata(
     _full_indices, _full_only_seq_offsets = _compute_mode_indices_and_offsets(split_lens, attn_modes, "full", device)
     _causal_sample_ids = sample_ids[_causal_indices]  # [N_causal_tokens]
     _full_only_sample_ids = sample_ids[_full_indices]  # [N_full_tokens]
+    _caption_seq_offsets, _max_caption_len = _build_caption_offsets(text_caption_lens, _causal_seq_offsets, device)
 
     return SequencePackMetadata(
         sample_lens=tuple(sample_lens),
@@ -273,6 +367,9 @@ def _build_sequence_pack_metadata(
         full_only_sample_ids=_full_only_sample_ids,
         num_causal_tokens=len(_causal_indices),
         num_full_tokens=len(_full_indices),
+        caption_seq_offsets=_caption_seq_offsets,
+        max_caption_len=_max_caption_len,
+        caption_lens=_normalize_caption_layout(text_caption_lens),
     )
 
 
@@ -282,15 +379,22 @@ def prepare_sequence_pack_metadata(
     attn_modes: list[str],
     packed_und_token_indexes: torch.Tensor,
     device: torch.device,
+    text_caption_lens: list[list[int]] | None = None,
 ) -> SequencePackMetadata:
-    """Validate and prepare reusable metadata for one packed-sequence layout."""
+    """Validate and prepare reusable metadata for one packed-sequence layout.
+
+    ``text_caption_lens`` is the per-sample caption layout from
+    ``PackedSequence.text_caption_lens``; supplying it is what subdivides the causal stream's
+    varlen boundaries per caption. Omitting it (or passing a layout with one caption per
+    sample) leaves the causal pass on the per-sample boundaries.
+    """
     non_causal_text_idxs = _find_non_causal_text_token_idx(
         attn_modes,
         split_lens,
         packed_und_token_indexes.tolist(),
     )
     assert len(non_causal_text_idxs) == 0, "non_causal_text_idxs should be empty"
-    return _build_sequence_pack_metadata(sample_lens, split_lens, attn_modes, device)
+    return _build_sequence_pack_metadata(sample_lens, split_lens, attn_modes, device, text_caption_lens)
 
 
 # ------------------------------------
@@ -336,6 +440,7 @@ def sequence_pack_from_packed_sequence(
     full_seq_alignment: int = 1,
     causal_seq_alignment: int = 1,
     prepared_metadata: SequencePackMetadata | None = None,
+    text_caption_lens: list[list[int]] | None = None,
 ) -> SequencePack:
     """
     Create a sequence pack from a packed sequence and metadata.
@@ -357,6 +462,12 @@ def sequence_pack_from_packed_sequence(
             FlexAttention path keys GEN queries against ``[UND | GEN]``, so the UND stream needs the
             same block alignment as the GEN one for the boundary between them to fall on a block
             boundary.
+        text_caption_lens (list[list[int]] | None): Per-sample caption layout from
+            ``PackedSequence.text_caption_lens``. It subdivides each sample's causal split one
+            range per caption, which is what keeps per-view captions from attending one another;
+            omitting it for a per-view pack builds metadata that silently merges them. It is also
+            part of what ``prepared_metadata`` is checked against, since two packs can share every
+            split length and still place their caption boundaries differently.
     """
     del packed_gen_token_indexes
 
@@ -367,8 +478,11 @@ def sequence_pack_from_packed_sequence(
             attn_modes=attn_modes,
             packed_und_token_indexes=packed_und_token_indexes,
             device=packed_sequence.device,
+            text_caption_lens=text_caption_lens,
         )
-    elif not prepared_metadata.matches_layout(sample_lens, split_lens, attn_modes, packed_sequence.device):
+    elif not prepared_metadata.matches_layout(
+        sample_lens, split_lens, attn_modes, packed_sequence.device, text_caption_lens
+    ):
         raise ValueError("Prepared sequence-pack metadata does not match the current packed-sequence layout")
 
     assert sum(sample_lens) == packed_sequence.shape[0], (
@@ -380,14 +494,6 @@ def sequence_pack_from_packed_sequence(
     full_only_seq = packed_sequence[meta["_full_indices"]]  # [N_full_tokens,D]
     causal_sample_ids = meta["_causal_sample_ids"]  # [N_causal_tokens]
     full_only_sample_ids = meta["_full_only_sample_ids"]  # [N_full_tokens]
-
-    # Decide the padded lengths, then materialise them once.
-    len_causal = int(causal_seq.shape[0])
-    len_full = int(full_only_seq.shape[0])
-    need_causal = _get_padded_size(len_causal, cp_world_size, pad_for_cuda_graphs, causal_seq_alignment)
-    need_full = _get_padded_size(len_full, cp_world_size, pad_for_cuda_graphs, full_seq_alignment)
-    if pad_for_cuda_graphs:
-        need_causal, need_full = _grow_cuda_graph_bounds(need_causal, need_full, is_image_batch)
 
     # The pad segment below pairs the two streams segment for segment, so it only applies when
     # they have the same, non-zero segment count, i.e. every sample contributes both a causal and
@@ -403,41 +509,41 @@ def sequence_pack_from_packed_sequence(
     # und keys, and an empty key range would turn those rows into an empty softmax. So once
     # either stream is padded, give both at least one padded row, re-rounded so the alignment
     # and CUDA-graph bucketing still hold.
-    if pad_segment_supported and (need_causal > len_causal or need_full > len_full):
-        need_causal = max(
-            need_causal, _get_padded_size(len_causal + 1, cp_world_size, pad_for_cuda_graphs, causal_seq_alignment)
-        )
-        need_full = max(
-            need_full, _get_padded_size(len_full + 1, cp_world_size, pad_for_cuda_graphs, full_seq_alignment)
-        )
-        if pad_for_cuda_graphs:
-            # Re-grow the marks so they still cover the bumped lengths and captured shapes hold.
-            need_causal, need_full = _grow_cuda_graph_bounds(need_causal, need_full, is_image_batch)
+    len_causal = int(causal_seq.shape[0])
+    len_full = int(full_only_seq.shape[0])
+    assert len_causal == meta["_num_causal_tokens"], "len_causal must be equal to the number of causal tokens"
+    assert len_full == meta["_num_full_tokens"], "len_full must be equal to the number of full tokens"
 
-    if need_causal != len_causal or need_full != len_full:
+    if pad_segment_supported:
+        need_causal = len_causal + cp_world_size
+        need_full = len_full + cp_world_size
+    else:
+        need_causal = len_causal
+        need_full = len_full
+
+    need_causal = _get_padded_size(need_causal, cp_world_size, pad_for_cuda_graphs, causal_seq_alignment)
+    need_full = _get_padded_size(need_full, cp_world_size, pad_for_cuda_graphs, full_seq_alignment)
+    if pad_for_cuda_graphs:
+        need_causal, need_full = _grow_cuda_graph_bounds(need_causal, need_full, is_image_batch)
+
+    pad_causal = need_causal - len_causal
+    pad_full = need_full - len_full
+
+    if pad_causal > 0 or pad_full > 0:
         padding_sample_id = meta["sample_offsets"].shape[0] - 1
-        causal_seq, causal_sample_ids = _pad_stream_and_sample_ids(
-            causal_seq,
-            causal_sample_ids,
-            need_causal,
-            padding_sample_id,
+        causal_seq, full_only_seq = _pad(
+            causal_seq=causal_seq,
+            full_only_seq=full_only_seq,
+            padded_causal_len=need_causal,
+            padded_full_len=need_full,
         )
-        full_only_seq, full_only_sample_ids = _pad_stream_and_sample_ids(
-            full_only_seq,
-            full_only_sample_ids,
-            need_full,
-            padding_sample_id,
+        causal_sample_ids, full_only_sample_ids = _pad_sample_ids(
+            causal_sample_ids=causal_sample_ids,
+            full_only_sample_ids=full_only_sample_ids,
+            padded_causal_len=need_causal,
+            padded_full_len=need_full,
+            padding_sample_id=padding_sample_id,
         )
-
-    pack: SequencePack = {
-        **meta,
-        "max_num_tokens": sum(sample_lens),
-        "causal_seq": causal_seq,
-        "full_only_seq": full_only_seq,
-        "_causal_sample_ids": causal_sample_ids,
-        "_full_only_sample_ids": full_only_sample_ids,
-        "is_sharded": False,
-    }
 
     # Trailing padding rows belong to no sample, and varlen attention leaves rows outside its
     # cumulative ranges unwritten in both directions: the forward output rows keep whatever was
@@ -448,23 +554,84 @@ def sequence_pack_from_packed_sequence(
     # query keeps its exact range, and both streams gain the same one extra segment, which keeps
     # the query and key segment counts equal for the gen->und pass. No real sample grows, so each
     # maximum is whichever is longer, the longest real sample or the padding itself.
-    pad_causal = int(causal_seq.shape[0]) - meta["_num_causal_tokens"]
-    pad_full = int(full_only_seq.shape[0]) - meta["_num_full_tokens"]
+    pad_segment_fields: SequencePack = {}
     if pad_segment_supported and (pad_causal > 0 or pad_full > 0):
         assert pad_causal > 0 and pad_full > 0, (
             "Padding must land on both streams so the pad segment is non-empty on every side, "
             f"got pad_causal={pad_causal}, pad_full={pad_full}."
         )
-        pack["_causal_seq_offsets_pad_segment"] = _append_pad_segment(
+        # The tower offsets/lengths replace the ones ``meta`` carries rather than sitting beside
+        # them under a second name. Both describe the same tensor -- ``causal_seq``/``full_only_seq``
+        # are already padded above -- so a second copy would only ever differ in whether it fenced
+        # the padding off, and every attention pass over these streams wants it fenced. The handful
+        # of callers that need the real-sample boundaries take them off the end instead: the padding
+        # is one trailing segment, so ``offsets[:-2]`` is the real-sample starts and
+        # ``offsets[-2]`` the real token count.
+        pad_segment_fields["_causal_seq_offsets"] = _append_pad_segment(
             meta["_causal_seq_offsets"], int(causal_seq.shape[0])
         )
-        pack["max_causal_len_pad_segment"] = max(meta["max_causal_len"], pad_causal)
-        pack["_full_only_seq_offsets_pad_segment"] = _append_pad_segment(
+        pad_segment_fields["max_causal_len"] = max(meta["max_causal_len"], pad_causal)
+        pad_segment_fields["_full_only_seq_offsets"] = _append_pad_segment(
             meta["_full_only_seq_offsets"], int(full_only_seq.shape[0])
         )
-        pack["max_full_len_pad_segment"] = max(meta["max_full_len"], pad_full)
+        pad_segment_fields["max_full_len"] = max(meta["max_full_len"], pad_full)
 
-    return pack
+        if meta["_caption_seq_offsets"] is not None:
+            # The caption boundaries subdivide the same stream, so its padding is the same
+            # trailing rows and needs the same extra segment. Unlike the two above this one
+            # pairs with nothing -- it only ever drives the causal self-attention pass, where
+            # queries and keys are both the causal stream.
+            pad_segment_fields["_caption_seq_offsets"] = _append_pad_segment(
+                meta["_caption_seq_offsets"], int(causal_seq.shape[0])
+            )
+            pad_segment_fields["max_caption_len"] = max(meta["max_caption_len"], pad_causal)
+
+        # The two-way dense full pass keys GEN queries against the interleaved stream rather than
+        # against either tower, so covering its padded queries needs a pad segment on
+        # ``sample_offsets`` too -- those are the offsets that describe that stream. Same shape as
+        # the other two: the offsets already end at the real token count, so appending the padded
+        # length is the whole of it. That padded length is both towers' padded lengths, which is
+        # what :func:`get_all_seq` materialises.
+        #
+        # Asserted rather than guarded, and asserted here rather than folded into
+        # ``pad_segment_supported``, because the three consumers have to agree. Emitting the tower
+        # segments without this one would leave the causal pass covered and the dense full pass
+        # back on plain offsets -- the exact asymmetry the segment exists to remove, reappearing
+        # silently on a layout nobody tested. Skipping all three instead would be no better now
+        # that an uncovered row is known to survive into the gradients on some backends. So a
+        # layout that breaks the pairing has to stop here and be looked at.
+        assert meta["sample_offsets"].shape[0] == meta["_full_only_seq_offsets"].shape[0], (
+            "The pad segments pair a GEN query segment with the interleaved keys of its own sample, which "
+            f"needs one full split per sample: got {meta['sample_offsets'].shape[0] - 1} samples and "
+            f"{meta['_full_only_seq_offsets'].shape[0] - 1} full splits. The packer emits them one to one "
+            "(see SequencePlan.finish_sample); a layout that does not has to say how its GEN queries and "
+            "interleaved keys line up before it can carry a pad segment."
+        )
+        pad_segment_fields["sample_offsets"] = _append_pad_segment(
+            meta["sample_offsets"], int(causal_seq.shape[0]) + int(full_only_seq.shape[0])
+        )
+        pad_segment_fields["max_sample_len"] = max(meta["max_sample_len"], pad_causal + pad_full)
+        # Every offsets array now carries the segment, so none of their names records that it
+        # happened; this flag is the only thing left that does. Callers that need the real sample
+        # count read it through :func:`has_pad_segment` / :func:`drop_pad_segment` rather than
+        # comparing a padded length against a real one, which is a data-dependent comparison on
+        # dims ``_mark_pack_unbacked`` has made unbacked and so has no answer under compile.
+        pad_segment_fields["_has_pad_segment"] = True
+
+    return {
+        **meta,
+        "max_num_tokens": sum(sample_lens),
+        "causal_seq": causal_seq,
+        "full_only_seq": full_only_seq,
+        "_causal_sample_ids": causal_sample_ids,
+        "_full_only_sample_ids": full_only_sample_ids,
+        "is_sharded": False,
+        # Last, and deliberately so: the four tower entries above shadow the ``meta`` ones of the
+        # same name, which is how the pad segment gets folded in. The two ``_pad_segment`` keys are
+        # new names and would land the same wherever they went. Empty when the pack is unpadded or
+        # its layout cannot pair the streams, leaving ``meta``'s own values in place.
+        **pad_segment_fields,
+    }
 
 
 def zeros_like(orig: SequencePack, shape: Tuple[int, ...] | torch.Size | None = None) -> SequencePack:
@@ -603,40 +770,114 @@ def set_gen_seq(pack: SequencePack, value: torch.Tensor) -> None:
     pack["full_only_seq"] = value
 
 
-def get_all_seq(pack: SequencePack) -> torch.Tensor:
+def get_all_seq_unpadded(pack: SequencePack) -> torch.Tensor:
     """
-    Get all tokens in a sequence pack in a single tensor.
+    Get the pack's real tokens as one interleaved tensor, stopping at the last of them.
+
+    :func:`get_all_seq` is the default: it returns the same stream padded to the length the
+    pack's ``sample_offsets`` describe, alongside those offsets, which is what a varlen pass
+    needs. This one yields no offsets and no padding, which is what its callers want -- the
+    context parallel gather and the OSS pipeline take it as the model's hidden state, and the
+    two-way dense full pass keys against it precisely because the dense API has no ranges to
+    fence padding off with.
+
     Args:
         pack (SequencePack): The sequence pack to get the all sequence from.
     Returns:
         torch.Tensor: All tokens concatenated over all sequences in the batch.
+
+    The two emptiness tests below are read through ``guard_or_true`` because dim 0 of these
+    streams is unbacked inside a compiled block (see
+    ``parallelize_unified_mot._mark_pack_unbacked``), which leaves a plain ``> 0`` with no answer
+    Dynamo can reach: it would raise a data-dependent error rather than pick a branch. They only
+    skip a scatter that would write nothing, so assuming True is never wrong -- and it is what
+    holds whenever the question is open at all, since ``_mark_pack_unbacked`` declines to mark a
+    dim it has already seen to be 0 or 1, leaving an empty stream's length concrete and the test
+    statically False. ``guard_or_true`` keeps that concrete case resolving exactly as before.
+
+    The ``new_zeros`` length is likewise left symbolic rather than passed through ``int()``, which
+    would demand a concrete value for the same unbacked sum and fail the same way.
     """
-    if "all_seq" in pack:
-        return pack["all_seq"]
     _ensure_core_metadata(pack)
     if pack["is_sharded"]:
-        assert False, "get_all_seq is not supported in context parallel sharded mode"
+        assert False, "get_all_seq_unpadded is not supported in context parallel sharded mode"
     out = pack["causal_seq"].new_zeros(
-        int(pack["_causal_indices"].shape[0] + pack["_full_indices"].shape[0]), *pack["causal_seq"].shape[1:]
+        pack["_causal_indices"].shape[0] + pack["_full_indices"].shape[0], *pack["causal_seq"].shape[1:]
     )  # [seq_len,D]
-    if pack["causal_seq"].shape[0] > 0:
+
+    # Each scatter slices a tower down to its index count, and ``slice_forward``'s decomposition
+    # has to decide whether that slice clamps. Under ``_mark_pack_unbacked`` both lengths are
+    # unbacked, and on the context parallel path they are expressions over *different* symbols --
+    # the tower is the all-to-all's gathered stream, ``cp_size`` times a shard length, while the
+    # indices still carry the batch-wide symbol the metadata was built with.
+    # where the relation is false and the scatter is skipped rather than performed.
+    if guard_or_true(pack["causal_seq"].shape[0] > 0):
+        torch._check(pack["_causal_indices"].shape[0] <= pack["causal_seq"].shape[0])
         out[pack["_causal_indices"]] = pack["causal_seq"][: pack["_causal_indices"].shape[0]]
-    if pack["full_only_seq"].shape[0] > 0:
+    if guard_or_true(pack["full_only_seq"].shape[0] > 0):
+        torch._check(pack["_full_indices"].shape[0] <= pack["full_only_seq"].shape[0])
         out[pack["_full_indices"]] = pack["full_only_seq"][: pack["_full_indices"].shape[0]]
     return out
 
 
-def set_all_seq(pack: SequencePack, value: torch.Tensor) -> None:
+def get_all_seq(pack: SequencePack) -> Tuple[torch.Tensor, torch.Tensor, int]:
     """
-    Override the all tokens in a sequence pack.
-    The order of tokens passed in must correspond to the order of tokens returned by get_all_seq.
+    Get all tokens in a sequence pack as one interleaved stream, padded to the length its
+    ``sample_offsets`` describe, with those offsets and their matching maximum length.
+
+    See :func:`has_pad_segment` for why the pad segment exists. The offsets/length are the pack's
+    own ``sample_offsets``/``max_sample_len`` rather than anything the stream itself yields --
+    they're the cumulative ranges the two-way dense full pass keys its GEN queries against, and
+    the padded stream below is only correct alongside them, which is why the two travel together.
+
+    :func:`get_all_seq_unpadded` returns real tokens only and no offsets, which is what its own
+    callers want: the context parallel gather and the OSS pipeline both take it as the model's
+    hidden state. The two-way dense full pass is the exception -- it uses this stream as the keys
+    for a *padded* query
+    stream, so its keys have to reach as far as the queries do or the padded queries fall outside
+    every cumulative range and the kernel leaves their rows, and the matching gradient rows,
+    exactly as it found them.
+
+    The padded length is both towers' padded lengths, so the trailing rows are the two towers'
+    padding taken together, and ``sample_offsets``'s own pad segment covers them as one extra segment.
+    They stay zero: the real tokens scatter into their packed positions as before, and what is
+    left is padding attending to padding, which needs no content, only a range.
+
+    Nothing scatters into the tail, so no gradient flows back from it into either tower -- the
+    index assignments below gather only the real positions.
+
     Args:
-        pack (SequencePack): The sequence pack to set the all sequence in.
-        value (torch.Tensor): The all sequence to set.
+        pack (SequencePack): The sequence pack to get the all-sequence from.
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor, int]: The all-tokens stream (interleaved, padded to
+        ``sample_offsets``'s length when the pack carries a pad segment, else
+        ``get_all_seq_unpadded``'s real-tokens-only variant), and the matching
+        ``sample_offsets``/``max_sample_len``.
+
+    The ``guard_or_true`` emptiness tests and the symbolic ``new_zeros`` length below are there
+    for the reason :func:`get_all_seq_unpadded` documents; this is the variant the compiled two-way dense
+    full pass actually calls, so it is the one that meets unbacked dims in practice.
     """
+    if not has_pad_segment(pack):
+        return get_all_seq_unpadded(pack), pack["sample_offsets"], pack["max_sample_len"]
+
     _ensure_core_metadata(pack)
-    pack["causal_seq"][: pack["_causal_indices"].shape[0]] = value[pack["_causal_indices"]]
-    pack["full_only_seq"][: pack["_full_indices"].shape[0]] = value[pack["_full_indices"]]
+    if pack["is_sharded"]:
+        assert False, "get_all_seq is not supported in context parallel sharded mode"
+    out = pack["causal_seq"].new_zeros(
+        pack["causal_seq"].shape[0] + pack["full_only_seq"].shape[0], *pack["causal_seq"].shape[1:]
+    )  # [padded_causal+padded_full,D]
+
+    # Same two invariants, for the same reason, as :func:`get_all_seq_unpadded` states above; this
+    # is the variant the compiled context-parallel two-way pass actually calls, so it is the one
+    # that meets the undecidable comparison in practice.
+    if guard_or_true(pack["causal_seq"].shape[0] > 0):
+        torch._check(pack["_causal_indices"].shape[0] <= pack["causal_seq"].shape[0])
+        out[pack["_causal_indices"]] = pack["causal_seq"][: pack["_causal_indices"].shape[0]]
+    if guard_or_true(pack["full_only_seq"].shape[0] > 0):
+        torch._check(pack["_full_indices"].shape[0] <= pack["full_only_seq"].shape[0])
+        out[pack["_full_indices"]] = pack["full_only_seq"][: pack["_full_indices"].shape[0]]
+    return out, pack["sample_offsets"], pack["max_sample_len"]
 
 
 def get_causal_seq(pack: SequencePack) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -663,6 +904,87 @@ def get_full_only_seq(pack: SequencePack) -> Tuple[torch.Tensor, torch.Tensor]:
     return pack["full_only_seq"], pack["_full_only_seq_offsets"]
 
 
+def get_caption_seq_offsets(pack: SequencePack) -> Tuple[torch.Tensor, int] | None:
+    """``(offsets, max_len)`` for the caption self-attention pass under per-view captions.
+
+    ``None`` unless the pack carries per-view captions, in which case the caller keeps
+    :func:`get_causal_seq`'s per-sample boundaries and nothing changes.
+
+    Where those boundaries make one sample's whole text one causal document, these make each
+    of its captions its own: a caption attends causally over itself and reaches no other, which
+    is the point of packing one per camera in the first place. The gen->und direction still
+    keys against the whole causal stream and is narrowed per view by the multiview mask
+    instead, which is what lets LiDAR read every caption while a camera reads one.
+
+    These boundaries are stated in unsharded coordinates, pad segment included, like every other
+    offsets array the pack carries. Unlike the tower offsets they have no context parallel caller
+    to pair them with unsharded lengths: the one pass that reads them keys the stream beside them
+    against them, and it only ever runs on a whole pack, because the context parallel wrapper
+    all-to-alls back to the full sequence and rebuilds its packs with ``is_sharded=False`` before
+    calling into attention. Per-view captions under context parallelism is unsupported for the
+    same reason on the interactive side, where ``build_interactive_multiview_mask_items`` refuses
+    the combination outright.
+    """
+    _ensure_core_metadata(pack)
+    offsets = pack.get("_caption_seq_offsets")
+    if offsets is None:
+        return None
+    return offsets, pack["max_caption_len"]
+
+
+def drop_pad_segment(pack: SequencePack, offsets: torch.Tensor) -> torch.Tensor:
+    """``offsets`` with the trailing pad segment removed, describing real samples only.
+
+    The tower offsets carry the padding as one extra trailing segment (see
+    :func:`has_pad_segment`), which is what every attention pass over them wants: the varlen
+    kernels need the padding fenced into a range of its own, and the FlexAttention metadata
+    builder indexes the offsets by sample count, so it reads the real boundary out of either form.
+
+    What is left is index arithmetic off the per-sample starts, which breaks silently rather than
+    loudly on the padded form: ``offsets[:-1]`` would take the padding's own start for a sample's,
+    and stepping forward from it can run past the end of the stream, since the pad segment is only
+    guaranteed non-empty, not any particular length.
+
+    Returns ``offsets`` unchanged on a pack that carries no pad segment, so callers do not have to
+    test for one themselves.
+
+    Args:
+        pack (SequencePack): The pack the offsets came from.
+        offsets (torch.Tensor): Tower offsets from :func:`get_causal_seq`/:func:`get_full_only_seq`.
+    Returns:
+        torch.Tensor: The offsets covering real samples only, shape ``[num_samples + 1]``.
+    """
+    return offsets[:-1] if has_pad_segment(pack) else offsets
+
+
+def has_pad_segment(pack: SequencePack) -> bool:
+    """
+    Whether the pack carries a trailing pad segment (padded causal/full-only offsets and lengths).
+
+    Trailing padding rows belong to no sample, and varlen attention leaves rows outside its
+    cumulative ranges unwritten in both directions: the forward output rows keep whatever was in
+    the buffer, and the backward skips the matching dq/dk/dv rows, which then reach the
+    projection weight gradients with no zero factor to cancel them. The pack therefore describes
+    its padding as one extra trailing segment, which makes padding attend only to padding while
+    each real query keeps its exact range.
+
+    Every offsets array the pack carries -- both towers and ``sample_offsets`` -- folds that
+    segment in, so reading them needs no gate. What needs one is anything that wants the *real*
+    samples: the segment count, the per-sample starts, and the dense/varlen choice. Since no
+    offsets name records the fold any more, ``sequence_pack_from_packed_sequence`` sets a flag
+    when it applies one, and this reads it.
+
+    Absent on a pack built without a pad segment, and on the metadata-only dicts some callers
+    construct by hand, so it is read with a default rather than required.
+
+    Args:
+        pack (SequencePack): The sequence pack to check.
+    Returns:
+        bool: True if the pack carries a pad segment.
+    """
+    return bool(pack.get("_has_pad_segment", False))
+
+
 def num_local_real_tokens(num_real_tokens: int, rank: int, shard_len: int) -> int:
     """
     Count how many of a stream's real (non-padding) tokens land on ``rank``'s contiguous shard.
@@ -678,6 +1000,27 @@ def num_local_real_tokens(num_real_tokens: int, rank: int, shard_len: int) -> in
         int: Real token count within this rank's shard.
     """
     return max(0, min(shard_len, num_real_tokens - rank * shard_len))
+
+
+def get_num_real_samples(pack: SequencePack) -> int:
+    """How many real samples the pack holds, not counting any trailing pad segment.
+
+    ``sample_offsets`` describes one segment per sample, plus one more for the padding on a pack
+    that carries a pad segment (see :func:`has_pad_segment`). Anything reasoning about samples
+    wants this rather than the raw segment count: the padding is a pseudo-sample that exists to
+    give the padded rows a range of their own, not a sequence the model was handed.
+
+    Shape arithmetic only -- no tensor op, no host sync, and no comparison, so nothing here
+    guards or specializes a compiled graph on the count. A caller that goes on to *compare* it
+    does incur that, and has to decide when it can afford to; see ``attention._use_varlen``.
+
+    Args:
+        pack (SequencePack): The sequence pack to count.
+    Returns:
+        int: The number of real samples (a symbolic int inside a compiled block).
+    """
+    num_segments = pack["sample_offsets"].shape[0] - 1
+    return num_segments - 1 if has_pad_segment(pack) else num_segments
 
 
 def get_num_real_tokens(pack: SequencePack) -> Tuple[int, int]:

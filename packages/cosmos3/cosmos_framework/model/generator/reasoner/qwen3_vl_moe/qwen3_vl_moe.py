@@ -332,12 +332,18 @@ def _weighted_expert_counts(
     a loop bound, which has to be an integer.
     """
     if token_weight is None:
+        # histc takes integers on CUDA but not on CPU, where it dispatches to the histogram
+        # kernel and raises `"histogram_cpu" not implemented for 'Int'`. Both come back as
+        # int32 so the caller sees one dtype regardless of device.
+        histc_input = (
+            expert_indices.float() if expert_indices.device.type == "cpu" else expert_indices.to(dtype=torch.int32)
+        )  # [N*K]
         return torch.histc(
-            expert_indices.to(dtype=torch.int32).view(-1),
+            histc_input.view(-1),
             bins=num_experts,
             min=0,
             max=num_experts - 1,
-        )  # int32 [E]
+        ).to(dtype=torch.int32)  # int32 [E]
     weights = token_weight.unsqueeze(1).expand_as(expert_indices).reshape(-1).to(torch.int32)  # [N*K]
     counts = torch.zeros(num_experts, dtype=torch.int32, device=expert_indices.device)  # [E]
     return counts.scatter_add_(0, expert_indices.reshape(-1).to(torch.int64), weights)  # int32 [E]
@@ -555,6 +561,58 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         flat_counts.scatter_add_(0, flat_idx, pair_counts)
         self.coactivation_counts.view(-1).add_(flat_counts)
 
+    def select_experts(
+        self,
+        selection_logits: torch.Tensor,  # [N,num_experts]
+        selection_scores: torch.Tensor,  # [N,num_experts]
+        natural_indices: torch.Tensor,  # [N,top_k]
+        natural_weights: torch.Tensor,  # [N,top_k]
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """The dispatch selection: the experts each token is sent to and their combine weights.
+
+        This is the one seam of the forward that decides WHICH experts a token reaches; an
+        integration that must route differently (a subclass, or a method bound on the instance at
+        adaptation time) overrides this and nothing else. The load-balancing statistics never see
+        its result: they count the gate-natural selection, which ``forward`` computes before calling
+        here and passes in so the plain path pays for one top-k.
+
+        Args:
+            selection_logits: (num_tokens, num_experts) router logits the selection is made on
+                (noised under noisy gating, otherwise the clean logits).
+            selection_scores: (num_tokens, num_experts) the activated ``selection_logits``.
+            natural_indices: (num_tokens, top_k) the gate's own top-k over ``selection_scores``.
+            natural_weights: (num_tokens, top_k) the ``selection_scores`` at ``natural_indices``.
+
+        Returns:
+            torch.Tensor: (num_tokens, top_k) int64 expert ids, the dispatch.
+            torch.Tensor: (num_tokens, top_k) combine weights, normalized over the row, in the
+                score dtype.
+        """
+        if self.aux_loss_free_load_balancing_config.enabled:
+            # Aux-loss-free load balancing changes selection only. DeepSeek-style
+            # Sigmoid routing adds bias to independent activated scores. Softmax
+            # scores are compressed and coupled by sum-to-one normalization, so
+            # bias is applied in logit space  to avoid disproportionate rank
+            # jumps.
+            biased_selection_scores = self.cosine_router.apply_selection_bias(
+                router_logits=selection_logits,
+                router_scores=selection_scores,
+                expert_bias=self.expert_bias.detach(),
+            )  # [num_tokens,num_experts]
+            _, expert_indices = torch.topk(
+                biased_selection_scores, self.top_k, dim=-1
+            )  # [num_tokens,top_k], [num_tokens,top_k]
+            expert_weights = selection_scores.gather(1, expert_indices)  # [num_tokens,top_k]
+        else:
+            expert_indices = natural_indices  # [num_tokens,top_k]
+            expert_weights = natural_weights  # [num_tokens,top_k]
+
+        if self.cosine_router.activation == "sigmoid":
+            expert_weights = self.cosine_router.normalize_scores(expert_weights)  # [num_tokens,top_k]
+        else:
+            expert_weights = expert_weights / expert_weights.sum(dim=-1, keepdim=True)  # [num_tokens,top_k]
+        return expert_indices, expert_weights
+
     def forward(
         self,
         hidden_states: torch.Tensor,  # [N,hidden_size]
@@ -564,6 +622,8 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
     ) -> tuple[torch.Tensor, LBLMetadata]:
         """
         This function performs the MoE computation, including routing, dispatch, GEMMs and combine.
+        The dispatch selection (which experts a token reaches, with what combine weights) is
+        ``select_experts``; everything else here is routing statistics, dispatch and combine.
 
         Args:
             hidden_states (torch.Tensor): (num_tokens, hidden_size)
@@ -575,7 +635,11 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
                 influence neither the output, nor the gradients, nor the load balancing. ``None``
                 treats every row as a real token.
             sample_ids (torch.Tensor | None): (num_tokens) sample assignment for each token.
-            num_samples (int | None): Number of packed samples, excluding the padding sentinel.
+            num_samples (int | None): Number of LBL buckets to retain, which is one *more* than
+                the pack's real sample count: callers pass the padded layout's segment count
+                (``N`` real samples plus the pad segment), so bucket ``N`` is retained and stays
+                empty while index ``num_samples`` = ``N + 1`` serves as the discarded sentinel
+                this method drains masked rows into.
 
         Returns:
             torch.Tensor: (num_tokens, hidden_size)
@@ -624,29 +688,9 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
             selection_scores, self.top_k, dim=-1
         )  # [num_tokens,top_k], [num_tokens,top_k]
 
-        if self.aux_loss_free_load_balancing_config.enabled:
-            # Aux-loss-free load balancing changes selection only. DeepSeek-style
-            # Sigmoid routing adds bias to independent activated scores. Softmax
-            # scores are compressed and coupled by sum-to-one normalization, so
-            # bias is applied in logit space  to avoid disproportionate rank
-            # jumps.
-            biased_selection_scores = self.cosine_router.apply_selection_bias(
-                router_logits=selection_logits,
-                router_scores=selection_scores,
-                expert_bias=self.expert_bias.detach(),
-            )  # [num_tokens,num_experts]
-            _, expert_indices = torch.topk(
-                biased_selection_scores, self.top_k, dim=-1
-            )  # [num_tokens,top_k], [num_tokens,top_k]
-            expert_weights = selection_scores.gather(1, expert_indices)  # [num_tokens,top_k]
-        else:
-            expert_indices = natural_indices  # [num_tokens,top_k]
-            expert_weights = natural_weights  # [num_tokens,top_k]
-
-        if self.cosine_router.activation == "sigmoid":
-            expert_weights = self.cosine_router.normalize_scores(expert_weights)  # [num_tokens,top_k]
-        else:
-            expert_weights = expert_weights / expert_weights.sum(dim=-1, keepdim=True)  # [num_tokens,top_k]
+        expert_indices, expert_weights = self.select_experts(
+            selection_logits, selection_scores, natural_indices, natural_weights
+        )  # [num_tokens,top_k], [num_tokens,top_k]
         expert_weights = expert_weights.to(hidden_states.dtype)  # [num_tokens,top_k]
         if token_weight is not None:
             # A zero combine weight is the implementation-independent half of making a padding row
@@ -685,16 +729,16 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
         # Sigmoid affinities are normalized across experts for this LBL term.
         mean_router_prob_per_expert = _weighted_mean(routing_probabilities, token_weight).squeeze(0)  # [num_experts]
 
-        # LBL count: when bias correction is on, ``num_tokens_per_expert`` reflects
-        # the bias-balanced dispatch, which would artificially satisfy LBL while
-        # the unbiased routing mass stays concentrated. Feed LBL the gate-natural counts
-        # instead. With bias off the gate-natural selection is the dispatch, so this is
-        # bit-identical to ``num_tokens_per_expert``.
-        if self.aux_loss_free_load_balancing_config.enabled:
+        # LBL count: always the gate-natural selection. A dispatch that differs from it (bias
+        # correction, or any ``select_experts`` override) would artificially satisfy LBL while the
+        # unbiased routing mass stays concentrated, so LBL is fed the natural counts instead. When
+        # the dispatch IS the natural selection (the plain path returns ``natural_indices`` itself)
+        # ``num_tokens_per_expert`` already is that count.
+        if expert_indices is natural_indices:
+            num_tokens_per_expert_lbl = num_tokens_per_expert
+        else:
             natural_counts = _weighted_expert_counts(natural_indices, self.num_experts, token_weight)
             num_tokens_per_expert_lbl = natural_counts.to(dtype=torch.int64)  # [num_experts]
-        else:
-            num_tokens_per_expert_lbl = num_tokens_per_expert
 
         sample_num_tokens_per_expert = None
         sample_num_tokens = None
@@ -703,6 +747,15 @@ class Qwen3VLMoeTextSparseMoeBlock(nn.Module):
             assert num_samples is not None
             if token_mask is not None:
                 # Route padding to the extra sample bucket that compute_sample_lbl_stats discards.
+                #
+                # Load-bearing, despite looking redundant: the packer already stamps padding rows
+                # with sample id ``N`` (``runtime._pad_sample_ids``), and ``num_samples``
+                # is ``N + 1`` because ``unified_mot._get_local_sample_ids`` counts the padded
+                # layout's segments. So ``N`` is a bucket compute_sample_lbl_stats *keeps*, and
+                # only this re-route moves the padding out to the sentinel it discards. Drop it
+                # and every padded pack contributes its padding as an extra pseudo-sample with a
+                # non-zero token count, which the loss's ``sample_num_tokens > 0`` mask then fails
+                # to filter.
                 sample_ids = torch.where(
                     token_mask,
                     sample_ids,
@@ -1820,6 +1873,10 @@ class Qwen3VLMoeCausalLMOutputWithPast(ModelOutput):
     attentions: Optional[tuple[torch.FloatTensor]] = None
     rope_deltas: Optional[torch.LongTensor] = None
     aux_loss: Optional[torch.FloatTensor] = None
+    # The final layer's states. This stack collects no PER-LAYER states -- the text model
+    # returns only its last -- so `hidden_states` above stays None and a consumer that needs
+    # the final state, such as a value head, reads it here under the usual HF name.
+    last_hidden_state: Optional[torch.FloatTensor] = None
 
 
 @dataclass
@@ -2285,6 +2342,7 @@ class Qwen3VLMoeForConditionalGeneration(Qwen3VLMoePreTrainedModel, GenerationMi
             logits=logits,
             past_key_values=outputs.past_key_values,
             rope_deltas=outputs.rope_deltas,
+            last_hidden_state=hidden_states,
         )
 
     def prepare_inputs_for_generation(
