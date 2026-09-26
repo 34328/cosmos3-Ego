@@ -45,3 +45,12 @@ PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 ## 路径清理记录
 
 训练/回放脚本和 Python 配置已使用动态仓库根目录。旧回放 JSON 中的项目根路径已迁移；原文、逐文件 SHA256 记录保存在 `outputs/maintenance/2026-09-26-path-relocation/`。检查点、日志和冻结 artifact 未重写，内部历史路径仍是溯源信息。再次移动仓库时，已有回放 JSON 需要再次迁移，脚本和配置不需要改根路径。
+
+## ar-video-action 分支清理（2026-09-26）
+
+本分支用于 AR 视频与动作联合生成，清理前的完整状态见 main `d90219e`。
+
+- 移除官方附带的 `evaluation/`、`cookbooks/`，参考源码改用共享路径 `/mnt/lzh/refs/cosmos-framework`。
+- 移除纯视频对照 `cosmos3_egoverse_it2v/`，以及 v0.0–v0.5 的 TOML、启动与回放脚本；`src/config.py` 中的继承链保留。
+- `tests/` 纳入 Git。
+- `outputs/` 仅保留 v0.2 与 v0.6 的 `iter_000001200` 模型权重（不含 optimizer），其余 checkpoint 与本地 W&B、dataloader trace 已删除，删除清单见 `outputs/maintenance/2026-09-26-checkpoint-prune/`。训练曲线以远端 W&B 为准。

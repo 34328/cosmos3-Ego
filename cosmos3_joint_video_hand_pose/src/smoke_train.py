@@ -24,7 +24,7 @@ from .audit_dataloader import audit_batch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TOML = PROJECT_ROOT / "configs/overfit_v0_0.toml"
+DEFAULT_TOML = PROJECT_ROOT / "configs/overfit_v0_6_frame_delta_temporal_mask.toml"
 
 
 def parse_args() -> argparse.Namespace:

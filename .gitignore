@@ -204,9 +204,8 @@ core.*
 /downloaded_data/
 .ipynb_checkpoints
 
-# Local EgoVerse manifests and project tests are not versioned yet.
+# Local EgoVerse manifests are not versioned yet.
 /training_manifests/
-/tests/
 
 # Small frozen codec and overfit-subset artifacts remain reproducibility inputs.
 !cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/**/*.csv
