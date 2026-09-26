@@ -384,6 +384,14 @@ class ModelConfig(BaseModel):
             "VFM-only; skipped on VLM."
         ),
     )
+    supervise_temporal_causal_actions: bool | None = Field(
+        default=None,
+        description=(
+            "Temporal-causal packing: supervise action tokens of non-conditioning "
+            "frames as noisy targets (joint video-action). Omit to keep the "
+            "experiment's value (default False). VFM-only; skipped on VLM."
+        ),
+    )
 
     ema: EMAConfig = Field(default_factory=EMAConfig)
     parallelism: ParallelismConfig = Field(default_factory=ParallelismConfig)

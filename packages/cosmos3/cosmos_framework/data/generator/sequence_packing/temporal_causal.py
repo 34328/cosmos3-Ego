@@ -27,6 +27,7 @@ def pack_supertokens_temporal_causal(
     base_fps: float = 24.0,
     pack_action_tokens: bool = True,
     action_tokens_per_latent: int | None = None,
+    supervise_action_tokens: bool = False,
 ) -> tuple[int, bool]:
     """Pack vision and (optionally) action tokens in supertoken order for temporal causal attention.
 
@@ -82,6 +83,11 @@ def pack_supertokens_temporal_causal(
             If False, append only vision tokens and report no null-action supertokens.
         action_tokens_per_latent: Action tokens per latent frame (``K``). ``None``
             uses ``temporal_compression_factor``.
+        supervise_action_tokens: If False (default), every action token is a clean
+            condition (forward dynamics). If True, the action group of every
+            non-conditioning vision frame is a noisy, loss-supervised target
+            (joint video-action generation) with that frame's timestep; the
+            groups of conditioning frames stay clean.
 
     Returns:
         Tuple of ``(total_split_len, null_action_flag)``. ``null_action_flag`` is False
@@ -104,6 +110,8 @@ def pack_supertokens_temporal_causal(
                 "(tcf video frames), so the last action of every group must end at the same time as its "
                 "vision latent."
             )
+    if supervise_action_tokens and (not pack_action_tokens or input_action_tokens is None):
+        raise ValueError("supervise_action_tokens=True requires pack_action_tokens=True and real action tokens.")
     patches_per_frame = patch_h * patch_w
 
     vision = seq_builder.ensure_vision()
@@ -186,10 +194,30 @@ def pack_supertokens_temporal_causal(
         action.tokens.append(all_action_tokens)
         action_payload_index = len(action.tokens) - 1
 
-        # Action conditioning mask: all action tokens are conditioning (not supervised)
-        # Null tokens are always conditioning; real actions are conditioning too (they are inputs)
-        action_condition_mask = torch.ones((latent_t * K, 1), device=device, dtype=dtype)  # [T*K,1]
-        action.condition_mask.append(action_condition_mask)
+        if supervise_action_tokens:
+            # Joint video-action layout: an action group is a clean condition iff its
+            # vision frame is; every other group is a noisy, supervised target.
+            if null_action_flag and 0 not in condition_set_vision:
+                raise ValueError("supervise_action_tokens requires the null action frame 0 to be a condition frame.")
+            action_condition_mask = torch.zeros((latent_t * K, 1), dtype=dtype)  # [T*K,1]
+            for fidx in condition_set_vision:
+                action_condition_mask[fidx * K : (fidx + 1) * K, 0] = 1.0
+            action.condition_mask.append(to_device_nonblocking(action_condition_mask, device))
+            action_noisy_rows = torch.tensor(
+                [
+                    row
+                    for fidx in range(latent_t)
+                    if fidx not in condition_set_vision
+                    for row in range(fidx * K, (fidx + 1) * K)
+                ],
+                dtype=torch.long,
+            )  # [N_noisy_action_rows]
+            action.noisy_frame_indexes.append(to_device_nonblocking(action_noisy_rows, device))
+        else:
+            # Action conditioning mask: all action tokens are conditioning (not supervised)
+            # Null tokens are always conditioning; real actions are conditioning too (they are inputs)
+            action_condition_mask = torch.ones((latent_t * K, 1), device=device, dtype=dtype)  # [T*K,1]
+            action.condition_mask.append(action_condition_mask)
 
     # Pack in interleaved supertoken order: [action_t, vision_t] for each frame t
     # (or just [vision_t] per frame when pack_action_tokens=False)
@@ -284,15 +312,21 @@ def pack_supertokens_temporal_causal(
             assert action_ids_3d is not None
             # Pack action tokens for this frame (indexes only; tokens already stored in seq_builder.action.tokens)
             action_position_ids = action_ids_3d[:, frame_t, :]  # [3,K]
-            seq_builder.append_action_span(
+            action_frame_indexes = seq_builder.append_action_span(
                 K,
                 action_position_ids,
                 payload_index=action_payload_index,
                 payload_start=frame_t * K,
                 payload_shape=(K,),
             )
-            # Action tokens are never in MSE loss (always conditioning)
             total_split_len += K
+            # Action tokens are in the MSE loss only when supervised (never for condition frames).
+            if supervise_action_tokens and frame_t not in condition_set_vision:
+                action.mse_loss_indexes.extend(action_frame_indexes)
+                action_ts = (
+                    input_timestep[frame_t].item() if isinstance(input_timestep, torch.Tensor) else input_timestep
+                )
+                action.timesteps.extend([action_ts] * K)
 
         # Pack vision tokens for this frame
         vision_position_ids = vision_ids_3d[:, frame_t, :]  # [3,patch_h*patch_w]

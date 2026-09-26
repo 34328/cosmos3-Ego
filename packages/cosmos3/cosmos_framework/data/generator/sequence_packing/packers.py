@@ -170,6 +170,7 @@ def pack_input_sequence(
     initial_mrope_temporal_offset: int | float | list[int | float] = 0,
     lidar_temporal_compression_factor: int | None = None,
     action_tokens_per_latent: int | None = None,
+    supervise_action_tokens: bool = False,
 ) -> PackedSequence:
     """
     Pack a sequence of input strings and VAE latents into a packed tensor format.
@@ -226,6 +227,9 @@ def pack_input_sequence(
             (``K``). ``None`` (default) uses ``temporal_compression_factor``, the
             historical layout. Stamped as ``num_action_tokens_per_supertoken``;
             ``temporal_compression_factor`` stays the mRoPE clock unit.
+        supervise_action_tokens: Temporal-causal only. If True, action groups of
+            non-conditioning vision frames are noisy, loss-supervised targets instead
+            of clean conditions (see ``pack_supertokens_temporal_causal``).
 
     Returns:
         PackedSequence containing all packed tensors and metadata. See PackedSequence for field details.
@@ -454,6 +458,7 @@ def pack_input_sequence(
                     base_fps=base_fps,
                     pack_action_tokens=sequence_plan.has_action,
                     action_tokens_per_latent=action_tokens_per_latent,
+                    supervise_action_tokens=supervise_action_tokens,
                 )
                 vision_split_len += item_split_len
                 item_split_lens.append(item_split_len)

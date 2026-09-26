@@ -325,6 +325,11 @@ class OmniMoTModelConfig:
     # mRoPE clock stays in tcf units; read by the temporal-causal packer, which
     # stamps it as num_action_tokens_per_supertoken.
     action_tokens_per_latent: int | None = None
+    # Temporal-causal packing treats action tokens as clean conditions by default
+    # (forward dynamics). True makes the action group of every non-conditioning
+    # vision frame a noisy, loss-supervised target (joint video-action
+    # generation); conditioning frames keep their action group clean.
+    supervise_temporal_causal_actions: bool = False
 
     # "none":             standard joint denoising (shared σ, no clean context)
     # "teacher_forcing":  all frames noised with shared σ; clean history via cross-attention

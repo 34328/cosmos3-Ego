@@ -26,3 +26,11 @@
   - `cosmos_framework/model/generator/omni_mot_model.py`：`_pack_input_sequence` 透传 `config.action_tokens_per_latent`；无 `conditioning_fps_action` 且 K≠tcf 时 `fps_action = conditioning_fps * K / tcf`。
   - `cosmos_framework/model/generator/omni_mot_causal_model.py`：chunkwise TF 截断、AR 推理中 action 切片 / streamed action 形状校验 / domain id 切片改用 K；各 AR pack 调用与 `_seed_frame_into_kv_cache` 透传 K；batched streaming Transfer 路径的占位 `fps_action_list` 在 K=None 时保持 24.0，否则取 `conditioning_fps_action` 或 `fps_video * K / tcf`。
   - `cosmos_framework/model/generator/omni_mot_causal_model_test.py`：`TestARGenerationLoopLogic` 的 MagicMock 配置显式设置 `action_tokens_per_latent = None`。
+
+### 联合视频–动作 teacher forcing（AR v0.1）
+
+默认关闭，关闭时与上游行为一致。
+
+- `configs/base/defaults/model_config.py`、`configs/toml_config/sft_config.py`、`configs/toml_config/toml_config_helper.py`：新增 `supervise_temporal_causal_actions`（默认 False）。
+- `data/generator/sequence_packing/temporal_causal.py`、`packers.py`、`model/generator/omni_mot_model.py`：`supervise_action_tokens=True` 时，非条件帧的 action 组成为带噪、计 loss 的目标（写入 condition mask、noisy_frame_indexes、mse_loss_indexes 与逐帧 timestep），条件帧的 action 组保持干净。
+- `model/generator/utils/kv_cache.py`、`model/generator/mot/causal_attention.py`：`KVTrainMemoryValue.gen_attention_override`（默认 None）；非 None 时替换 `three_way_attention_with_kv_cache` 中单视频项的 GEN 自注意力分量，文本交叉注意力与 merge 不变。

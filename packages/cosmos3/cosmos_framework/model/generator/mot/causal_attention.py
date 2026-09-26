@@ -1474,6 +1474,9 @@ def three_way_attention_with_kv_cache(
             raise ValueError(
                 f"Temporal-causal transfer requires aligned control and target shapes; got {vision_token_shapes}."
             )
+    gen_attention_override = getattr(memory_value, "gen_attention_override", None)
+    if is_transfer and gen_attention_override is not None:
+        raise ValueError("gen_attention_override supports single-item temporal-causal layouts only.")
     T, H_p, W_p = vision_token_shapes[0]
     S_super = num_action_tokens + H_p * W_p
     item_len = T * S_super
@@ -1516,7 +1519,10 @@ def three_way_attention_with_kv_cache(
         video_v_2d = video_v.reshape(1, T, S_super, num_kv_heads, head_dim)  # [1,T,S_super,H_kv,D]
 
         video_components: list[tuple[torch.Tensor, torch.Tensor]]
-        if isinstance(memory_value, TFNoisyMemoryValue):
+        if gen_attention_override is not None:
+            # Caller-supplied GEN visibility (e.g. joint video-action teacher forcing).
+            video_components = gen_attention_override(video_q_2d, video_k_2d, video_v_2d, memory_value)
+        elif isinstance(memory_value, TFNoisyMemoryValue):
             # Teacher forcing: two merge components framewise, four chunkwise
             # (frames_per_chunk > 1, chunk partition [1, C, C, ...]).
             video_components = teacher_forcing_gen_attention(

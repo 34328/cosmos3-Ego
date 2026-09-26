@@ -946,6 +946,7 @@ class OmniMoTModel(ImaginaireModel):
             action_dim=self.config.max_action_dim,
             initial_mrope_temporal_offset=initial_mrope_temporal_offset,
             action_tokens_per_latent=getattr(self.config, "action_tokens_per_latent", None),
+            supervise_action_tokens=bool(getattr(self.config, "supervise_temporal_causal_actions", False)),
         )
 
     def _get_temporal_positions_vision(
