@@ -20,28 +20,6 @@ from .wandb_metrics import EgoVerseLossWandbCallback, LossOnlyWandBCallback
 
 COSMOS_REPO_ROOT = Path(__file__).resolve().parents[2]
 
-REMOVED_MASK_EXPERIMENT_MESSAGE = (
-    "v0.4/v0.6 依赖的 joint video-action mask 已在 cf5d68c 同步中移除，复现请 checkout 8525625"
-)
-
-
-def _removed_mask_experiment(*args, **kwargs):
-    """LazyCall target for experiments whose attention mask no longer exists.
-
-    Without the mask, v0.4 and v0.6 would silently reproduce v0.3 and v0.5.
-    """
-    del args, kwargs
-    raise RuntimeError(REMOVED_MASK_EXPERIMENT_MESSAGE)
-
-
-def _disable_removed_mask_experiment(experiment: LazyDict) -> None:
-    """Keep the registration (and TOML overrides) valid, but fail on build."""
-    experiment["model"]["_target_"] = _removed_mask_experiment
-    experiment["dataloader_train"]["_target_"] = _removed_mask_experiment
-    # Raise before any child dataset is constructed.
-    experiment["dataloader_train"]["_recursive_"] = False
-
-
 # W&B 0.28 removed a helper still used by the native Cosmos initializer.
 ensure_wandb_generate_id()
 
@@ -307,26 +285,11 @@ egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action["mode
 )
 
 
-# v0.4 (video-first causal mask) originally changed only the GEN attention
-# visibility of v0.3.  That joint video-action mask was removed in the cf5d68c
-# sync, so the remaining config equals v0.3; it stays registered (v0.5 is
-# derived from it) but building it raises, see _disable_removed_mask_experiment.
-# v0.4–v0.6 的 joint video-action mask 在 cf5d68c 同步时移除；复现原实验请 checkout 8525625
-egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask = copy.deepcopy(
-    egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action
-)
-egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask["job"][
-    "name"
-] = "overfit_v0.4_video_first_causal_mask"
-
-
-# B3 rigid-trajectory ablation: preserve the stable CP1/FSDP-8/75K joint
-# training setup, disable attention ablations, and encode future camera and
-# wrist transforms as frame-to-frame SE(3) increments.  This makes v0.5 a
-# representation-only experiment, matching the run that preceded v0.6.
-# v0.4–v0.6 的 joint video-action mask 在 cf5d68c 同步时移除；复现原实验请 checkout 8525625
+# B3 rigid-trajectory ablation on top of v0.3: keep the stable CP1/FSDP-8/75K
+# joint training setup and encode future camera and wrist transforms as
+# frame-to-frame SE(3) increments.  Representation-only change.
 egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3 = copy.deepcopy(
-    egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask
+    egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action
 )
 egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["job"]["name"] = (
     "overfit_v0.5_frame_delta_b3"
@@ -339,22 +302,6 @@ _v0_5_dataset["future_normalizer"] = (
     f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
     "cosmos3_action_contract/v3_frame_delta/normalizers/future_frame_delta_normalizer.json"
 )
-
-
-# v0.6 (temporal action mask) originally differed from v0.5 only in its joint
-# video-action attention mask.  That mask was removed in the cf5d68c sync, so
-# the remaining config equals v0.5; it stays registered but building it raises.
-# v0.4–v0.6 的 joint video-action mask 在 cf5d68c 同步时移除；复现原实验请 checkout 8525625
-egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask = copy.deepcopy(
-    egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3
-)
-egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask["job"]["name"] = (
-    "overfit_v0.6_frame_delta_temporal_mask"
-)
-
-# Disable only after v0.5 has been deep-copied from v0.4; v0.5 is unaffected.
-_disable_removed_mask_experiment(egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask)
-_disable_removed_mask_experiment(egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask)
 
 
 ConfigStore.instance().store(
@@ -372,20 +319,8 @@ ConfigStore.instance().store(
 ConfigStore.instance().store(
     group="experiment",
     package="_global_",
-    name="egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask",
-    node=egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask,
-)
-ConfigStore.instance().store(
-    group="experiment",
-    package="_global_",
     name="egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3",
     node=egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3,
-)
-ConfigStore.instance().store(
-    group="experiment",
-    package="_global_",
-    name="egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask",
-    node=egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask,
 )
 
 

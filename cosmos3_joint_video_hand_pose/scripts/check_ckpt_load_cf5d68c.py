@@ -13,8 +13,8 @@ its ``net_ema.*`` tensors are reported as unexpected keys and skipped via
 ``checkpoint.keys_to_skip_loading``) and a v0.6 training checkpoint
 (``outputs/.../checkpoints/iter_XXXXXXXXX/model``). ``--toml`` selects the
 experiment used to build the model; it defaults to the v0.5 smoke-train TOML.
-The v0.6 experiment itself now refuses to build (its joint video-action mask
-was removed in the cf5d68c sync); its checkpoints share the v0.5 architecture.
+The v0.6 experiment definition was removed with its joint video-action mask;
+its checkpoints share the v0.5 architecture and still load as weights.
 
 With ``--forward``, ``egoverse_action_override_used`` in the result is true only
 if that forward pass reached the EgoVerse visibility-weighted action loss

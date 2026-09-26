@@ -8,7 +8,7 @@
 
 动作宽度为 57D，尾部补齐到 64D：camera 9、右 wrist 9、右 hand latent 15、左 wrist 9、左 hand latent 15。当前仍是 T 个 action，首帧 a0 为 clean condition。无首帧动作的 T-1 合同只是设计稿。
 
-v0.5 B3 / v0.6 使用逐帧 SE(3) camera/wrist 增量，手型 latent 不做时间差分；旧版本使用首帧相对增量。必须按原版本解码，不能混用 normalizer。v0.6 视频不读取动作；动作 A_t 读取 text、V_<=floor(t/4)、A_<=t；视频内部仍为双向 attention。
+v0.5 B3 使用逐帧 SE(3) camera/wrist 增量，手型 latent 不做时间差分；更早版本使用首帧相对增量。必须按原版本解码，不能混用 normalizer。v0.4/v0.6 的 joint video-action attention mask 已删除（原实现见 `8525625`），v0.6 checkpoint 仍可作为权重加载。
 
 ## 数据与实验参数
 
@@ -36,7 +36,6 @@ PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 ## 已知限制
 
 - joint CP2 曾出现非有限梯度，沿用 CP1；同时查看原始 NaN/Inf 计数，不能只看清洗后的梯度范数。
-- v0.4 历史 run 的 mask 未生效；现在重新运行同名配方也不能复现当年的错误配置行为。
 - B3 future normalizer 仅由 36-episode 子集统计；扩展训练需重新定义并冻结数据合同。
 - normalizer/codec 的完整 checkpoint 自动绑定仍待完善。
 - 回放是固定训练样本，不能用于宣称泛化。文档中的视觉结论本次未重新人工验收。
@@ -60,3 +59,10 @@ PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 - 方案文档：`docs/ar_v0.1_design.md`（已确认，动作向量内容与 camera pose 仍为【待定】）。
 - 要点：对齐 lingbot-va demo 配置，frame_stride = 2、每 latent 帧 K = 8 个 action、推理 chunk C = 4；训练随机 C ∈ [1, 4]、窗口 ∈ [4, 64]；T 按 segment 长度分档 129 / 65 / 33；人手速度通过 fps 标签 × 0.5 放慢（视频 7.5、action 15）。
 - 下一步：P0 框架同步官方 cosmos-framework `cf5d68c`，并把 action_tokens_per_latent 从 tcf 解耦。
+
+## P0 框架同步（2026-09-27）
+
+- `packages/cosmos3` 整体同步到官方 `cf5d68c`，上游版本与本地补丁清单见 `packages/cosmos3/UPSTREAM.md`。
+- 本地补丁仅保留：dataloader 断点续训、grad clip 触发统计、`omni_mot_model` action loss 走子类覆盖、`action_tokens_per_latent`（K）与 tcf 解耦。
+- v0.4/v0.6 的 joint video-action mask 实验连同 v0.6 TOML 与启动/回放脚本删除；非 AR 基线为 v0.5。
+- `scripts/check_ckpt_load_cf5d68c.py`：Nano SFT 与 v0.6 checkpoint 在新框架下均可加载（missing 0、shape mismatch 0）。

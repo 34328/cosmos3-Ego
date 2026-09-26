@@ -1,39 +1,29 @@
 from types import SimpleNamespace
 
-import pytest
 import torch
-
-from cosmos_framework.utils.lazy_config import instantiate
 
 from cosmos3_joint_video_hand_pose.src import config as experiment_config
 from cosmos3_joint_video_hand_pose.src import model as model_module
-from cosmos3_joint_video_hand_pose.src.dataloader_state import RecoverablePackingDataLoader
 
 
-REMOVED = {
-    "v0_4": experiment_config.egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask,
-    "v0_6": experiment_config.egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask,
-}
+def test_only_supported_experiments_are_defined():
+    names = {name for name in vars(experiment_config) if name.startswith("egoverse_joint_video_hand_pose_overfit_")}
+    assert names == {
+        "egoverse_joint_video_hand_pose_overfit_v0_0",
+        "egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced",
+        "egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action",
+        "egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3",
+    }
 
 
-@pytest.mark.parametrize("name", sorted(REMOVED))
-@pytest.mark.parametrize("part", ["model", "dataloader_train"])
-def test_removed_mask_experiments_refuse_to_build(name, part):
-    experiment = REMOVED[name]
-    # The dataloader must fail before any child dataset is constructed.
-    assert experiment["dataloader_train"]["_recursive_"] is False
-    with pytest.raises(RuntimeError, match="cf5d68c.*8525625"):
-        instantiate(experiment[part])
-
-
-def test_v0_3_and_v0_5_are_not_disabled():
-    for experiment in (
-        experiment_config.egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action,
-        experiment_config.egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3,
-    ):
-        assert experiment["model"]["_target_"] is model_module.EgoVerseOmniMoTModel
-        assert experiment["dataloader_train"]["_target_"] is RecoverablePackingDataLoader
-        assert "_recursive_" not in experiment["dataloader_train"]
+def test_v0_5_derives_from_v0_3_with_b3_only():
+    v0_3 = experiment_config.egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action
+    v0_5 = experiment_config.egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3
+    assert v0_5["model"]["_target_"] is model_module.EgoVerseOmniMoTModel
+    assert v0_5["model"]["config"] == v0_3["model"]["config"]
+    dataset = v0_5["dataloader_train"]["dataloader"]["datasets"]["egoverse"]["dataset"]
+    assert dataset["rigid_pose_frame_delta"] is True
+    assert dataset["future_normalizer"].endswith("v3_frame_delta/normalizers/future_frame_delta_normalizer.json")
 
 
 def test_subblock_losses_are_not_repeated_from_previous_step(monkeypatch):
