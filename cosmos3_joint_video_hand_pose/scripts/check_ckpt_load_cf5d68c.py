@@ -12,7 +12,9 @@ Typical targets are the Cosmos3-Nano SFT DCP checkpoint (``.../iter_XXXXXXXXX/mo
 its ``net_ema.*`` tensors are reported as unexpected keys and skipped via
 ``checkpoint.keys_to_skip_loading``) and a v0.6 training checkpoint
 (``outputs/.../checkpoints/iter_XXXXXXXXX/model``). ``--toml`` selects the
-experiment used to build the model; it defaults to the v0.6 smoke-train TOML.
+experiment used to build the model; it defaults to the v0.5 smoke-train TOML.
+The v0.6 experiment itself now refuses to build (its joint video-action mask
+was removed in the cf5d68c sync); its checkpoints share the v0.5 architecture.
 
 With ``--forward``, ``egoverse_action_override_used`` in the result is true only
 if that forward pass reached the EgoVerse visibility-weighted action loss
@@ -150,11 +152,11 @@ def main() -> None:
         indices = [int(x.reshape(-1)[0]) if torch.is_tensor(x) else int(x) for x in batch["dataset_index"]]
         batch = misc.to(batch, device="cuda")
         model.train()
-        # Only a value written by this forward pass may mark the EgoVerse loss as used.
-        model._last_visibility_loss_metrics = None
+        # _compute_losses clears these metrics at the start of every call, so a
+        # non-empty dict can only have been written by this forward pass.
         with torch.no_grad():
             output, loss = model.training_step(batch, 0)
-        visibility = getattr(model, "_last_visibility_loss_metrics", None)
+        visibility = getattr(model, "_last_visibility_loss_metrics", None) or {}
         result["forward"] = {
             "samples": len(indices),
             "dataset_index": indices,
@@ -162,9 +164,9 @@ def main() -> None:
             "flow_matching_loss_vision": float(output["flow_matching_loss_vision"].float().cpu()),
             "flow_matching_loss_action": float(output["flow_matching_loss_action"].float().cpu()),
             "egoverse_loss_action_raw": float(output["egoverse_loss_action_raw"].float().cpu()),
-            "egoverse_action_override_used": visibility is not None,
+            "egoverse_action_override_used": bool(visibility),
             "visibility_subblock_losses": {
-                k: float(v.float().cpu()) for k, v in (visibility or {}).items() if k.endswith("_loss")
+                k: float(v.float().cpu()) for k, v in visibility.items() if k.endswith("_loss")
             },
             "peak_memory_gib": torch.cuda.max_memory_allocated() / 2**30,
         }

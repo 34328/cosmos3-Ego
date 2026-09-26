@@ -12,7 +12,7 @@ from .temporal import cosmos_wam_token_count
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TOML = PROJECT_ROOT / "configs/overfit_v0_6_frame_delta_temporal_mask.toml"
+DEFAULT_TOML = PROJECT_ROOT / "configs/overfit_v0_5_frame_delta_b3.toml"
 
 
 def parse_args() -> argparse.Namespace:

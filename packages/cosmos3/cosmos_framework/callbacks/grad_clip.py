@@ -260,10 +260,11 @@ class GradClip(Callback):
         # Keep clipping incidence separate from the averaged pre-clip norm.
         # ``optim/grad_scale`` is the AMP GradScaler value and must not be used
         # to infer whether norm clipping actually fired.
-        self._clip_trigger_window: dict[str, int] = defaultdict(int)
+        # Per-step bookkeeping stays on the device (no ``.item()``); it is only
+        # synchronized to host values on logging steps in ``on_training_step_end``.
+        self._clip_trigger_window: dict[str, torch.Tensor] = {}
         self._clip_trigger_total: dict[str, int] = defaultdict(int)
-        self._last_clip_trigger: dict[str, int] = defaultdict(int)
-        self._last_applied_scale: dict[str, float] = defaultdict(lambda: 1.0)
+        self._last_global_norm: dict[str, torch.Tensor] = {}
 
         # The model parts the cache was built from, paired with the mesh grouping
         # of every one of their parameters; filled on the first optimizer step and
@@ -396,15 +397,15 @@ class GradClip(Callback):
             cur_state[mesh_str].update(mesh_norm)
         cur_state["global"].update(global_norm)
 
-        # Record whether this step actually rescaled the gradients.
-        norm_value = float(global_norm.detach().float().item())
-        clip_triggered = int(math.isfinite(norm_value) and norm_value > self.clip_norm)
-        self._last_clip_trigger[self._state_key] = clip_triggered
-        self._clip_trigger_window[self._state_key] += clip_triggered
-        self._clip_trigger_total[self._state_key] += clip_triggered
-        self._last_applied_scale[self._state_key] = (
-            min(1.0, self.clip_norm / (norm_value + 1.0e-6)) if math.isfinite(norm_value) else 0.0
-        )
+        # Record whether this step actually rescaled the gradients, without a
+        # device->host sync: the comparison runs in float64 on the device so it
+        # matches the host-side ``float(norm) > clip_norm`` test exactly.
+        norm = global_norm.detach().float().clone()
+        norm64 = norm.double()
+        triggered = (torch.isfinite(norm64) & (norm64 > self.clip_norm)).to(torch.int64)
+        window = self._clip_trigger_window.get(self._state_key)
+        self._clip_trigger_window[self._state_key] = triggered if window is None else window + triggered
+        self._last_global_norm[self._state_key] = norm
 
         # 8. Log after the optimizer-step counter advances, in
         #    ``on_training_step_end``.
@@ -440,10 +441,19 @@ class GradClip(Callback):
                 if mesh_str == "global":
                     log.info(f"{key}: {avg:.5f} (iteration {iteration})")
             prefix = f"grad_clip/{modality}" if self.track_per_modality else "grad_clip"
-            log_dict[f"{prefix}/triggered"] = self._last_clip_trigger[modality]
-            log_dict[f"{prefix}/trigger_count_window"] = self._clip_trigger_window[modality]
+            window = self._clip_trigger_window.pop(modality, None)
+            window_count = int(window.item()) if window is not None else 0
+            self._clip_trigger_total[modality] += window_count
+            last_norm = self._last_global_norm.get(modality)
+            if last_norm is None:
+                last_triggered, applied_scale = 0, 1.0
+            else:
+                norm_value = float(last_norm.item())
+                last_triggered = int(math.isfinite(norm_value) and norm_value > self.clip_norm)
+                applied_scale = min(1.0, self.clip_norm / (norm_value + 1.0e-6)) if math.isfinite(norm_value) else 0.0
+            log_dict[f"{prefix}/triggered"] = last_triggered
+            log_dict[f"{prefix}/trigger_count_window"] = window_count
             log_dict[f"{prefix}/trigger_count_cumulative"] = self._clip_trigger_total[modality]
-            log_dict[f"{prefix}/applied_scale"] = self._last_applied_scale[modality]
-            self._clip_trigger_window[modality] = 0
+            log_dict[f"{prefix}/applied_scale"] = applied_scale
         if wandb.run:
             wandb.log(log_dict, step=iteration)

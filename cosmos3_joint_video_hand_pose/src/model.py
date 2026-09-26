@@ -46,6 +46,8 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
         self._current_hand_visibility: list[torch.Tensor] | None = None
         self._cp_local_hand_visibility: list[torch.Tensor] | None = None
         self._fixed_pack_action_intervention = "original"
+        # Sub-block action losses written by the current _compute_losses call only.
+        self._last_visibility_loss_metrics: dict[str, torch.Tensor] = {}
 
     def _add_noise_to_input(self, *args, **kwargs):
         result = super()._add_noise_to_input(*args, **kwargs)
@@ -197,6 +199,8 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
             ts = timesteps[sample_index, :frames] if timesteps.dim() > 1 else timesteps[sample_index]
             return rectified_flow.train_time_weight(ts, self.tensor_kwargs_fp32).to(reference)
 
+        # This 57D path is normalized by visibility_weighted_action_flow_loss
+        # itself; ``normalize_by_active`` (rf_cfg.normalize_loss_by_active) does not apply here.
         loss, metrics = visibility_weighted_action_flow_loss(
             pred=pred,
             target=target,
@@ -224,6 +228,9 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
         timesteps_lidar=None,
     ):
         """Expose raw and actually weighted components for distributed logging."""
+        # Only report sub-block losses produced by this step's 57D action loss;
+        # steps without it (no action, dummy branch) must not repeat stale values.
+        self._last_visibility_loss_metrics = {}
         total_loss, losses = super()._compute_losses(
             out_net=out_net,
             data_batch_packed=data_batch_packed,
@@ -271,7 +278,7 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
             egoverse_sigma_video_low_0_1_fraction=(video_sigma < 0.1).float().mean(),
             egoverse_sigma_video_low_0_2_fraction=(video_sigma < 0.2).float().mean(),
         )
-        for name, value in getattr(self, "_last_visibility_loss_metrics", {}).items():
+        for name, value in self._last_visibility_loss_metrics.items():
             if name.endswith("_loss"):
                 losses[f"egoverse_loss_action_{name.removesuffix('_loss')}_raw"] = value * sample_scale
         return total_loss, losses
