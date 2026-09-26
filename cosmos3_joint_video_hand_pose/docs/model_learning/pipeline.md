@@ -1,3 +1,5 @@
+> 版本化参考：本文保留早期设计细节；当前 B3 表示、时间遮罩及运行参数见[当前实现](../../../docs/current-state.md)。
+
 # EgoVerse Joint Video–Action Data Pipeline
 
 这里两张图说明当前 CP1 / FSDP8 / 75K joint baseline 的数据流；57D action、首帧

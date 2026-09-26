@@ -202,11 +202,11 @@ egoverse_joint_video_hand_pose_overfit_v0_0 = LazyDict(
                         ratio=1,
                         dataset=L(get_egoverse_cosmos_dataset)(
                             episodes_manifest=(
-                                "/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/"
+                                f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
                                 "cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/episodes.csv"
                             ),
                             segments_manifest=(
-                                "/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/"
+                                f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
                                 "cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/segments.csv"
                             ),
                             tokenizer_config="${model.config.vlm_config.tokenizer}",
@@ -216,11 +216,11 @@ egoverse_joint_video_hand_pose_overfit_v0_0 = LazyDict(
                             max_sequence_length="${model.config.max_num_tokens_after_packing}",
                             prompt_mode="episode_context_and_segment",
                             state_normalizer=(
-                                "/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/"
+                                f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
                                 "cosmos3_action_contract/v2/normalizers/state_normalizer.json"
                             ),
                             future_normalizer=(
-                                "/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/"
+                                f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
                                 "cosmos3_action_contract/v2/normalizers/future_delta_normalizer.json"
                             ),
                         ),
@@ -317,7 +317,7 @@ _v0_5_dataset = egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3[
 ]["dataloader"]["datasets"]["egoverse"]["dataset"]
 _v0_5_dataset["rigid_pose_frame_delta"] = True
 _v0_5_dataset["future_normalizer"] = (
-    "/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/"
+    f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
     "cosmos3_action_contract/v3_frame_delta/normalizers/future_frame_delta_normalizer.json"
 )
 egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["model"]["config"][

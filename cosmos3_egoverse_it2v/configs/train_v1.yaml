@@ -1,3 +1,4 @@
+# 历史描述文件，不是当前启动配置；运行参数以对应 TOML 与 src/config.py 为准。
 experiment: egoverse_it2v_v1
 initialization: /mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464
 dataset:
@@ -15,4 +16,4 @@ training:
 loss:
   video_only: true
 outputs:
-  train: /mnt/lzh/cosmos/outputs/egoverse_it2v/train/v1
+  train: /mnt/lzh/cosmos-EgoWAM/outputs/egoverse_it2v/train/v1

@@ -1,0 +1,60 @@
+# Machine-readable overfit_v0.0 contract. Runtime config is registered in src/config.py.
+experiment:
+  id: egoverse_cosmos3_nano_joint_overfit_v0_0
+  output_root: /mnt/lzh/cosmos/outputs/joint_video_hand_pose/train/overfit_v0.0
+  initialization: /mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464
+dataset:
+  task: brushing_shoes
+  scene: repair_bench
+  episodes: 36
+  segments: 181
+  episodes_manifest: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/episodes.csv
+  segments_manifest: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/segments.csv
+  prompt_mode: episode_context_and_segment
+  max_sequence_length: 85000
+action_contract:
+  artifact: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/manifest.json
+  state_normalizer: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/normalizers/state_normalizer.json
+  future_normalizer: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/normalizers/future_delta_normalizer.json
+  raw_action_dim: 57
+  model_action_dim: 64
+loss:
+  video_loss_weight: 10.0
+  action_loss_weight: 7.0
+  lambda_out_of_fov: 0.0
+  action_subblocks_equal_weight: true
+training:
+  world_size: 8
+  context_parallel_shard_degree: 2
+  data_parallel_shard_degree: 4
+  base_learning_rate: 2.0e-5
+  action_projection_lr_multiplier: 5.0
+  action_projection_learning_rate: 1.0e-4
+  warmup_steps: 20
+  scheduler_cycle_steps: 2000
+  checkpoints: [300, 600, 900, 1200, 1500, 1800, 2000]
+  train_shift: 5.0
+inference:
+  shift: 5.0
+  source_split: train
+  sample_count: 4
+  min_frames: 201
+  max_frames: 401
+monitoring:
+  wandb_mode: online
+  wandb_project: cosmos3-Ego
+  log_every_steps: 1
+  metrics:
+    - loss/video_raw
+    - loss/action_raw
+    - loss/action_camera_translation_raw
+    - loss/action_camera_rotation_raw
+    - loss/action_right_wrist_translation_raw
+    - loss/action_right_wrist_rotation_raw
+    - loss/action_right_hand_latent_raw
+    - loss/action_left_wrist_translation_raw
+    - loss/action_left_wrist_rotation_raw
+    - loss/action_left_hand_latent_raw
+    - loss/total
+    - optim/lr_base
+    - optim/lr_action

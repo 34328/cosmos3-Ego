@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /mnt/lzh/cosmos
+readonly REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_ROOT"
 readonly PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 readonly TORCHRUN=/home/lzh/miniconda3/envs/cosmos3/bin/torchrun
-readonly TRAIN_ROOT=/mnt/lzh/cosmos/outputs/joint_video_hand_pose/overfit/overfit_v0.6_frame_delta_temporal_mask
-readonly INFERENCE_ROOT=/mnt/lzh/cosmos/outputs/joint_video_hand_pose/inference/overfit_v0.6_frame_delta_temporal_mask
+readonly TRAIN_ROOT="${REPO_ROOT}/outputs/joint_video_hand_pose/overfit/overfit_v0.6_frame_delta_temporal_mask"
+readonly INFERENCE_ROOT="${REPO_ROOT}/outputs/joint_video_hand_pose/inference/overfit_v0.6_frame_delta_temporal_mask"
 # Reuse the exact v0.5 B3 selection rather than merely repeating its seed.
-readonly INPUT_ROOT=/mnt/lzh/cosmos/outputs/joint_video_hand_pose/inference/overfit_v0.5_frame_delta_b3/monitor_inputs
+readonly INPUT_ROOT="${REPO_ROOT}/outputs/joint_video_hand_pose/inference/overfit_v0.5_frame_delta_b3/monitor_inputs"
 readonly ITERATION="${1:-000001200}"
 
-export PYTHONPATH=/mnt/lzh/cosmos:/mnt/lzh/cosmos/packages/cosmos3
+export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/packages/cosmos3"
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 export WAN_VAE_PATH=/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth
 

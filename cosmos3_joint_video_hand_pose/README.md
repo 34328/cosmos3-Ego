@@ -1,13 +1,11 @@
-# Cosmos 3 Joint Video + Hand Pose
+# 视频与双手动作联合训练
 
-当前 joint 小数据训练统一使用 **CP=1 / FSDP=8 / 75K**。
+已实现 EgoVerse 数据适配、57D action 编解码、Cosmos 联合训练、恢复及预测/GT 四格回放。
 
-- 文档入口：[docs/README.md](docs/README.md)
-- 当前 full-attention 配置：`configs/overfit_v0_3_active_norm_independent_action.toml`
-- 当前 full-attention 训练入口：`scripts/launch_overfit_v0_3_active_norm_independent_action.sh`
-- 已验收 CP1 checkpoint replay：`scripts/run_current_joint_baseline_replays.sh`
-- Video-first causal-mask 配置：`configs/overfit_v0_4_video_first_causal_mask.toml`
-- Video-first causal-mask 训练入口：`scripts/launch_overfit_v0_4_video_first_causal_mask.sh`
+- [当前实现与运行说明](../docs/current-state.md)
+- [文档导航](docs/README.md)
+- [历史实验归档](../docs/archive/2026-09-26-egowam/README.md)
 
-`overfit_v0_0` 只保留为模型/数据合同和 smoke/audit 的基础配置，不再提供正式训练入口。
-历史 CP=2 与 action-loss-off 消融的结论保存在 `docs/training/`，其失败配置不再保留为可运行实验。
+配方：`configs/overfit_v0_3_active_norm_independent_action.toml` 为 full-attention 配方，`overfit_v0_5_frame_delta_b3.toml` 为 B3 表示，`overfit_v0_6_frame_delta_temporal_mask.toml` 为 B3 加时间遮罩。对应入口位于 `scripts/`。
+
+v0.0 仅作基础 smoke/audit 配置；v0.4 历史 run 不能证明 mask 效果。一次性 v0.4→v0.5 自动实验链已停用。已有实验和输出保留，新研究使用独立配置与 run 名称。

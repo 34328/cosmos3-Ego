@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 
 from hydra.core.config_store import ConfigStore
 from cosmos_framework.configs.base.defaults.callbacks import BASIC_CALLBACKS
@@ -13,6 +14,8 @@ from cosmos_framework.utils.lazy_config import LazyDict
 from .data import get_egoverse_it2v_dataset
 from .wandb_compat import ensure_wandb_generate_id
 
+
+COSMOS_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 ensure_wandb_generate_id()
 
@@ -36,7 +39,7 @@ model["tokenizer"]["vae_path"] = "/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth
 model["vlm_config"]["tokenizer"]["pretrained_model_name"] = "/mnt/checkpoints/Cosmos3-Nano/text_tokenizer"
 model["vlm_config"]["tokenizer"]["config_variant"] = "hf"
 model["vlm_config"]["model_instance"]["config"]["base_config"]["json_file"] = (
-    "/mnt/lzh/cosmos/packages/cosmos3/cosmos_framework/model/generator/reasoner/"
+    f"{COSMOS_REPO_ROOT}/packages/cosmos3/cosmos_framework/model/generator/reasoner/"
     "qwen3_vl/configs/Qwen3-VL-8B-Instruct.json"
 )
 model["rectified_flow_training_config"].update(
@@ -141,8 +144,8 @@ egoverse_it2v_v1 = LazyDict(dict(
                 egoverse_it2v=dict(
                     ratio=1,
                     dataset=L(get_egoverse_it2v_dataset)(
-                        episodes_manifest="${oc.env:EGOVERSE_EPISODES_MANIFEST,/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/episodes.csv}",
-                        segments_manifest="${oc.env:EGOVERSE_SEGMENTS_MANIFEST,/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/segments.csv}",
+                        episodes_manifest=f"${{oc.env:EGOVERSE_EPISODES_MANIFEST,{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/episodes.csv}}",
+                        segments_manifest=f"${{oc.env:EGOVERSE_SEGMENTS_MANIFEST,{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/segments.csv}}",
                         tokenizer_config="${model.config.vlm_config.tokenizer}",
                         cfg_dropout_rate=0.1,
                         iterable_shuffle=True,

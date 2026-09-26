@@ -1,3 +1,5 @@
+> 版本化参考：本文保留早期设计细节；当前 B3 表示、时间遮罩及运行参数见[当前实现](../../../docs/current-state.md)。
+
 # TODO-4：EgoVerse 视频训练链路 v1
 
 > 状态：数据合同已锁定，当前 joint 生产 guardrail 为 8 卡 CP=1、FSDP shard=8、

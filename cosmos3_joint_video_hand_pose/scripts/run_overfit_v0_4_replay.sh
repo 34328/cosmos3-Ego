@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /mnt/lzh/cosmos
+readonly REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_ROOT"
 readonly PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 readonly TORCHRUN=/home/lzh/miniconda3/envs/cosmos3/bin/torchrun
-readonly ROOT=/mnt/lzh/cosmos/cosmos3_joint_video_hand_pose
-readonly TRAIN_ROOT=/mnt/lzh/cosmos/outputs/joint_video_hand_pose/overfit/overfit_v0.4_video_first_causal_mask
-readonly INFERENCE_ROOT=/mnt/lzh/cosmos/outputs/joint_video_hand_pose/inference/overfit_v0.4_video_first_causal_mask
+readonly ROOT="${REPO_ROOT}/cosmos3_joint_video_hand_pose"
+readonly TRAIN_ROOT="${REPO_ROOT}/outputs/joint_video_hand_pose/overfit/overfit_v0.4_video_first_causal_mask"
+readonly INFERENCE_ROOT="${REPO_ROOT}/outputs/joint_video_hand_pose/inference/overfit_v0.4_video_first_causal_mask"
 readonly INPUT_ROOT="$INFERENCE_ROOT/monitor_inputs"
 readonly V2="$ROOT/artifacts/cosmos3_action_contract/v2/normalizers"
 readonly ITERATION="${1:-000001200}"
 
-export PYTHONPATH=/mnt/lzh/cosmos:/mnt/lzh/cosmos/packages/cosmos3
+export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/packages/cosmos3"
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 export WAN_VAE_PATH=/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth
 "$PYTHON" "$ROOT/artifacts/cosmos3_action_contract/v2/validate_manifest.py"

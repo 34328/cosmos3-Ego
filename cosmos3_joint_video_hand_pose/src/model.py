@@ -14,7 +14,7 @@ try:
     from cosmos_framework.model.generator.omni_mot_model import OmniMoTModel
 except ImportError as error:  # pragma: no cover - exercised only outside the Cosmos environment
     raise ImportError(
-        "EgoVerseOmniMoTModel requires PYTHONPATH=/mnt/lzh/cosmos/packages/cosmos3"
+        "EgoVerseOmniMoTModel requires PYTHONPATH=<repository-root>:<repository-root>/packages/cosmos3"
     ) from error
 
 

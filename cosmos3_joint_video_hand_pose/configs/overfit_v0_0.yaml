@@ -1,21 +1,22 @@
+# 历史描述文件，不是当前启动配置；运行参数以对应 TOML 与 src/config.py 为准。
 # Machine-readable overfit_v0.0 contract. Runtime config is registered in src/config.py.
 experiment:
   id: egoverse_cosmos3_nano_joint_overfit_v0_0
-  output_root: /mnt/lzh/cosmos/outputs/joint_video_hand_pose/train/overfit_v0.0
+  output_root: /mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/train/overfit_v0.0
   initialization: /mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464
 dataset:
   task: brushing_shoes
   scene: repair_bench
   episodes: 36
   segments: 181
-  episodes_manifest: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/episodes.csv
-  segments_manifest: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/segments.csv
+  episodes_manifest: /mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/episodes.csv
+  segments_manifest: /mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/artifacts/cosmos3_training_subsets/brushing_shoes_repair_bench_36ep_v1/segments.csv
   prompt_mode: episode_context_and_segment
   max_sequence_length: 85000
 action_contract:
-  artifact: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/manifest.json
-  state_normalizer: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/normalizers/state_normalizer.json
-  future_normalizer: /mnt/lzh/cosmos/cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/normalizers/future_delta_normalizer.json
+  artifact: /mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/manifest.json
+  state_normalizer: /mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/normalizers/state_normalizer.json
+  future_normalizer: /mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/normalizers/future_delta_normalizer.json
   raw_action_dim: 57
   model_action_dim: 64
 loss:

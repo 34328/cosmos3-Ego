@@ -1,0 +1,47 @@
+# 当前实现与运行说明
+
+核对日期：2026-09-26。仓库位置：`/mnt/lzh/cosmos-EgoWAM`。历史实验结论见[归档](archive/2026-09-26-egowam/README.md)，后续新实验另设名称和输出目录。
+
+## 实现边界
+
+输入为文本、首帧 RGB 和首帧真实双手姿态；同一个 Cosmos Generator 联合预测未来视频、相机和双手姿态。使用 Cosmos3-Nano SFT 初始化；Reasoner、视频 VAE、左右手 MLP-AE-15 冻结，生成路径参与训练。
+
+动作宽度为 57D，尾部补齐到 64D：camera 9、右 wrist 9、右 hand latent 15、左 wrist 9、左 hand latent 15。当前仍是 T 个 action，首帧 a0 为 clean condition。无首帧动作的 T-1 合同只是设计稿。
+
+v0.5 B3 / v0.6 使用逐帧 SE(3) camera/wrist 增量，手型 latent 不做时间差分；旧版本使用首帧相对增量。必须按原版本解码，不能混用 normalizer。v0.6 视频不读取动作；动作 A_t 读取 text、V_<=floor(t/4)、A_<=t；视频内部仍为双向 attention。
+
+## 数据与实验参数
+
+Mecka 母集为 4,295 episodes / 33,535 segments；train 为 4,142 / 32,355，test 为 153 / 1,180，无独立 val。现有联合实验使用 brushing_shoes / repair_bench 的 36 episodes / 181 train segments。
+
+视频由 640×360 底部 reflect-pad 到 640×368，T=4n+1；RGB、动作和 visibility 同步采样。当前文本拼接 episode 描述与 segment 指令。联合实验使用 CP1/FSDP8、75K token cap、BF16、full activation checkpoint。video/action loss 权重 1.0/0.7，八个 action 子块等权，画外手权重 0。v0.3 起启用 active normalization 和独立 action noise schedule。
+
+现有配方运行 1200 步、每 300 步保存；base LR 2e-5，shared/video 4 倍、action projection 5 倍，warmup 100。以上是已有小数据配方，不是后续大规模训练的默认批准参数。
+
+## 环境与入口
+
+```bash
+cd /mnt/lzh/cosmos-EgoWAM
+export PYTHONPATH="$PWD:$PWD/packages/cosmos3"
+export LD_LIBRARY_PATH=''
+PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
+# 仅校验冻结资产，不启动训练
+"$PYTHON" cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/validate_manifest.py
+```
+
+预训练权重：`/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464`；VAE：`/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth`。数据路径由 episode CSV 中的 `abs_zarr_path` 指定。
+
+联合训练配方位于 `cosmos3_joint_video_hand_pose/configs/*.toml`，启动入口为该项目 `scripts/launch_overfit_*.sh`，配套回放为 `scripts/run_*replay*.sh`。历史 YAML 仅为描述快照，不作为启动依据。已有输出会触发部分脚本的防覆盖检查；新实验先建立独立配方，不复用旧 run 名称。启动前检查 GPU，现有 joint 配方需要 8 张空闲 GPU。
+
+## 已知限制
+
+- joint CP2 曾出现非有限梯度，沿用 CP1；同时查看原始 NaN/Inf 计数，不能只看清洗后的梯度范数。
+- v0.4 历史 run 的 mask 未生效；现在重新运行同名配方也不能复现当年的错误配置行为。
+- B3 future normalizer 仅由 36-episode 子集统计；扩展训练需重新定义并冻结数据合同。
+- normalizer/codec 的完整 checkpoint 自动绑定仍待完善。
+- 回放是固定训练样本，不能用于宣称泛化。文档中的视觉结论本次未重新人工验收。
+- 根目录测试未跟踪；复现所需数据、环境与本地测试不会随普通 Git 克隆自动取得。
+
+## 路径清理记录
+
+训练/回放脚本和 Python 配置已使用动态仓库根目录。旧回放 JSON 中的项目根路径已迁移；原文、逐文件 SHA256 记录保存在 `outputs/maintenance/2026-09-26-path-relocation/`。检查点、日志和冻结 artifact 未重写，内部历史路径仍是溯源信息。再次移动仓库时，已有回放 JSON 需要再次迁移，脚本和配置不需要改根路径。
