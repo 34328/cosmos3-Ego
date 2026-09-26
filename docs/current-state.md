@@ -54,3 +54,9 @@ PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 - 移除纯视频对照 `cosmos3_egoverse_it2v/`，以及 v0.0–v0.5 的 TOML、启动与回放脚本；`src/config.py` 中的继承链保留。
 - `tests/` 纳入 Git。
 - `outputs/` 仅保留 v0.2 与 v0.6 的 `iter_000001200` 模型权重（不含 optimizer），其余 checkpoint 与本地 W&B、dataloader trace 已删除，删除清单见 `outputs/maintenance/2026-09-26-checkpoint-prune/`。训练曲线以远端 W&B 为准。
+
+## AR v0.1 方案（2026-09-26）
+
+- 方案文档：`docs/ar_v0.1_design.md`（已确认，动作向量内容与 camera pose 仍为【待定】）。
+- 要点：对齐 lingbot-va demo 配置，frame_stride = 2、每 latent 帧 K = 8 个 action、推理 chunk C = 4；训练随机 C ∈ [1, 4]、窗口 ∈ [4, 64]；T 按 segment 长度分档 129 / 65 / 33；人手速度通过 fps 标签 × 0.5 放慢（视频 7.5、action 15）。
+- 下一步：P0 框架同步官方 cosmos-framework `cf5d68c`，并把 action_tokens_per_latent 从 tcf 解耦。
