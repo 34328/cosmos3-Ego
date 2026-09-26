@@ -155,7 +155,10 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
         has_valid_tokens,
         rectified_flow,
         raw_action_dim=None,
+        action_valid_mask=None,
         normalize_by_active=False,
+        exclude_fully_conditioned_items=False,
+        action_slot_stats=None,
     ):
         if raw_action_dim is None:
             return super()._compute_flow_matching_loss(
@@ -166,8 +169,21 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
                 has_valid_tokens=has_valid_tokens,
                 rectified_flow=rectified_flow,
                 raw_action_dim=raw_action_dim,
+                action_valid_mask=action_valid_mask,
                 normalize_by_active=normalize_by_active,
+                exclude_fully_conditioned_items=exclude_fully_conditioned_items,
+                action_slot_stats=action_slot_stats,
             )
+        # EgoVerse samples carry no per-channel action_valid_mask; its 57D
+        # visibility-weighted objective owns channel selection itself.
+        if action_valid_mask is not None and any(mask is not None for mask in action_valid_mask):
+            raise NotImplementedError("EgoVerse action loss does not support action_valid_mask")
+        if exclude_fully_conditioned_items:
+            raise NotImplementedError("EgoVerse action loss does not support exclude_fully_conditioned_items")
+        # action_slot_stats only collects unified-schema (raw_action_dim == 59)
+        # slot losses; for the 57D EgoVerse contract they stay zero, matching
+        # the native path, so the collector is intentionally left untouched.
+        del action_slot_stats
         if not has_valid_tokens:
             dummy = 0.0 * sum(item.sum() for item in pred)
             return dummy, dummy.unsqueeze(0)
@@ -205,6 +221,7 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
         is_image_batch,
         timesteps_action=None,
         timesteps_sound=None,
+        timesteps_lidar=None,
     ):
         """Expose raw and actually weighted components for distributed logging."""
         total_loss, losses = super()._compute_losses(
@@ -215,6 +232,7 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
             is_image_batch=is_image_batch,
             timesteps_action=timesteps_action,
             timesteps_sound=timesteps_sound,
+            timesteps_lidar=timesteps_lidar,
         )
         rf_cfg = self.config.rectified_flow_training_config
         sample_scale = torch.ones((), device=total_loss.device, dtype=total_loss.dtype)

@@ -1824,14 +1824,15 @@ class OmniMoTModel(ImaginaireModel):
                     sample_loss=slot_stat_zeros,
                     sample_count=torch.zeros_like(slot_stat_zeros),
                 )
-                fm_loss_action, _ = compute_flow_matching_loss(
+                # Route through the overridable method so subclasses can supply a
+                # custom action objective; the default delegates unchanged.
+                fm_loss_action, _ = self._compute_flow_matching_loss(
                     pred=out_net["preds_action"],
                     target=gen_data_noised.vt_target_action,
                     condition_mask=data_batch_packed.action.condition_mask,
                     timesteps=ts_action,
                     has_valid_tokens=action_has_valid_tokens,
                     rectified_flow=self.rectified_flow_action,
-                    tensor_kwargs_fp32=self.tensor_kwargs_fp32,
                     raw_action_dim=data_batch_packed.action.raw_action_dim,
                     action_valid_mask=data_batch_packed.action.action_valid_mask,
                     normalize_by_active=normalize_by_active,

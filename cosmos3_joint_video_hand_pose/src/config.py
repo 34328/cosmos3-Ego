@@ -291,21 +291,20 @@ egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action["mode
 # changed: future video cannot read future action, while action can still read
 # clean conditions, video, and action.  Keep action loss and shared-backbone
 # gradients enabled so this tests the intended joint causal factorization.
+# v0.4–v0.6 的 joint video-action mask 在 cf5d68c 同步时移除；复现原实验请 checkout 8525625
 egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask = copy.deepcopy(
     egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action
 )
 egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask["job"][
     "name"
 ] = "overfit_v0.4_video_first_causal_mask"
-egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask["model"]["config"][
-    "video_action_causal_mask"
-] = True
 
 
 # B3 rigid-trajectory ablation: preserve the stable CP1/FSDP-8/75K joint
 # training setup, disable attention ablations, and encode future camera and
 # wrist transforms as frame-to-frame SE(3) increments.  This makes v0.5 a
 # representation-only experiment, matching the run that preceded v0.6.
+# v0.4–v0.6 的 joint video-action mask 在 cf5d68c 同步时移除；复现原实验请 checkout 8525625
 egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3 = copy.deepcopy(
     egoverse_joint_video_hand_pose_overfit_v0_4_video_first_causal_mask
 )
@@ -320,9 +319,6 @@ _v0_5_dataset["future_normalizer"] = (
     f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
     "cosmos3_action_contract/v3_frame_delta/normalizers/future_frame_delta_normalizer.json"
 )
-egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["model"]["config"][
-    "video_action_causal_mask"
-] = False
 
 
 # v0.6 keeps the complete B3 training contract and replaces only the
@@ -330,17 +326,13 @@ egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["model"]["config"][
 # action frame t reads text, video latents up to t, and action tokens up to t.
 # The first-frame image and future video retain native bidirectional IT2V
 # attention, while every video query is structurally unable to read action.
+# v0.4–v0.6 的 joint video-action mask 在 cf5d68c 同步时移除；复现原实验请 checkout 8525625
 egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask = copy.deepcopy(
     egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3
 )
 egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask["job"]["name"] = (
     "overfit_v0.6_frame_delta_temporal_mask"
 )
-_v0_6_model = egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask[
-    "model"
-]["config"]
-_v0_6_model["video_action_causal_mask"] = False
-_v0_6_model["video_action_temporal_causal_mask"] = True
 
 
 ConfigStore.instance().store(

@@ -95,7 +95,7 @@ class CosmosActionPromptFormatter:
     """Build the exact official action JSON string consumed by the tokenizer."""
 
     def __init__(self) -> None:
-        from cosmos_framework.data.generator.action.json_formatter import ActionPromptJsonFormatter
+        from cosmos_framework.data.generator.action.utils.json_formatter import ActionPromptJsonFormatter
 
         self._formatter = ActionPromptJsonFormatter(float_seconds=True)
 
@@ -298,7 +298,7 @@ def get_egoverse_cosmos_dataset(
     rigid_pose_frame_delta: bool = False,
 ):
     from cosmos_framework.data.generator.action.datasets.action_sft_dataset import ActionIterableShuffleDataset
-    from cosmos_framework.data.generator.action.transforms import ActionTransformPipeline
+    from cosmos_framework.data.generator.action.utils.transforms import ActionTransformPipeline
 
     action_builder_kwargs = {}
     if state_normalizer is not None:

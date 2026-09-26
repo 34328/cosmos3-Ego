@@ -9,7 +9,7 @@ import torch
 import torch.distributed as dist
 import wandb
 
-from cosmos_framework.callbacks.grad_clip import _clip_grad, _fused_nan_to_num
+from cosmos_framework.callbacks.grad_clip import _fused_nan_to_num, _group_params_by_mesh, _total_norm_by_mesh
 from cosmos_framework.callbacks.wandb_log import _LossRecord
 from cosmos_framework.model._base import ImaginaireModel
 from cosmos_framework.utils import distributed
@@ -34,6 +34,16 @@ SUBBLOCK_LOSS_METRIC_SOURCES = {
 }
 
 LOSS_METRIC_SOURCES = BASE_LOSS_METRIC_SOURCES | SUBBLOCK_LOSS_METRIC_SOURCES
+
+
+def _pre_clip_grad_norm(parameters: list[torch.Tensor]) -> torch.Tensor:
+    """Global L2 grad norm over ``parameters`` without modifying gradients.
+
+    Uses the same mesh grouping and DTensor reduction as the native GradClip
+    callback; every parameter must already have a gradient.
+    """
+    total_norm, _ = _total_norm_by_mesh(_group_params_by_mesh(parameters))
+    return total_norm
 
 SIGMA_METRIC_SOURCES = {
     "sigma/video_mean": "egoverse_sigma_video_mean",
@@ -200,7 +210,7 @@ class EgoVerseLossWandbCallback(Callback):
         # An ablation may intentionally freeze one whole group; report that
         # group as zero rather than turning diagnostics into a training error.
         # All ranks execute the same group order because
-        # _clip_grad performs distributed DTensor reductions.  First detect
+        # _pre_clip_grad_norm performs distributed DTensor reductions.  First detect
         # whether each raw group contains NaN/Inf.  Cosmos' configured
         # GradClip(force_finite=True) sanitizes them immediately after this
         # callback, so hiding this distinction would make a sanitized norm look
@@ -215,7 +225,7 @@ class EgoVerseLossWandbCallback(Callback):
             if not parameters:
                 nonfinite[nonfinite_names[metric_name]] = 0.0
                 continue
-            raw_norm, _ = _clip_grad(parameters, max_norm=1.0, return_norm_only=True)
+            raw_norm = _pre_clip_grad_norm(parameters)
             nonfinite[nonfinite_names[metric_name]] = float(not torch.isfinite(raw_norm).item())
         nonfinite["grad_nonfinite/all_selected_present"] = max(nonfinite.values())
 
@@ -293,7 +303,7 @@ class EgoVerseLossWandbCallback(Callback):
             if not parameters:
                 norms[metric_name] = torch.zeros((), device=reference_device)
                 continue
-            norm, _ = _clip_grad(parameters, max_norm=1.0, return_norm_only=True)
+            norm = _pre_clip_grad_norm(parameters)
             norms[metric_name] = norm.detach().float()
         norms["grad_norm/all_selected_pre_clip"] = torch.linalg.vector_norm(torch.stack(list(norms.values())))
 

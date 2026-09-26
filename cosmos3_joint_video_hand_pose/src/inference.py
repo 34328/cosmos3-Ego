@@ -10,12 +10,12 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
-from cosmos_framework.data.generator.action.action_processing import (
+from cosmos_framework.data.generator.action.utils.action_processing import (
     ActionProcessingRecord,
     make_batched_action_processing_fields,
     pad_action_to_max_dim,
 )
-from cosmos_framework.data.generator.action.transforms import build_sequence_plan_from_mode
+from cosmos_framework.data.generator.action.utils.transforms import build_sequence_plan_from_mode
 from cosmos_framework.inference.args import ModelMode
 from cosmos_framework.inference.vision import read_media_frames
 
