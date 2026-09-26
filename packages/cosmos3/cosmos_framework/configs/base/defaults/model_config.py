@@ -319,6 +319,12 @@ class OmniMoTModelConfig:
     # Only supports image2video modes (with or without actions).
     # Requires joint_attn_implementation="three_way".
     video_temporal_causal: bool = False
+    # Temporal-causal action tokens per latent vision frame (K). None keeps the
+    # historical K = VAE temporal compression factor (tcf). K != tcf changes the
+    # action rate relative to video (action fps = video fps * K / tcf) while the
+    # mRoPE clock stays in tcf units; read by the temporal-causal packer, which
+    # stamps it as num_action_tokens_per_supertoken.
+    action_tokens_per_latent: int | None = None
 
     # "none":             standard joint denoising (shared σ, no clean context)
     # "teacher_forcing":  all frames noised with shared σ; clean history via cross-attention

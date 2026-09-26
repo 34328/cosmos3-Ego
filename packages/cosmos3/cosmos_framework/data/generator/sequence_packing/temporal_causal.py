@@ -26,12 +26,17 @@ def pack_supertokens_temporal_causal(
     enable_fps_modulation: bool = False,
     base_fps: float = 24.0,
     pack_action_tokens: bool = True,
+    action_tokens_per_latent: int | None = None,
 ) -> tuple[int, bool]:
     """Pack vision and (optionally) action tokens in supertoken order for temporal causal attention.
 
     Buffer layout per frame:
-        pack_action_tokens=True:  [action_t (tcf), vision_t (H*W)]  — supertoken size tcf + H*W
+        pack_action_tokens=True:  [action_t (K), vision_t (H*W)]    — supertoken size K + H*W
         pack_action_tokens=False: [vision_t (H*W)]                  — supertoken size H*W
+
+    ``K = action_tokens_per_latent`` is the number of action tokens per latent
+    frame; ``None`` (default) means ``K = tcf``, the historical layout. ``tcf``
+    itself remains the video clock unit of the mRoPE positions.
 
     Use ``pack_action_tokens=False`` when ``config.action_gen=False``; the resulting
     ``num_action_tokens_per_supertoken=0`` is stamped on the pack and read by the
@@ -40,16 +45,20 @@ def pack_supertokens_temporal_causal(
     mRoPE layout (with actions, unified_3d_mrope only). The layout is inferred from the
     action tensor shape:
         - Whole-clip training (frame 0 is the clean conditioning frame, so
-          ``real_actions`` has ``(T-1)*tcf`` rows): null action for supertoken 0, real
+          ``real_actions`` has ``(T-1)*K`` rows): null action for supertoken 0, real
           actions for frames 1..T-1 with ``start_frame_offset=1`` so the last action in
           group i co-locates with vision frame i; vision uses ``start_frame_offset=0``.
         - AR generation, single frame OR chunk (every frame carries a real action, so
-          ``real_actions`` has ``latent_t*tcf`` rows): vision AND action both use
+          ``real_actions`` has ``latent_t*K`` rows): vision AND action both use
           ``start_frame_offset=1``, generalizing the single-frame AR supertoken to
           ``latent_t`` frames. The caller (``pack_input_sequence_autoregressive``)
           seeds ``temporal_offset`` one frame-stride back to compensate, so the unit
           lands at the same absolute positions as the whole-clip training pack.
         - Interleaved per frame as cat([action_ids, vision_ids]).
+
+    With FPS modulation, the last action of each group co-locates with its vision
+    latent only if ``action_fps == vision_fps * K / tcf``; for ``K != tcf`` this is
+    validated whenever both FPS values are given.
 
     ``input_timestep`` is float (TF/none) or Tensor(T_max,) (DF, per-frame sigma).
     Conditioning frames are excluded from mse_loss_indexes either way.
@@ -58,13 +67,12 @@ def pack_supertokens_temporal_causal(
         seq_builder: Mutable sequence builder receiving packed spans and metadata.
         input_vision_tokens: Vision latent tokens with shape ``[1, C, T, H, W]``.
         input_action_tokens: Optional action tokens. Whole-clip training uses
-            ``(T - 1) * temporal_compression_factor`` rows; AR chunks use
-            ``T * temporal_compression_factor`` rows.
+            ``(T - 1) * K`` rows; AR chunks use ``T * K`` rows.
         condition_frame_indexes_vision: Vision frame indexes treated as clean conditioning.
         input_timestep: Diffusion timestep as a scalar float or per-frame tensor.
         latent_patch_size: Spatial patch size used to derive the vision patch grid.
-        temporal_compression_factor: Number of frame-rate action tokens per latent
-            vision frame.
+        temporal_compression_factor: VAE temporal compression factor (video frames
+            per latent frame); the mRoPE clock unit. Also the default ``K``.
         action_dim: Action feature dimension used when null action tokens are created.
         vision_fps: Optional video FPS for FPS-modulated vision mRoPE positions.
         action_fps: Optional action FPS for FPS-modulated action mRoPE positions.
@@ -72,6 +80,8 @@ def pack_supertokens_temporal_causal(
         base_fps: Base FPS for temporal position normalization.
         pack_action_tokens: If True, append action tokens before each vision supertoken.
             If False, append only vision tokens and report no null-action supertokens.
+        action_tokens_per_latent: Action tokens per latent frame (``K``). ``None``
+            uses ``temporal_compression_factor``.
 
     Returns:
         Tuple of ``(total_split_len, null_action_flag)``. ``null_action_flag`` is False
@@ -81,6 +91,19 @@ def pack_supertokens_temporal_causal(
     patch_h = math.ceil(latent_h / latent_patch_size)
     patch_w = math.ceil(latent_w / latent_patch_size)
     tcf = temporal_compression_factor
+    K = tcf if action_tokens_per_latent is None else int(action_tokens_per_latent)
+    if K < 1:
+        raise ValueError(f"action_tokens_per_latent must be a positive integer or None, got {action_tokens_per_latent}.")
+    if pack_action_tokens and K != tcf and vision_fps is not None and action_fps is not None:
+        expected_action_fps = float(vision_fps) * K / tcf
+        if not math.isclose(float(action_fps), expected_action_fps, rel_tol=1e-5, abs_tol=1e-6):
+            raise ValueError(
+                f"action_tokens_per_latent={K} with temporal_compression_factor={tcf} requires "
+                f"action_fps == vision_fps * K / tcf = {vision_fps} * {K} / {tcf} = {expected_action_fps}, "
+                f"got action_fps={action_fps}. Each group of K action tokens spans one video latent "
+                "(tcf video frames), so the last action of every group must end at the same time as its "
+                "vision latent."
+            )
     patches_per_frame = patch_h * patch_w
 
     vision = seq_builder.ensure_vision()
@@ -91,43 +114,43 @@ def pack_supertokens_temporal_causal(
 
     null_action_flag: bool
     if pack_action_tokens:
-        # Build all_action_tokens: shape (latent_t * tcf, action_dim)
+        # Build all_action_tokens: shape (latent_t * K, action_dim)
         #
         # Cases (token assembly; mRoPE start_frame_offset is chosen separately below,
         # inferred from the same action shape):
         #   1. Whole-clip training with conditioning frame (latent_t > 1, real_actions
-        #      has (T-1)*tcf rows): prepend tcf null tokens for frame 0, then real
+        #      has (T-1)*K rows): prepend K null tokens for frame 0, then real
         #      actions for frames 1..T-1.
         #   2. AR generation (every frame has a real action, real_actions has
-        #      latent_t*tcf rows — single frame OR chunk): no null prefix.
+        #      latent_t*K rows — single frame OR chunk): no null prefix.
         #   3. AR frame 0 / image2video (action is None): all null tokens.
         if input_action_tokens is not None:
-            # input_action_tokens shape: (1, T*tcf, D) or (T*tcf, D) for training; (T*tcf, D) for AR units
+            # input_action_tokens shape: (1, T*K, D) or (T*K, D) for training; (T*K, D) for AR units
             if input_action_tokens.dim() == 3:
-                real_actions = input_action_tokens.squeeze(0)  # [T*tcf,action_dim] or [N,action_dim]
+                real_actions = input_action_tokens.squeeze(0)  # [T*K,action_dim] or [N,action_dim]
             else:
                 real_actions = input_action_tokens  # [N,action_dim]
-            null_tokens = real_actions.new_zeros((tcf, action_dim))  # [tcf,action_dim]
-            if real_actions.shape[0] == latent_t * tcf:
-                # AR generation (single frame: tcf == 1*tcf, or chunk: latent_t*tcf):
+            null_tokens = real_actions.new_zeros((K, action_dim))  # [K,action_dim]
+            if real_actions.shape[0] == latent_t * K:
+                # AR generation (single frame: K == 1*K, or chunk: latent_t*K):
                 # every supertoken carries a real action, no null prefix.
                 all_action_tokens = real_actions
                 null_action_flag = False
-            elif real_actions.shape[0] == (latent_t - 1) * tcf:
+            elif real_actions.shape[0] == (latent_t - 1) * K:
                 # Conditioning frame present: null for supertoken 0, real for 1..T-1
-                all_action_tokens = torch.cat([null_tokens, real_actions], dim=0)  # [T*tcf,action_dim]
+                all_action_tokens = torch.cat([null_tokens, real_actions], dim=0)  # [T*K,action_dim]
                 null_action_flag = True
             else:
                 raise ValueError(
-                    "Temporal-causal action tokens must have either latent_t*tcf rows for AR chunks "
-                    f"or (latent_t-1)*tcf rows for whole-clip training; got {real_actions.shape[0]} rows "
-                    f"for latent_t={latent_t}, tcf={tcf}."
+                    "Temporal-causal action tokens must have either latent_t*K rows for AR chunks "
+                    f"or (latent_t-1)*K rows for whole-clip training; got {real_actions.shape[0]} rows "
+                    f"for latent_t={latent_t}, K(action_tokens_per_latent)={K}, tcf={tcf}."
                 )
         else:
             # AR frame 0 or image2video: all action tokens are null
             all_action_tokens = torch.zeros(
-                latent_t * tcf, action_dim, device=device, dtype=dtype
-            )  # [T*tcf,action_dim]
+                latent_t * K, action_dim, device=device, dtype=dtype
+            )  # [T*K,action_dim]
             null_action_flag = True
     else:
         # pack_action_tokens=False: action tokens must not be supplied.
@@ -158,14 +181,14 @@ def pack_supertokens_temporal_causal(
 
     if pack_action_tokens:
         assert action is not None
-        # Action token shapes: latent_t * tcf total (including null tokens)
-        action.token_shapes.append((latent_t * tcf,))
+        # Action token shapes: latent_t * K total (including null tokens)
+        action.token_shapes.append((latent_t * K,))
         action.tokens.append(all_action_tokens)
         action_payload_index = len(action.tokens) - 1
 
         # Action conditioning mask: all action tokens are conditioning (not supervised)
         # Null tokens are always conditioning; real actions are conditioning too (they are inputs)
-        action_condition_mask = torch.ones((latent_t * tcf, 1), device=device, dtype=dtype)  # [T*tcf,1]
+        action_condition_mask = torch.ones((latent_t * K, 1), device=device, dtype=dtype)  # [T*K,1]
         action.condition_mask.append(action_condition_mask)
 
     # Pack in interleaved supertoken order: [action_t, vision_t] for each frame t
@@ -177,17 +200,18 @@ def pack_supertokens_temporal_causal(
     effective_vision_fps = vision_fps if enable_fps_modulation else None
 
     # AR generation (single frame OR chunk) is detected by every frame carrying a
-    # real action (``real_actions`` has ``latent_t*tcf`` rows). There, vision AND
+    # real action (``real_actions`` has ``latent_t*K`` rows). There, vision AND
     # action both use start_frame_offset=1 so the last action in each group
     # co-locates with its vision frame, mirroring whole-clip training; the caller
     # (pack_input_sequence_autoregressive) seeds temporal_offset one frame-stride
     # back to compensate. Whole-clip training (frame 0 is the null conditioning
-    # frame, ``real_actions`` has ``(T-1)*tcf`` rows) keeps vision start_frame_offset=0.
+    # frame, ``real_actions`` has ``(T-1)*K`` rows) keeps vision start_frame_offset=0.
     all_frames_have_real_action = (
-        pack_action_tokens and input_action_tokens is not None and real_actions.shape[0] == latent_t * tcf
+        pack_action_tokens and input_action_tokens is not None and real_actions.shape[0] == latent_t * K
     )
     vision_sfo = 1 if all_frames_have_real_action else 0
 
+    # Vision mRoPE keeps the VAE temporal compression factor (video clock), not K.
     vision_ids_flat, new_offset = get_3d_mrope_ids_vae_tokens(
         grid_t=latent_t,
         grid_h=patch_h,
@@ -212,13 +236,15 @@ def pack_supertokens_temporal_causal(
         fps_active = effective_action_fps is not None
         t_dtype = torch.float32 if fps_active else torch.long
         t_offset = float(temporal_offset) if fps_active else int(temporal_offset)
-        null_t = torch.full((tcf,), t_offset, dtype=t_dtype)  # [tcf]
-        null_hw = torch.zeros(tcf, dtype=t_dtype)  # [tcf]
-        null_ids = torch.stack([null_t, null_hw, null_hw])  # [3,tcf]
+        null_t = torch.full((K,), t_offset, dtype=t_dtype)  # [K]
+        null_hw = torch.zeros(K, dtype=t_dtype)  # [K]
+        null_ids = torch.stack([null_t, null_hw, null_hw])  # [3,K]
 
         def _real_action_ids(n_frames: int, start_frame_offset: int) -> torch.Tensor:
+            # K action tokens per latent frame, each advancing one action period;
+            # base_temporal_compression_factor stays tcf so the mRoPE unit matches vision.
             flat, _ = get_3d_mrope_ids_vae_tokens(
-                grid_t=n_frames * tcf,
+                grid_t=n_frames * K,
                 grid_h=1,
                 grid_w=1,
                 temporal_offset=temporal_offset,
@@ -229,26 +255,26 @@ def pack_supertokens_temporal_causal(
                 base_temporal_compression_factor=tcf,
                 start_frame_offset=start_frame_offset,
             )
-            return flat.reshape(3, n_frames, tcf)  # [3,n_frames,tcf]
+            return flat.reshape(3, n_frames, K)  # [3,n_frames,K]
 
         if all_frames_have_real_action:
-            # AR generation (single frame: tcf == 1*tcf, or chunk: latent_t*tcf):
+            # AR generation (single frame: K == 1*K, or chunk: latent_t*K):
             # every supertoken carries a real action. start_frame_offset=1 puts
             # a_{j-1}'s last sub-token on vision frame j -- the whole-clip TF
             # training layout. The caller seeds temporal_offset (N-1) frame-strides
             # back to compensate.
-            action_ids_3d = _real_action_ids(latent_t, start_frame_offset=1)  # [3,T,tcf]
+            action_ids_3d = _real_action_ids(latent_t, start_frame_offset=1)  # [3,T,K]
         elif latent_t > 1:
             # Whole-clip training: supertoken 0 = null (conditioning frame), frames
             # 1..T-1 = real with start_frame_offset=1. Covers real-action training
-            # (real_actions has (T-1)*tcf rows) and the architectural all-null layout
+            # (real_actions has (T-1)*K rows) and the architectural all-null layout
             # (input_action_tokens is None); the tokens differ but the IDs match.
-            null_ids_3d = null_ids.reshape(3, 1, tcf)  # [3,1,tcf]
-            real_ids_3d = _real_action_ids(latent_t - 1, start_frame_offset=1)  # [3,T-1,tcf]
-            action_ids_3d = torch.cat([null_ids_3d, real_ids_3d], dim=1)  # [3,T,tcf]
+            null_ids_3d = null_ids.reshape(3, 1, K)  # [3,1,K]
+            real_ids_3d = _real_action_ids(latent_t - 1, start_frame_offset=1)  # [3,T-1,K]
+            action_ids_3d = torch.cat([null_ids_3d, real_ids_3d], dim=1)  # [3,T,K]
         else:
             # AR frame 0 / image2video (latent_t == 1, no action): only null.
-            action_ids_3d = null_ids.reshape(3, 1, tcf)  # [3,1,tcf]
+            action_ids_3d = null_ids.reshape(3, 1, K)  # [3,1,K]
 
     seq_builder._mrope_temporal_offset = new_offset
 
@@ -257,16 +283,16 @@ def pack_supertokens_temporal_causal(
             assert action is not None
             assert action_ids_3d is not None
             # Pack action tokens for this frame (indexes only; tokens already stored in seq_builder.action.tokens)
-            action_position_ids = action_ids_3d[:, frame_t, :]  # [3,tcf]
+            action_position_ids = action_ids_3d[:, frame_t, :]  # [3,K]
             seq_builder.append_action_span(
-                tcf,
+                K,
                 action_position_ids,
                 payload_index=action_payload_index,
-                payload_start=frame_t * tcf,
-                payload_shape=(tcf,),
+                payload_start=frame_t * K,
+                payload_shape=(K,),
             )
             # Action tokens are never in MSE loss (always conditioning)
-            total_split_len += tcf
+            total_split_len += K
 
         # Pack vision tokens for this frame
         vision_position_ids = vision_ids_3d[:, frame_t, :]  # [3,patch_h*patch_w]

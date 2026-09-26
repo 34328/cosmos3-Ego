@@ -67,6 +67,7 @@ def pack_input_sequence_autoregressive(
     vision_temporal_positions: torch.Tensor | None = None,
     num_views: int | None = None,
     text_view_ids: list[int] | None = None,
+    action_tokens_per_latent: int | None = None,
 ) -> PackedSequence:
     """
     Pack input sequence for autoregressive video generation (one AR unit at a time).
@@ -89,9 +90,9 @@ def pack_input_sequence_autoregressive(
     Args:
         vision_latent: Vision latent for the current AR unit. Shape: (1, C, T, H, W),
             where ``T`` is 1 for framewise AR and ``chunk_len`` for chunkwise AR. Or None.
-        action_latent: Action latent for the current AR unit. Temporal causal: (T*tcf, D)
-            (T action frames a_{N-1}..a_{N+T-2}, tcf sub-tokens each). Standard: (1, 1, D).
-            Or None.
+        action_latent: Action latent for the current AR unit. Temporal causal: (T*K, D)
+            (T action frames a_{N-1}..a_{N+T-2}, K = ``action_tokens_per_latent``
+            sub-tokens each, default tcf). Standard: (1, 1, D). Or None.
         text_tokens: One text token sequence, one sequence per camera view, or
             None for units after frame 0. Per-view sequences require
             ``text_view_ids``.
@@ -139,6 +140,8 @@ def pack_input_sequence_autoregressive(
             axis. Required by multiview FlexAttention metadata.
         text_view_ids: Camera-view ID for every entry in a nested ``text_tokens``
             payload. ``None`` keeps one sample-level caption visible to all views.
+        action_tokens_per_latent: Temporal-causal action tokens per latent frame
+            (``K``). ``None`` uses ``temporal_compression_factor``.
 
     Returns:
         Finalized PackedSequence containing the supertoken(s) for this AR unit
@@ -171,6 +174,7 @@ def pack_input_sequence_autoregressive(
         pack = pack_input_sequence_autoregressive(
             vision_latent=chunk,           # (1, C, chunk_len, H, W) - denoised jointly
             action_latent=chunk_actions,   # (chunk_len*tcf, D) - a_{N-1}..a_{N+C-2}
+                                           # (chunk_len*K with action_tokens_per_latent=K)
             text_tokens=None,
             timestep=t,
             fps_vision=[24.0],
@@ -223,7 +227,8 @@ def pack_input_sequence_autoregressive(
     if action_latent is not None:
         if video_temporal_causal:
             assert action_latent.dim() == 2, (
-                f"Temporal causal action_latent should be (num_frames*tcf, D), got {tuple(action_latent.shape)}"
+                "Temporal causal action_latent should be (num_frames*K, D) with K = action_tokens_per_latent "
+                f"(default tcf), got {tuple(action_latent.shape)}"
             )
         else:
             assert action_latent.shape[0] == 1, f"action_latent batch_size must be 1, got {action_latent.shape[0]}"
@@ -261,10 +266,13 @@ def pack_input_sequence_autoregressive(
     action_domain_id_tensor: torch.Tensor | None = None
     if has_action and action_domain_id is not None:
         action_domain_id_tensor = torch.as_tensor(action_domain_id, dtype=torch.long).reshape(-1)
+        action_tokens_per_frame = (
+            temporal_compression_factor if action_tokens_per_latent is None else action_tokens_per_latent
+        )
         expected_action_tokens = (
             action_latent.shape[-2]
             if action_latent is not None
-            else (vision_latent.shape[2] * temporal_compression_factor if vision_latent is not None else 0)
+            else (vision_latent.shape[2] * action_tokens_per_frame if vision_latent is not None else 0)
         )
         if action_domain_id_tensor.numel() not in (1, expected_action_tokens):
             raise ValueError(
@@ -354,6 +362,7 @@ def pack_input_sequence_autoregressive(
         video_temporal_causal=video_temporal_causal,
         action_dim=action_dim,
         initial_mrope_temporal_offset=initial_temporal_offset,
+        action_tokens_per_latent=action_tokens_per_latent,
     )
 
     return packed_seq
@@ -375,6 +384,7 @@ def pack_input_sequence_autoregressive_batch(
     base_fps: float = 24.0,
     cached_text_offsets: list[int] | None = None,
     unified_3d_mrope_temporal_modality_margin: int = 0,
+    action_tokens_per_latent: int | None = None,
 ) -> PackedSequence:  # vision items: B * [1,C,T,H,W]
     """Pack one homogeneous autoregressive vision unit for multiple samples.
 
@@ -400,6 +410,10 @@ def pack_input_sequence_autoregressive_batch(
         base_fps: Training reference FPS.
         cached_text_offsets: Per-sample cached text lengths when text is omitted.
         unified_3d_mrope_temporal_modality_margin: Text-to-vision position margin.
+        action_tokens_per_latent: Temporal-causal action tokens per latent frame
+            (``K``), forwarded to ``pack_input_sequence``. ``None`` uses
+            ``temporal_compression_factor``. This batch packer carries no actions,
+            so it only matters for layout metadata consistency.
 
     Returns:
         A packed multi-sample autoregressive sequence.
@@ -474,4 +488,5 @@ def pack_input_sequence_autoregressive_batch(
         temporal_compression_factor=temporal_compression_factor,
         video_temporal_causal=video_temporal_causal,
         initial_mrope_temporal_offset=initial_offsets,
+        action_tokens_per_latent=action_tokens_per_latent,
     )

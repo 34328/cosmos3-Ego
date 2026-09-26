@@ -143,7 +143,8 @@ class PackedSequence:
     null_action_supertokens: bool = False
 
     # Temporal causal: number of action tokens prefixing each vision supertoken.
-    # Equals temporal_compression_factor when actions are packed inline; 0 when
+    # Equals action_tokens_per_latent (K, default temporal_compression_factor)
+    # when actions are packed inline; 0 when
     # action_gen=False or for non-temporal-causal layouts. Single source of truth
     # for downstream attention/KV-cache code (per-supertoken layout is
     # num_action_tokens_per_supertoken + H_p * W_p).

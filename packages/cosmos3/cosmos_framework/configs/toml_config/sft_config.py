@@ -375,6 +375,15 @@ class ModelConfig(BaseModel):
             "adapter. Defaults target the four MoE-gen projection matrices."
         ),
     )
+    action_tokens_per_latent: int | None = Field(
+        default=None,
+        description=(
+            "Temporal-causal action tokens per latent vision frame (K). Omit to "
+            "keep the experiment's value (default None = VAE temporal "
+            "compression factor). Action fps must equal video fps * K / tcf. "
+            "VFM-only; skipped on VLM."
+        ),
+    )
 
     ema: EMAConfig = Field(default_factory=EMAConfig)
     parallelism: ParallelismConfig = Field(default_factory=ParallelismConfig)

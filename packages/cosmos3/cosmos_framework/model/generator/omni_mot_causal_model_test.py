@@ -2096,6 +2096,7 @@ class TestARGenerationLoopLogic:
         m.config.diffusion_expert_config.patch_spatial = 1
         m.config.max_action_dim = 8
         m.config.video_temporal_causal = False
+        m.config.action_tokens_per_latent = None
         # Use the eager (non-compiled) path: torch.compile is not exercised in unit
         # tests and the two paths differ in text_token handling — the rolling/compiled
         # path keeps text_tokens in every pack for compile-invariant shapes, while the

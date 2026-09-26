@@ -819,6 +819,43 @@ class OmniMoTCausalModel(OmniMoTModel):
         gen_data_clean.control_weights = None
         return gen_data_clean
 
+    @staticmethod
+    def _action_tokens_per_latent(config: Any, tcf: int) -> int:
+        """Temporal-causal action tokens per latent frame (K); ``None`` in config means ``tcf``."""
+        configured = getattr(config, "action_tokens_per_latent", None)
+        return int(tcf) if configured is None else int(configured)
+
+    @staticmethod
+    def _resolve_fps_action_list(
+        data_batch: dict[str, Any],
+        fps_vision_list: list[float],
+        tcf: int,
+        action_tokens_per_latent: int | None,
+        default_fps: float,
+    ) -> list[float]:
+        """Per-sample action FPS for AR packing.
+
+        ``action_tokens_per_latent=None`` keeps the historical ``default_fps``
+        placeholder. Otherwise use ``conditioning_fps_action`` from the batch when
+        present, else ``fps_video * K / tcf`` so each K-token action group ends on
+        its video latent.
+        """
+        batch_size = len(fps_vision_list)
+        if action_tokens_per_latent is None:
+            return [float(default_fps)] * batch_size
+        fps_action_value = data_batch.get("conditioning_fps_action")
+        if fps_action_value is None:
+            return [float(fps) * action_tokens_per_latent / tcf for fps in fps_vision_list]
+        if isinstance(fps_action_value, list):
+            fps_action_list = [float(torch.as_tensor(value).reshape(-1)[0]) for value in fps_action_value]
+        else:
+            fps_action_list = [float(value) for value in torch.as_tensor(fps_action_value).reshape(-1).tolist()]
+        if len(fps_action_list) == 1 and batch_size > 1:
+            fps_action_list = fps_action_list * batch_size
+        if len(fps_action_list) != batch_size:
+            raise ValueError(f"Expected {batch_size} action FPS values, got {len(fps_action_list)}")
+        return fps_action_list
+
     def _is_chunkwise_tf(self) -> bool:
         """True when this step runs chunkwise teacher-forcing attention (``C > 1``)."""
         return self.config.teacher_forcing_frames_per_chunk > 1 and self.config.causal_training_strategy in (
@@ -938,10 +975,11 @@ class OmniMoTCausalModel(OmniMoTModel):
 
         * vision latents ``x0_tokens_vision[i]`` ``[B,C,T,H,W]`` -> ``keep_t`` frames
         * vision pixels  ``raw_state_vision[i]`` -> ``get_pixel_num_frames(keep_t)``
-        * action latents ``x0_tokens_action[j]`` ``[(T-1)*tcf, D]`` -> ``(keep_t-1)*tcf``
-          rows (``tcf`` action tokens interleaved per vision frame; latent frame 0
-          is the null-action conditioning frame and is not stored, hence
-          ``(T-1)*tcf`` rows). ``raw_state_action`` aliases ``x0_tokens_action``
+        * action latents ``x0_tokens_action[j]`` ``[(T-1)*K, D]`` -> ``(keep_t-1)*K``
+          rows (``K = action_tokens_per_latent``, default tcf, action tokens
+          interleaved per vision frame; latent frame 0 is the null-action
+          conditioning frame and is not stored, hence ``(T-1)*K`` rows).
+          ``raw_state_action`` aliases ``x0_tokens_action``
           (action is not VAE-encoded), so it follows automatically.
 
         Sound is packed as a separate, non-chunked split on its own latent rate;
@@ -972,8 +1010,8 @@ class OmniMoTCausalModel(OmniMoTModel):
                 # Temporal dim is -3 for both [B, C, T, H, W] and [C, T, H, W].
                 gen_data_clean.raw_state_vision[i] = rv[..., :keep_pixels, :, :].contiguous()
 
-        # Action latents: tcf rows per vision frame for frames 1..T-1 (frame 0 is
-        # the null conditioning frame, not stored), i.e. (T-1)*tcf rows. Round the
+        # Action latents: K rows per vision frame for frames 1..T-1 (frame 0 is
+        # the null conditioning frame, not stored), i.e. (T-1)*K rows. Round the
         # stored real-action frame count down to the chunk grid; this matches each
         # entry's truncated vision because both round the same T with the same rule.
         # Framewise domain IDs describe those stored real actions, so truncate them
@@ -981,6 +1019,7 @@ class OmniMoTCausalModel(OmniMoTModel):
         # later, when it also adds the null action tokens.
         if gen_data_clean.x0_tokens_action is not None:
             tcf = self.tokenizer_vision_gen.temporal_compression_factor or 1
+            action_tokens_per_latent = OmniMoTCausalModel._action_tokens_per_latent(self.config, tcf)  # K
             action_domain_ids = gen_data_clean.action_domain_id
             if action_domain_ids is not None and len(action_domain_ids) != len(gen_data_clean.x0_tokens_action):
                 raise ValueError(
@@ -990,13 +1029,16 @@ class OmniMoTCausalModel(OmniMoTModel):
             for j, act in enumerate(gen_data_clean.x0_tokens_action):
                 if act is None:
                     continue
-                rows = act.shape[-2]  # (T-1)*tcf
-                if rows % tcf != 0:
+                rows = act.shape[-2]  # (T-1)*K
+                if rows % action_tokens_per_latent != 0:
                     raise ValueError(
                         f"Action latents entry {j} has {rows} rows along the temporal axis, not a multiple of "
-                        f"temporal_compression_factor={tcf}; cannot chunk-align for chunkwise TF."
+                        f"action_tokens_per_latent={action_tokens_per_latent} (temporal_compression_factor={tcf}); "
+                        "cannot chunk-align for chunkwise TF."
                     )
-                keep_rows = C * ((rows // tcf) // C) * tcf  # (keep_t - 1) * tcf
+                keep_rows = (
+                    C * ((rows // action_tokens_per_latent) // C) * action_tokens_per_latent
+                )  # (keep_t - 1) * K
                 if action_domain_ids is not None:
                     domain_ids = action_domain_ids[j]
                     flat_domain_ids = domain_ids.reshape(-1)
@@ -1576,6 +1618,13 @@ class OmniMoTCausalModel(OmniMoTModel):
         )
 
         tcf = int(self.tokenizer_vision_gen.temporal_compression_factor or 4)
+        action_tokens_per_latent = getattr(self.config, "action_tokens_per_latent", None)
+        # Placeholder action FPS for this action-free path (no action tokens are packed).
+        # K=None keeps the historical 24.0; otherwise read conditioning_fps_action or
+        # derive fps_video * K / tcf.
+        fps_action_list = OmniMoTCausalModel._resolve_fps_action_list(
+            data_batch, fps_vision_list, tcf, action_tokens_per_latent, default_fps=24.0
+        )
         patch_size = int(self.config.diffusion_expert_config.patch_spatial)
         video_temporal_causal = bool(self.config.video_temporal_causal)
         enable_fps_modulation = bool(self.config.diffusion_expert_config.enable_fps_modulation)
@@ -1651,11 +1700,12 @@ class OmniMoTCausalModel(OmniMoTModel):
                 action_domain_id=None,
                 gen_data_clean=gen_data_clean,
                 fps_vision_list=fps_vision_list,
-                fps_action_list=[24.0] * batch_size,
+                fps_action_list=fps_action_list,
                 seed=seeds,
                 cfg_active=cfg_active,
                 cfgp_enabled=False,
                 tcf=tcf,
+                action_tokens_per_latent=action_tokens_per_latent,
                 patch_size=patch_size,
                 action_dim=self.config.max_action_dim,
                 video_tc=video_temporal_causal,
@@ -1686,6 +1736,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                 condition_frame_indexes_vision=[],
                 frame_idx=row_positions,
                 temporal_compression_factor=tcf,
+                action_tokens_per_latent=action_tokens_per_latent,
                 video_temporal_causal=video_temporal_causal,
                 enable_fps_modulation=enable_fps_modulation,
                 base_fps=base_fps,
@@ -1703,6 +1754,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                     condition_frame_indexes_vision=[],
                     frame_idx=row_positions,
                     temporal_compression_factor=tcf,
+                    action_tokens_per_latent=action_tokens_per_latent,
                     video_temporal_causal=video_temporal_causal,
                     enable_fps_modulation=enable_fps_modulation,
                     base_fps=base_fps,
@@ -1733,7 +1785,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                 sampler_mode=sampler_mode,
                 distilled_num_steps=distilled_num_steps,
                 fps_vision_list=fps_vision_list,
-                fps_action_list=[24.0] * batch_size,
+                fps_action_list=fps_action_list,
                 use_ar_rolling_path=use_ar_rolling_path,
                 transfer_history_sink_tokens=transfer_history_sink_tokens,
                 transfer_history_max_tokens=transfer_history_target_max_tokens,
@@ -1762,11 +1814,12 @@ class OmniMoTCausalModel(OmniMoTModel):
                         action_domain_id=None,
                         gen_data_clean=gen_data_clean,
                         fps_vision_list=fps_vision_list,
-                        fps_action_list=[24.0] * batch_size,
+                        fps_action_list=fps_action_list,
                         seed=seeds,
                         cfg_active=cfg_active,
                         cfgp_enabled=False,
                         tcf=tcf,
+                        action_tokens_per_latent=action_tokens_per_latent,
                         patch_size=patch_size,
                         action_dim=self.config.max_action_dim,
                         video_tc=video_temporal_causal,
@@ -2177,7 +2230,15 @@ class OmniMoTCausalModel(OmniMoTModel):
 
         # Step 4: Convert FPS tensors to list[float] for packing functions
         fps_vision_list = gen_data_clean.fps_vision.tolist() if gen_data_clean.fps_vision is not None else [24.0]
-        fps_action_list = gen_data_clean.fps_action.tolist() if gen_data_clean.fps_action is not None else [24.0]
+        if gen_data_clean.fps_action is not None:
+            fps_action_list = gen_data_clean.fps_action.tolist()
+        elif getattr(self.config, "action_tokens_per_latent", None) is not None:
+            # Decoupled K: keep action_fps == fps_video * K / tcf even without FPS metadata.
+            _fps_tcf = int(self.tokenizer_vision_gen.temporal_compression_factor or 4)
+            _fps_k = OmniMoTCausalModel._action_tokens_per_latent(self.config, _fps_tcf)
+            fps_action_list = [float(fps) * _fps_k / _fps_tcf for fps in fps_vision_list]
+        else:
+            fps_action_list = [24.0]
         action_domain_id = OmniMoTCausalModel._first_action_domain_id(gen_data_clean)
         raw_action_dim = OmniMoTCausalModel._first_raw_action_dim(gen_data_clean)
 
@@ -2252,6 +2313,10 @@ class OmniMoTCausalModel(OmniMoTModel):
 
         # Common packing params (reused across all pack_input_sequence_autoregressive calls)
         _tcf: int = self.tokenizer_vision_gen.temporal_compression_factor or 4
+        # Action tokens per latent frame (K); None in config keeps K == tcf. Packing
+        # still receives temporal_compression_factor=_tcf as the mRoPE clock unit.
+        _K_cfg: int | None = getattr(self.config, "action_tokens_per_latent", None)
+        _K: int = OmniMoTCausalModel._action_tokens_per_latent(self.config, _tcf)
         _patch_size: int = self.config.diffusion_expert_config.patch_spatial
         _action_dim: int = self.config.max_action_dim
         _video_tc: bool = self.config.video_temporal_causal
@@ -2310,6 +2375,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                     cfg_active=cfg_active,
                     cfgp_enabled=cfgp_enabled,
                     tcf=_tcf,
+                    action_tokens_per_latent=_K_cfg,
                     patch_size=_patch_size,
                     action_dim=_action_dim,
                     video_tc=_video_tc,
@@ -2363,6 +2429,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                     cfg_active=cfg_active,
                     cfgp_enabled=cfgp_enabled,
                     tcf=_tcf,
+                    action_tokens_per_latent=_K_cfg,
                     patch_size=_patch_size,
                     action_dim=_action_dim,
                     video_tc=_video_tc,
@@ -2381,31 +2448,32 @@ class OmniMoTCausalModel(OmniMoTModel):
                 log.info(f"[AR inference] frames [{chunk_start}, {chunk_end}) / {num_frames}")
             # Action prefix for the chunk (forward_dynamics): latent frame f is
             # driven by action a_{f-1}, so concatenate a_{chunk_start-1}..a_{chunk_end-2}
-            # (tcf tokens each) into one (chunk_len*tcf, D) prefix.
+            # (K tokens each) into one (chunk_len*K, D) prefix.
             if has_action and chunk_start > 0:
                 if streaming_actions:
                     # chunk_len == 1 under streaming (chunk_size > 1 is rejected above).
                     if next_streamed_action is None:
                         raise ValueError(f"Missing streamed action tensor for frame_idx={chunk_start}")
-                    if tuple(next_streamed_action.shape) != (_tcf, _action_dim):
+                    if tuple(next_streamed_action.shape) != (_K, _action_dim):
                         raise ValueError(
-                            f"Expected streamed action tensor shape {(_tcf, _action_dim)}, "
+                            f"Expected streamed action tensor shape {(_K, _action_dim)} "
+                            f"(action_tokens_per_latent, action_dim), "
                             f"got {tuple(next_streamed_action.shape)}"
                         )
                     curr_action_latent = next_streamed_action.to(
                         device=self.tensor_kwargs["device"],
                         dtype=torch.float32,
-                    )  # [tcf,D]
+                    )  # [K,D]
                 else:
                     assert gen_data_clean.x0_tokens_action is not None
                     # x0_tokens_action is a dense list; batch_size==1 so take the single entry and slice.
                     curr_action_latent = gen_data_clean.x0_tokens_action[0][
-                        (chunk_start - 1) * _tcf : (chunk_end - 1) * _tcf, :
-                    ].to(**self.tensor_kwargs)  # a_{chunk_start-1}..a_{chunk_end-2}; [chunk_len*tcf, D]
+                        (chunk_start - 1) * _K : (chunk_end - 1) * _K, :
+                    ].to(**self.tensor_kwargs)  # a_{chunk_start-1}..a_{chunk_end-2}; [chunk_len*K, D]
                 curr_action_domain_id = OmniMoTCausalModel._slice_action_domain_id(
                     action_domain_id,
-                    (chunk_start - 1) * _tcf,
-                    (chunk_end - 1) * _tcf,
+                    (chunk_start - 1) * _K,
+                    (chunk_end - 1) * _K,
                 )
             else:
                 curr_action_latent = None
@@ -2449,6 +2517,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                 condition_frame_indexes_action=[],
                 frame_idx=chunk_start,
                 temporal_compression_factor=_tcf,
+                action_tokens_per_latent=_K_cfg,
                 video_temporal_causal=_video_tc,
                 action_dim=_action_dim,
                 enable_fps_modulation=_enable_fps_mod,
@@ -2477,6 +2546,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                     condition_frame_indexes_action=[],
                     frame_idx=chunk_start,
                     temporal_compression_factor=_tcf,
+                    action_tokens_per_latent=_K_cfg,
                     video_temporal_causal=_video_tc,
                     action_dim=_action_dim,
                     enable_fps_modulation=_enable_fps_mod,
@@ -2542,16 +2612,16 @@ class OmniMoTCausalModel(OmniMoTModel):
                 _seed_action_domain_id: torch.Tensor | None = None
                 if has_action and _f > 0:
                     if streaming_actions:
-                        _seed_action = curr_action_latent  # [tcf,D] (chunk_len == 1 under streaming)
+                        _seed_action = curr_action_latent  # [K,D] (chunk_len == 1 under streaming)
                     else:
                         assert gen_data_clean.x0_tokens_action is not None
-                        _seed_action = gen_data_clean.x0_tokens_action[0][(_f - 1) * _tcf : _f * _tcf, :].to(
+                        _seed_action = gen_data_clean.x0_tokens_action[0][(_f - 1) * _K : _f * _K, :].to(
                             **self.tensor_kwargs
-                        )  # a_{_f-1}; [tcf,D]
+                        )  # a_{_f-1}; [K,D]
                     _seed_action_domain_id = OmniMoTCausalModel._slice_action_domain_id(
                         action_domain_id,
-                        (_f - 1) * _tcf,
-                        _f * _tcf,
+                        (_f - 1) * _K,
+                        _f * _K,
                     )
                 elif has_action:
                     _seed_action_domain_id = OmniMoTCausalModel._null_action_domain_id(action_domain_id)
@@ -2578,6 +2648,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                     cfg_active=cfg_active,
                     cfgp_enabled=cfgp_enabled,
                     tcf=_tcf,
+                    action_tokens_per_latent=_K_cfg,
                     patch_size=_patch_size,
                     action_dim=_action_dim,
                     video_tc=_video_tc,
@@ -2602,7 +2673,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                         _action_out: torch.Tensor | None = curr_action_latent
                     elif _f > 0:
                         assert gen_data_clean.x0_tokens_action is not None
-                        _action_out = gen_data_clean.x0_tokens_action[0][(_f - 1) * _tcf : _f * _tcf, :].to(
+                        _action_out = gen_data_clean.x0_tokens_action[0][(_f - 1) * _K : _f * _K, :].to(
                             **self.tensor_kwargs
                         )
                     else:
@@ -3029,6 +3100,7 @@ class OmniMoTCausalModel(OmniMoTModel):
         transfer_history_sink_tokens: int = 0,
         transfer_history_max_tokens: int | None = None,
         batched_ar: bool = False,
+        action_tokens_per_latent: int | None = None,
     ) -> None:
         """Run one forward pass that writes ``frame_latent``'s K/V into
         ``dual_kv_cache[layer].gen_cache[frame_idx]``, under the strategy-appropriate
@@ -3063,6 +3135,8 @@ class OmniMoTCausalModel(OmniMoTModel):
             transfer_history_sink_tokens: Leading pinned Transfer-history tokens.
             transfer_history_max_tokens: Maximum recent Transfer-history suffix,
                 or maximum total suffix when no sink tokens are configured.
+            action_tokens_per_latent: Temporal-causal action tokens per latent frame
+                (K); ``None`` keeps K == ``tcf``. ``tcf`` stays the mRoPE clock unit.
         """
         if position_frame_idx is None:
             position_frame_idx = frame_idx
@@ -3113,6 +3187,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                     condition_frame_indexes_vision=condition_vision,
                     frame_idx=position_frame_idx,
                     temporal_compression_factor=tcf,
+                    action_tokens_per_latent=action_tokens_per_latent,
                     video_temporal_causal=video_tc,
                     enable_fps_modulation=enable_fps_mod,
                     base_fps=base_fps,
@@ -3133,6 +3208,7 @@ class OmniMoTCausalModel(OmniMoTModel):
                 condition_frame_indexes_action=[],
                 frame_idx=position_frame_idx,
                 temporal_compression_factor=tcf,
+                action_tokens_per_latent=action_tokens_per_latent,
                 video_temporal_causal=video_tc,
                 action_dim=action_dim,
                 enable_fps_modulation=enable_fps_mod,

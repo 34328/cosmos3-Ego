@@ -945,6 +945,7 @@ class OmniMoTModel(ImaginaireModel):
             video_temporal_causal=self.config.video_temporal_causal,
             action_dim=self.config.max_action_dim,
             initial_mrope_temporal_offset=initial_mrope_temporal_offset,
+            action_tokens_per_latent=getattr(self.config, "action_tokens_per_latent", None),
         )
 
     def _get_temporal_positions_vision(
@@ -4987,6 +4988,13 @@ class OmniMoTModel(ImaginaireModel):
                 # branch above so inference paths don't hit AttributeError on .to().
                 fps_action_raw = torch.stack(fps_action_raw).flatten()
             fps_action = fps_action_raw.to(**self.tensor_kwargs)
+        elif fps_action is not None and getattr(self.config, "action_tokens_per_latent", None) is not None:
+            # Decoupled action rate: K action tokens per latent (tcf video frames),
+            # so action fps = video fps * K / tcf. K == tcf keeps fps_action == fps_vision.
+            action_tokens_per_latent = int(self.config.action_tokens_per_latent)
+            tcf = int(self.tokenizer_vision_gen.temporal_compression_factor or 4)
+            if action_tokens_per_latent != tcf:
+                fps_action = fps_action * action_tokens_per_latent / tcf
 
         # LiDAR sweep rate for mRoPE, a property of the recording rather than of the clip, so
         # it comes from the config the way the LiDAR VAE's compression does.

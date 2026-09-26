@@ -169,6 +169,7 @@ def pack_input_sequence(
     action_dim: int = 32,
     initial_mrope_temporal_offset: int | float | list[int | float] = 0,
     lidar_temporal_compression_factor: int | None = None,
+    action_tokens_per_latent: int | None = None,
 ) -> PackedSequence:
     """
     Pack a sequence of input strings and VAE latents into a packed tensor format.
@@ -221,6 +222,10 @@ def pack_input_sequence(
             from the LiDAR tokenizer at runtime. With the sweep rate in
             ``gen_data_clean.fps_lidar`` it places LiDAR latents on the same real-time axis
             as the camera, the way action tokens are placed on it.
+        action_tokens_per_latent: Temporal-causal action tokens per latent vision frame
+            (``K``). ``None`` (default) uses ``temporal_compression_factor``, the
+            historical layout. Stamped as ``num_action_tokens_per_supertoken``;
+            ``temporal_compression_factor`` stays the mRoPE clock unit.
 
     Returns:
         PackedSequence containing all packed tensors and metadata. See PackedSequence for field details.
@@ -448,6 +453,7 @@ def pack_input_sequence(
                     enable_fps_modulation=enable_fps_modulation,
                     base_fps=base_fps,
                     pack_action_tokens=sequence_plan.has_action,
+                    action_tokens_per_latent=action_tokens_per_latent,
                 )
                 vision_split_len += item_split_len
                 item_split_lens.append(item_split_len)
@@ -460,8 +466,11 @@ def pack_input_sequence(
             # stamp the supertoken layout constant directly here. This is the
             # single source of truth read by downstream attention / KV-cache
             # code (no recomputation in the network).
+            action_tokens_per_supertoken = (
+                temporal_compression_factor if action_tokens_per_latent is None else action_tokens_per_latent
+            )
             seq_builder.num_action_tokens_per_supertoken = (
-                temporal_compression_factor if sequence_plan.has_action else 0
+                action_tokens_per_supertoken if sequence_plan.has_action else 0
             )
             sample_len += vision_split_len
             action_split_len = 0  # Already absorbed into vision_split_len
