@@ -196,11 +196,17 @@ class EgoVerseARSegmentDataset(Dataset):
             right_keypoints=read("right.obs_keypoints"),
             left_keypoints=read("left.obs_keypoints"),
         )  # [span,57]
+        def visibility_of(side: str) -> np.ndarray:
+            name = f"{side}.obs_palm_in_fov_front_1"
+            if name in group:
+                return read(name, np.uint8)
+            # Episodes outside the materialized training subsets: same projection, computed on the fly.
+            from .materialize_visibility import compute_visibility
+
+            return compute_visibility(group, int(action_indexes[-1]) + 1, side)[action_indexes]
+
         per_frame_visibility = torch.from_numpy(
-            np.stack(
-                (read("right.obs_palm_in_fov_front_1", np.uint8), read("left.obs_palm_in_fov_front_1", np.uint8)),
-                axis=-1,
-            ).astype(np.bool_)
+            np.stack((visibility_of("right"), visibility_of("left")), axis=-1).astype(np.bool_)
         )  # [span,2]
         video = decode_rgb_video(group["images.front_1"][video_indexes])
         action = expand_state_group(per_frame_action, self.tokens_per_latent)
@@ -241,6 +247,7 @@ def get_egoverse_ar_dataset(
     clip_frame_tiers: tuple[int, ...] = DEFAULT_CLIP_FRAME_TIERS,
     speed_factors: dict[str, float] | None = None,
     random_window: bool = True,
+    split: str = "train",
 ):
     from cosmos_framework.data.generator.action.datasets.action_sft_dataset import ActionIterableShuffleDataset
     from cosmos_framework.data.generator.action.utils.transforms import ActionTransformPipeline
@@ -253,6 +260,7 @@ def get_egoverse_ar_dataset(
     raw = EgoVerseARSegmentDataset(
         episodes_manifest,
         segments_manifest,
+        split=split,
         frame_stride=frame_stride,
         clip_frame_tiers=tuple(clip_frame_tiers),
         speed_factors=None if speed_factors is None else dict(speed_factors),

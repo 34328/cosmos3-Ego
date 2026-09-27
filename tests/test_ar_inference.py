@@ -67,3 +67,20 @@ def test_generated_history_feeds_predictions_back():
     last_hist_video, last_hist_action = seen[-1]
     assert torch.equal(last_hist_video[:, :, 1:5], video[:, :, 1:5])
     assert torch.equal(last_hist_action[8:40], action[8:40])
+
+
+def test_oracle_actions_read_gt_current_video_but_return_generated_video():
+    sampler, _ = _stub_sampler()
+    current_is_gt = []
+
+    def forward(video, action, first_noisy, end, frame_sigmas, clean_video=None, clean_action=None):
+        current_is_gt.append(bool(torch.all(video[:, :, first_noisy:end] == 100.0)))
+        return torch.ones_like(video), torch.ones_like(action)
+
+    sampler.forward = forward
+    video, action = sampler.sample(2, 2, 1.0, 1.0, history="oracle", seed=0)
+    # Per chunk: two video solver steps on the generated chunk, then two action steps on GT video.
+    assert current_is_gt == [False, False, True, True] * 2
+    for start, end in chunk_frame_ranges(9, 4):
+        assert not torch.any(video[:, :, start:end] == 100.0)
+        assert not torch.any(action[start * 8 : end * 8] == 100.0)

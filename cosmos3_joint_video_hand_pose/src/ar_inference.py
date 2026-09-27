@@ -4,8 +4,15 @@ r"""Chunked autoregressive joint video-action sampling for AR v0.1 (lingbot-va o
 For every chunk the video latents are denoised first and the actions second,
 each with an Euler flow-matching solver. Every solver step re-runs the replayed
 teacher-forcing forward over the clip truncated to the end of the current
-chunk: earlier chunks are clean conditions (generated, or ground truth with
-``--history gt``), the current chunk is noisy. Under the lingbot-va mask this is
+chunk: earlier chunks are clean conditions, the current chunk is noisy.
+``--history`` selects what the model is conditioned on:
+
+* ``oracle``: ground-truth history, and the action solver reads the ground-truth
+  video of its own chunk (upper bound of the action branch);
+* ``gt``: ground-truth history, actions read the generated video of their chunk;
+* ``generated``: free rollout on the model's own earlier chunks.
+
+Under the lingbot-va mask this is
 exactly the receptive field of training -- noisy video sees text and clean
 earlier chunks; noisy actions additionally see the clean video of their chunk
 -- so no separate KV cache is needed (v0.1 trades speed for exactness).
@@ -18,7 +25,8 @@ Run on one GPU from the repository root::
 
     CUDA_VISIBLE_DEVICES=<gpu> PYTHONPATH=$PWD:$PWD/packages/cosmos3 \
         torchrun --nproc_per_node=1 -m cosmos3_joint_video_hand_pose.src.ar_inference \
-        --ckpt <iter_dir>/model --output <dir> [--num-samples 4] [--history gt] [--consistency-check]
+        --ckpt <iter_dir>/model --output <dir> [--num-samples 4] [--history oracle,gt,generated]
+        [--consistency-check]
 """
 
 from __future__ import annotations
@@ -51,6 +59,9 @@ def chunk_frame_ranges(num_frames: int, chunk_size: int) -> list[tuple[int, int]
 def collapse_state_group(rows: torch.Tensor, tokens_per_latent: int) -> torch.Tensor:
     """Inverse of ``expand_state_group``: ``[L*K, D]`` -> ``[1 + (L-1)K, D]``."""
     return torch.cat([rows[:1], rows[tokens_per_latent:]], dim=0)
+
+
+HISTORY_MODES = ("oracle", "gt", "generated")
 
 
 class ARSampler:
@@ -148,8 +159,10 @@ class ARSampler:
         ``history='gt'`` conditions each chunk on ground-truth history (teacher forcing) and
         ``history='generated'`` on the model's own earlier chunks. Predictions are copied to a
         separate output buffer per chunk, so GT history never overwrites earlier predictions.
+        ``history='oracle'`` is ``gt`` plus the ground-truth video of the current chunk as the
+        action solver's condition; its returned video is still the generated one.
         """
-        if history not in ("gt", "generated"):
+        if history not in HISTORY_MODES:
             raise ValueError(f"unknown history mode {history!r}")
         generator = torch.Generator(device=self.gt_video.device).manual_seed(seed)
         video = self.gt_video.clone()
@@ -162,7 +175,7 @@ class ARSampler:
         out_video, out_action = self.gt_video.clone(), self.gt_action.clone()
         video_sigmas, action_sigmas = flow_sigmas(video_steps, video_shift), flow_sigmas(action_steps, action_shift)
         for start, end in chunk_frame_ranges(self.num_frames, self.chunk_size):
-            if history == "gt":
+            if history in ("oracle", "gt"):
                 video[:, :, :start] = self.gt_video[:, :, :start]
                 action[self.rows(0, start)] = self.gt_action[self.rows(0, start)]
             frame_sigmas = torch.zeros(self.num_frames)
@@ -170,13 +183,15 @@ class ARSampler:
                 frame_sigmas[start:end] = video_sigmas[i]
                 pred_video, _ = self.forward(video, action, start, end, frame_sigmas)
                 video[:, :, start:end] += (video_sigmas[i + 1] - video_sigmas[i]) * pred_video[:, :, start:end]
+            out_video[:, :, start:end] = video[:, :, start:end]
+            if history == "oracle":
+                video[:, :, start:end] = self.gt_video[:, :, start:end]
             for i in range(action_steps):
                 frame_sigmas[start:end] = action_sigmas[i]
                 _, pred_action = self.forward(video, action, start, end, frame_sigmas)
                 rows = self.rows(start, end)
                 action[rows] += (action_sigmas[i + 1] - action_sigmas[i]) * pred_action[rows]
                 self._zero_padding(action)
-            out_video[:, :, start:end] = video[:, :, start:end]
             out_action[self.rows(start, end)] = action[self.rows(start, end)]
         self._zero_padding(out_action)
         return out_video, out_action
@@ -260,6 +275,32 @@ def _psnr(pred: np.ndarray, target: np.ndarray) -> float:
     return float("inf") if mse == 0 else 10 * math.log10(255.0**2 / mse)
 
 
+def per_chunk_metrics(pred57, ref57, builder, pred_frames, gt_frames, num_frames, chunk_size, K, tcf=4) -> list:
+    """Error of every generated chunk: pose error at the chunk's last action and video PSNR.
+
+    Latent ``j >= 1`` covers collapsed action rows ``1+(j-1)K .. jK`` and pixel frames ``tcf*j-tcf+1 .. tcf*j``.
+    """
+    pred, ref = builder.decode(pred57), builder.decode(ref57)
+    streams = ("headcam_f0", "right_wrist_f0", "left_wrist_f0")
+    records = []
+    for index, (start, end) in enumerate(chunk_frame_ranges(num_frames, chunk_size)):
+        first_row, last_row = 1 + (start - 1) * K, (end - 1) * K
+        record = {"chunk": index + 1, "latent_frames": [start, end]}
+        for name in streams:
+            p, r = getattr(pred, name).numpy(), getattr(ref, name).numpy()
+            err = np.linalg.norm(p[first_row : last_row + 1, :3, 3] - r[first_row : last_row + 1, :3, 3], axis=-1)
+            record[f"{name[:-3]}_end_pos_err_mm"] = float(err[-1] * 1000)
+            record[f"{name[:-3]}_mean_pos_err_mm"] = float(err.mean() * 1000)
+        for side in ("right", "left"):
+            p = getattr(pred, f"{side}_keypoints_f0").numpy()[first_row : last_row + 1]
+            r = getattr(ref, f"{side}_keypoints_f0").numpy()[first_row : last_row + 1]
+            record[f"{side}_hand_mpjpe_mm"] = float(np.linalg.norm(p - r, axis=-1).mean() * 1000)
+        frames = slice(tcf * start - tcf + 1, tcf * (end - 1) + 1)
+        record["video_psnr"] = _psnr(pred_frames[frames], gt_frames[frames])
+        records.append(record)
+    return records
+
+
 def _write_side_by_side(path: Path, gt: np.ndarray, pred: np.ndarray, fps: float) -> None:
     import imageio.v2 as imageio
 
@@ -282,7 +323,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--window", type=int, default=30, help="block-id window (lingbot demo attn_window: 30)")
     parser.add_argument("--video-steps", type=int, default=20)
     parser.add_argument("--action-steps", type=int, default=20)
-    parser.add_argument("--history", choices=("generated", "gt"), default="generated")
+    parser.add_argument("--history", default="generated",
+                        help=f"comma-separated subset of {HISTORY_MODES} (see module docstring)")
+    parser.add_argument("--episodes-manifest", default=None, help="override the dataset episodes CSV (e.g. held-out)")
+    parser.add_argument("--segments-manifest", default=None, help="override the dataset segments CSV")
+    parser.add_argument("--split", default="train", help="manifest split to read")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--consistency-check", action="store_true", help="only run the TF consistency check")
     return parser.parse_args()
@@ -290,6 +335,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    histories = [h.strip() for h in args.history.split(",") if h.strip()]
+    if not histories or any(h not in HISTORY_MODES for h in histories):
+        raise SystemExit(f"--history must be a comma-separated subset of {HISTORY_MODES}, got {args.history!r}")
     from cosmos_framework.configs.toml_config.sft_config import load_experiment_from_toml
     from cosmos_framework.utils import distributed, misc
     from cosmos_framework.utils.generator.model_loader import _load_model
@@ -307,6 +355,8 @@ def main() -> None:
             "model.config.parallelism.data_parallel_shard_degree=1",
             "model.config.parallelism.data_parallel_replicate_degree=1",
             "model.config.parallelism.context_parallel_shard_degree=1",
+            # As the official inference loader: bf16 weights, no fp32 master copy.
+            "model.config.parallelism.enable_inference_mode=true",
             "model.config.activation_checkpointing.mode=none",
         ],
     )
@@ -319,7 +369,14 @@ def main() -> None:
     model.eval()
 
     dataset_cfg = config.dataloader_train.dataloader.datasets.egoverse.dataset
-    dataset = instantiate(dataset_cfg, iterable_shuffle=False, random_window=False, cfg_dropout_rate=0.0)
+    overrides = {"iterable_shuffle": False, "random_window": False, "cfg_dropout_rate": 0.0}
+    if args.episodes_manifest:
+        overrides["episodes_manifest"] = args.episodes_manifest
+    if args.segments_manifest:
+        overrides["segments_manifest"] = args.segments_manifest
+    if args.split != "train":
+        overrides["split"] = args.split
+    dataset = instantiate(dataset_cfg, **overrides)
     raw_dataset = dataset.dataset
     if args.indices:
         indices = [int(i) for i in args.indices.split(",")]
@@ -339,33 +396,42 @@ def main() -> None:
         # PackingDataLoader wraps every field of each packed sample in a list.
         batch = misc.to(_training_layout_batch(dataset[index]), device="cuda")
         sampler = ARSampler(model, batch, args.chunk_size, args.window)
-        record = {"index": index, "sample_id": raw["sample_id"], "clip_frames": raw["clip_frames"]}
-        started = time.time()
         if args.consistency_check:
+            record = {"index": index, "sample_id": raw["sample_id"], "clip_frames": raw["clip_frames"]}
+            started = time.time()
             chunks = len(chunk_frame_ranges(sampler.num_frames, args.chunk_size))
             record["consistency"] = [sampler.consistency_check(c, args.seed + c) for c in sorted({0, chunks // 2, chunks - 1})]
-        else:
+            record["seconds"] = time.time() - started
+            results.append(record)
+            print("AR_SAMPLE " + json.dumps(record), flush=True)
+            continue
+        gt_frames = _to_uint8_frames(raw["video"])
+        ref57 = collapse_state_group(raw["action"].float(), sampler.tokens_per_latent)
+        for history in histories:
+            record = {"index": index, "sample_id": raw["sample_id"], "clip_frames": raw["clip_frames"],
+                      "history": history}
+            started = time.time()
             video, action = sampler.sample(args.video_steps, args.action_steps, video_shift, action_shift,
-                                           args.history, args.seed)
+                                           history, args.seed)
             K = sampler.tokens_per_latent
             pred57 = collapse_state_group(action[:, :57].cpu(), K)
-            ref57 = collapse_state_group(raw["action"].float(), K)
             record["action_metrics"] = evaluate_actions(pred57, ref57, builder)
             pred_frames = _to_uint8_frames(model.decode(video.to(model.tensor_kwargs["dtype"])))
-            gt_frames = _to_uint8_frames(raw["video"])
             record["video_psnr_future"] = _psnr(pred_frames[1:], gt_frames[1:])
-            stem = args.output / f"{index:04d}_{args.history}"
+            record["per_chunk"] = per_chunk_metrics(pred57, ref57, builder, pred_frames, gt_frames,
+                                                    sampler.num_frames, args.chunk_size, K)
+            stem = args.output / f"{index:04d}_{history}"
             np.savez(stem.with_suffix(".npz"), pred_action57=pred57.numpy(), ref_action57=ref57.numpy(),
                      pred_video=pred_frames, source_frame_indices=raw["source_frame_indices"].numpy())
             fps_model = float(raw["conditioning_fps"])
             _write_side_by_side(stem.parent / f"{stem.name}_model_time.mp4", gt_frames, pred_frames, fps_model)
             _write_side_by_side(stem.parent / f"{stem.name}_real_time.mp4", gt_frames, pred_frames,
                                 fps_model / raw_dataset.speed_factor)
-        record["seconds"] = time.time() - started
-        results.append(record)
-        print("AR_SAMPLE " + json.dumps(record), flush=True)
+            record["seconds"] = time.time() - started
+            results.append(record)
+            print("AR_SAMPLE " + json.dumps(record), flush=True)
     summary = {"ckpt": args.ckpt, "toml": str(args.toml), "args": {k: str(v) for k, v in vars(args).items()}, "samples": results}
-    name = "consistency.json" if args.consistency_check else f"results_{args.history}.json"
+    name = "consistency.json" if args.consistency_check else f"results_{'_'.join(histories)}.json"
     (args.output / name).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     if torch.distributed.is_initialized():
         torch.distributed.destroy_process_group()
