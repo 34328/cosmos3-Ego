@@ -102,7 +102,27 @@
 | `gt` | 61 | 46 |
 | `generated` | 71 | 41 |
 
-视频文件：各评测目录下的 `<index>_<history>_overlay.mp4`。
+### 3.5 回放示例
+
+每组第 1 个 clip：训练集为 `69b1c40f…:0`（scrub shoe with brush），验证集为 `69b1d55a…:0`（新 episode）。点击链接在 wandb 查看视频和截图。
+- 左栏是 GT 视频，右栏是生成视频。
+- 绿色是 GT 手，红色是预测手，都用 GT 相机位姿投影。
+- 每张图从上到下是第 16 / 64 / 128 帧，约真实时间 1 / 4.3 / 8.5 s。
+
+| 条件 | 训练集 | 验证集 |
+|---|---|---|
+| `oracle` | [train oracle](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/z64udx0r) · `showcase/train_oracle.mp4` | [heldout oracle](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/z64udx0r) · `showcase/heldout_oracle.mp4` |
+| `gt` | [train gt](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/z64udx0r) · `showcase/train_gt.mp4` | [heldout gt](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/z64udx0r) · `showcase/heldout_gt.mp4` |
+| `generated` | [train generated](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/z64udx0r) · `showcase/train_generated.mp4` | [heldout generated](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/z64udx0r) · `showcase/heldout_generated.mp4` |
+
+各条件怎么看：
+- `oracle`：红色手紧贴绿色手，对应表 3.1 里的 18 / 26 mm。
+- `gt`：右栏生成视频里的手，经常和红色预测手不重合。这说明 action 没有跟上生成的视频，是 3.1 里误差回到"不动"水平的直观表现。
+- `generated`：画面一直稳定。但动作逐渐走向和 GT 不同的轨迹，到第 128 帧红色手整体偏下，对应 3.2 的漂移。
+
+在线查看这 6 个视频和图：wandb [ar_v0.1_eval_showcase](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/z64udx0r)。文件在远端 `outputs/joint_video_hand_pose/ar/eval/showcase/`，本地在 `eval_videos/ar_v0.1/`。
+
+全部 4 个 clip × 3 种条件的视频在远端各评测目录下：`<index>_<history>_overlay.mp4`，以及不带手部叠加的 `*_real_time.mp4` / `*_model_time.mp4`。
 
 ## 4. 推理耗时
 
@@ -192,3 +212,4 @@ CUDA_VISIBLE_DEVICES=0 torchrun --nproc_per_node=1 -m cosmos3_joint_video_hand_p
 **产物**：`outputs/joint_video_hand_pose/ar/eval/`
 - `iter1200_{train,heldout}/`：npz、`*_model_time.mp4`、`*_real_time.mp4`、`*_overlay.mp4`、`run.log`、`overlay_report.json`
 - `benchmark_iter1200/benchmark.json`
+- `showcase/`：第 3.5 节的 6 个回放视频与截图
