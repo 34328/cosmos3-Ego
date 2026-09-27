@@ -35,5 +35,5 @@ max_iter     = 1200
 logging_iter = 1
 
 [checkpoint]
-load_path = "${oc.env:BASE_CHECKPOINT_PATH,/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464}"
+load_path = "${oc.env:BASE_CHECKPOINT_PATH,/mnt/lzh/checkpoints/Cosmos3-Nano-dcp}"
 save_iter = 300

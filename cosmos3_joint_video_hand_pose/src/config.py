@@ -174,7 +174,7 @@ egoverse_joint_video_hand_pose_overfit_v0_0 = LazyDict(
             keys_not_to_resume=[],
             keys_to_skip_loading=["net_ema."],
             load_ema_to_reg=False,
-            load_path="${oc.env:BASE_CHECKPOINT_PATH,/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464}",
+            load_path="${oc.env:BASE_CHECKPOINT_PATH,/mnt/lzh/checkpoints/Cosmos3-Nano-dcp}",
             load_training_state=False,
             only_load_scheduler_state=False,
             save_iter=300,
@@ -314,11 +314,8 @@ _v0_5_dataset["future_normalizer"] = (
 # ~ [4, 64], per-chunk video/action noise, EgoVerse speed factor 0.5.
 AR_V0_1_FRAME_STRIDE = 2
 AR_V0_1_ACTION_TOKENS_PER_LATENT = 4 * AR_V0_1_FRAME_STRIDE
-AR_V0_1_NANO_CHECKPOINT = "/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464"
-AR_V0_1_V0_6_CHECKPOINT = (
-    f"{COSMOS_REPO_ROOT}/outputs/joint_video_hand_pose/overfit/"
-    "overfit_v0.6_frame_delta_temporal_mask/checkpoints/iter_000001200"
-)
+# Official Cosmos3-Nano HF release converted with cosmos_framework.scripts.convert_model_to_dcp.
+AR_V0_1_NANO_CHECKPOINT = "/mnt/lzh/checkpoints/Cosmos3-Nano-dcp"
 
 
 def _ar_v0_1_model_config() -> OmniMoTCausalModelConfig:
@@ -346,7 +343,7 @@ def _ar_v0_1_model_config() -> OmniMoTCausalModelConfig:
 
 
 egoverse_joint_video_hand_pose_ar_v0_1 = copy.deepcopy(egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3)
-egoverse_joint_video_hand_pose_ar_v0_1["job"].update(group="ar", name="ar_v0.1_r2_nano")
+egoverse_joint_video_hand_pose_ar_v0_1["job"].update(group="ar", name="ar_v0.1_nano")
 egoverse_joint_video_hand_pose_ar_v0_1["model"] = L(EgoVerseARModel)(
     config=_ar_v0_1_model_config(),
     lambda_out_of_fov=0.0,
@@ -386,13 +383,6 @@ _ar_v0_1_datasets["egoverse"]["dataset"] = L(get_egoverse_ar_dataset)(
     random_window=True,
 )
 
-# R1: same recipe, initialized from the v0.6 overfit checkpoint (weights only).
-egoverse_joint_video_hand_pose_ar_v0_1_r1_v0_6 = copy.deepcopy(egoverse_joint_video_hand_pose_ar_v0_1)
-egoverse_joint_video_hand_pose_ar_v0_1_r1_v0_6["job"]["name"] = "ar_v0.1_r1_v0_6"
-egoverse_joint_video_hand_pose_ar_v0_1_r1_v0_6["checkpoint"]["load_path"] = (
-    "${oc.env:BASE_CHECKPOINT_PATH," + AR_V0_1_V0_6_CHECKPOINT + "}"
-)
-
 
 ConfigStore.instance().store(
     group="experiment",
@@ -413,8 +403,12 @@ ConfigStore.instance().store(
     node=egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3,
 )
 
-for _name in ("egoverse_joint_video_hand_pose_ar_v0_1", "egoverse_joint_video_hand_pose_ar_v0_1_r1_v0_6"):
-    ConfigStore.instance().store(group="experiment", package="_global_", name=_name, node=globals()[_name])
+ConfigStore.instance().store(
+    group="experiment",
+    package="_global_",
+    name="egoverse_joint_video_hand_pose_ar_v0_1",
+    node=egoverse_joint_video_hand_pose_ar_v0_1,
+)
 
 
 def make_config():

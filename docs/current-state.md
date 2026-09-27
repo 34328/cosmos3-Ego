@@ -29,7 +29,7 @@ PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 "$PYTHON" cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/validate_manifest.py
 ```
 
-预训练权重：`/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464`；VAE：`/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth`。数据路径由 episode CSV 中的 `abs_zarr_path` 指定。
+预训练权重：官方 Cosmos3-Nano（`/mnt/checkpoints/Cosmos3-Nano`）转换成的 DCP `/mnt/lzh/checkpoints/Cosmos3-Nano-dcp`（2026-09-27 起所有训练的默认值；转换脚本 `/mnt/lzh/checkpoints/convert_nano_offline.py`）。此前的 v0.x 与 AR v0.1 用的是 `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464`，它与官方权重的理解通路完全相同，生成通路（`*_moe_gen`、`llm2vae`/`vae2llm`、`time_embedder`）不同，相对差中位数 2.7%；VAE：`/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth`。数据路径由 episode CSV 中的 `abs_zarr_path` 指定。
 
 联合训练配方位于 `cosmos3_joint_video_hand_pose/configs/*.toml`，启动入口为该项目 `scripts/launch_overfit_*.sh`，配套回放为 `scripts/run_*replay*.sh`。历史 YAML 仅为描述快照，不作为启动依据。已有输出会触发部分脚本的防覆盖检查；新实验先建立独立配方，不复用旧 run 名称。启动前检查 GPU，现有 joint 配方需要 8 张空闲 GPU。
 
@@ -61,7 +61,7 @@ PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 - 框架：`packages/cosmos3` 同步官方 `cf5d68c`（`packages/cosmos3/UPSTREAM.md` 记录上游版本与本地补丁）；v0.4/v0.6 mask 实验已删除，非 AR 基线为 v0.5。
 - 默认关闭的框架补丁：`action_tokens_per_latent`（K 与 tcf 解耦）、`supervise_temporal_causal_actions`、`gen_attention_override`。
 - 代码：`src/ar_dataset.py`、`ar_attention.py`、`ar_model.py`、`ar_inference.py`（`--history oracle,gt,generated`）、`ar_overlay.py`（GT 相机位姿下的手部投影）、`ar_benchmark.py`（推理耗时）。
-- 训练：R2（Nano 初始化）、R1（v0.6 初始化）各 1200 步，仅保留 `iter_000001200`，输出 `outputs/joint_video_hand_pose/ar/<run>`；评测产物 `outputs/joint_video_hand_pose/ar/eval/`。
+- 训练：1200 步（初始化为 `iter_000048464`，不是官方原始权重），仅保留 `iter_000001200`，输出 `outputs/joint_video_hand_pose/ar/ar_v0.1_sft48464`；评测产物 `outputs/joint_video_hand_pose/ar/eval/`。
 - 结论：动作在读取真实视频时单 chunk 手腕误差 12–18 mm，换成生成视频后回到"不动"水平；第 1 个 chunk 最差；逐帧增量从首帧积分会累积漂移。640×368、T=129 单卡推理约 3 分钟（无 KV cache）。
 - 测试：`tests/` 共 114 项（4 项 GPU 测试在 CPU 上跳过）。
 

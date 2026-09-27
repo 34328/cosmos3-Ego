@@ -6,20 +6,20 @@
 
 **结论**：链路已经跑通，包括训练、逐 chunk 先视频后动作的推理、评测和手部投影回放。
 - 视频生成中规中矩。
-- 动作在读取真实当前视频时学得好（单 chunk 手腕误差 12–18 mm）。换成模型生成的视频后，误差回到"不动"的水平。
+- 动作在读取真实当前视频时学得好（训练集单 chunk 手腕误差 18 mm）。换成模型生成的视频后，误差回到"不动"的水平。
 - 动作质量的改进放到 v0.2，见第 6 节。
 
 ## 1. 训练
 
-| 项目 | R2 | R1 |
-|---|---|---|
-| 初始化 | Cosmos3-Nano SFT `iter_000048464` | v0.6 `iter_000001200`（非 AR 联合模型） |
-| 配置 | `configs/ar_v0_1.toml` | `configs/ar_v0_1_r1_v0_6.toml` |
-| 节点 / 时长 | Tdebug1，约 1.6 h | Tdebug2，约 1.6 h |
-| wandb | [oyeuy4nx](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/oyeuy4nx) | [uoqufrhx](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/uoqufrhx) |
-| 输出（仅保留 `iter_000001200`） | `outputs/joint_video_hand_pose/ar/ar_v0.1_r2_nano` | `outputs/joint_video_hand_pose/ar/ar_v0.1_r1_v0_6` |
+| 项目 | 值 |
+|---|---|
+| 初始化 | `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464`（**不是官方发布权重**，见下方说明） |
+| 配置 | `configs/ar_v0_1.toml`（训练时的版本） |
+| 节点 / 时长 | Tdebug1，约 1.6 h |
+| wandb | [oyeuy4nx](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/oyeuy4nx) |
+| 输出（仅保留 `iter_000001200`） | `outputs/joint_video_hand_pose/ar/ar_v0.1_sft48464` |
 
-- **共同设置**：
+- **设置**：
   - 数据：36 episode 子集（brushing_shoes / repair_bench），可用 clip 148 个。
   - 硬件与并行：8 卡 H800，CP1/FSDP8。每卡每步 1 个 clip，有效 batch 为 8。
   - 优化：1200 步，lr 2e-5（warmup 100 步，cosine 衰减到 0.1×）。
@@ -27,20 +27,18 @@
   - loss = video + 0.7 × action。
   - 速度与显存：每步约 4.7 s，每卡约 55 GiB。
 - **稳定性**：全程无报错，梯度 NaN/Inf 计数为 0。
+- **Loss**（把 1200 步均分 7 段，每段取平均，首段 → 末段）：total 0.381 → 0.169，video 0.161 → 0.146，action 0.315 → 0.034。
+- **初始化说明**：这个 checkpoint 沿用自仓库早期 v0.x 配置的默认值，不是官方原始权重。逐个参数和官方 Cosmos3-Nano 比对（`outputs/joint_video_hand_pose/ar/ckpt_checks/official_vs_sft48464.json`）：
+  - 809 个参数中 416 个完全相同，包括理解通路、词嵌入和 action 投影；
+  - 393 个不同，集中在生成通路（`*_moe_gen`、`llm2vae` / `vae2llm`、`time_embedder`），相对差中位数 2.7%，最大 31%；
+  - 目录里还带 optimizer、scheduler、trainer 状态。
 
-**Loss**（把 1200 步均分 7 段，每段取平均，下表为首段 → 末段）：
-
-| | total | video | action |
-|---|---|---|---|
-| R2 | 0.381 → 0.169 | 0.161 → 0.146 | 0.315 → 0.034 |
-| R1 | 0.302 → 0.138 | 0.159 → 0.122 | 0.205 → 0.022 |
-
-每步只有 8 个 clip，旧版多样本 packing 每步放的样本更多，所以同样 1200 步的训练量不能和 v0.6 直接对比。
+  所以它是官方 Nano 的生成通路又接着训练过的版本。**之后的训练全部从官方原始 Nano 开始**：`/mnt/checkpoints/Cosmos3-Nano` 用官方 `convert_model_to_dcp` 转成 `/mnt/lzh/checkpoints/Cosmos3-Nano-dcp`，`configs/ar_v0_1.toml` 已默认加载它。本文数字都来自这次非官方初始化的训练。
 
 ## 2. 评测设置
 
-- **权重**：两个 run 的 `iter_000001200`。
-- **数据**：每组 4 个 T=129 clip，每个 8 个未来 chunk，约 8.6 s 真实时间。
+- **权重**：上述训练的 `iter_000001200`。
+- **数据**：训练集、验证集各 4 个 T=129 clip，每个 8 个未来 chunk，约 8.6 s 真实时间。
   - **训练集**：36 ep 子集的 index 0/2/4/8。
   - **验证集**：同任务同场景、未参与训练的 4 个 episode，其中 2 个操作者在训练集出现过，2 个是新操作者。清单在 `outputs/joint_video_hand_pose/ar/eval/heldout_manifest/`。原 36 ep 子集全部是 train，没有划分验证集。
 - **推理**：C=4，window=30，视频与 action 各 20 步 Euler。第 0 帧（视频首帧 + 首帧 state）给真值。
@@ -60,39 +58,32 @@
 
 ## 3. 结果
 
-### 3.1 单 chunk 动作误差
+### 3.1 单 chunk 动作误差（mm）
 
-下表是 chunk 2–8 的平均值（mm），每格依次为：右手腕末端 / 左手腕末端 / 头部末端 / 右手 MPJPE / 左手 MPJPE。
+每格依次为：右手腕末端 / 左手腕末端 / 头部末端 / 右手 MPJPE / 左手 MPJPE。`gt` 和 `generated` 在第 1 个 chunk 的输入相同。
 
-| 条件 | 训练集 R2 | 训练集 R1 | 验证集 R2 | 验证集 R1 |
+| 条件 | 训练集 chunk 2–8 | 验证集 chunk 2–8 | 训练集 chunk 1 | 验证集 chunk 1 |
 |---|---|---|---|---|
-| 不动 | 73 / 45 / 47 / — / — | 同左 | 43 / 24 / 19 / — / — | 同左 |
-| `oracle` | **18 / 9 / 4 / 14 / 8** | **12 / 7 / 4 / 10 / 6** | 26 / 18 / 12 / 24 / 15 | 32 / 19 / 12 / 26 / 16 |
-| `gt` | 71 / 49 / 55 / 50 / 28 | 73 / 43 / 48 / 47 / 25 | 56 / 33 / 36 / 44 / 22 | 55 / 39 / 43 / 46 / 23 |
-| `generated` | 96 / 54 / 49 / 75 / 44 | 84 / 51 / 53 / 64 / 34 | 70 / 40 / 41 / 55 / 31 | 56 / 34 / 33 / 54 / 29 |
-
-第 1 个 chunk 单独统计，每格为右手腕 / 左手腕 / 头部 / 右手 MPJPE（mm）。`gt` 和 `generated` 在第 1 个 chunk 的输入相同，所以合并成一行。
-
-| 条件 | 训练集 R2 | 训练集 R1 | 验证集 R2 | 验证集 R1 |
-|---|---|---|---|---|
-| 不动 | 84 / 52 / 70 | 同左 | 73 / 29 / 34 | 同左 |
-| `oracle` | 44 / 18 / 6 / 22 | 47 / 16 / 4 / 26 | 56 / 20 / 14 / 42 | 49 / 18 / 15 / 41 |
-| `gt` = `generated` | 89 / 64 / 71 / 75 | 72 / 29 / 65 / 61 | 69 / 38 / 49 / 56 | 86 / 36 / 62 / 61 |
+| 不动 | 73 / 45 / 47 / — / — | 43 / 24 / 19 / — / — | 84 / 52 / 70 / — | 73 / 29 / 34 / — |
+| `oracle` | **18 / 9 / 4 / 14 / 8** | **26 / 18 / 12 / 24 / 15** | 44 / 18 / 6 / 22 | 56 / 20 / 14 / 42 |
+| `gt` | 71 / 49 / 55 / 50 / 28 | 56 / 33 / 36 / 44 / 22 | 89 / 64 / 71 / 75 | 69 / 38 / 49 / 56 |
+| `generated` | 96 / 54 / 49 / 75 / 44 | 70 / 40 / 41 / 55 / 31 | 同 `gt` | 同 `gt` |
 
 ### 3.2 `generated` 整段漂移（第 128 帧，mm）
 
-| | 训练集 R2 | 训练集 R1 | 验证集 R2 | 验证集 R1 |
-|---|---|---|---|---|
-| 右手腕 / 左手腕 / 头部 | 150 / 116 / 187 | 161 / 95 / 175 | 108 / 109 / 105 | 134 / 143 / 116 |
+| | 右手腕 | 左手腕 | 头部 |
+|---|---|---|---|
+| 训练集 | 150 | 116 | 187 |
+| 验证集 | 108 | 109 | 105 |
 
 ### 3.3 视频 PSNR（dB，第 1 个 chunk / chunk 2–8）
 
 `oracle` 和 `gt` 用的是同一份生成视频，两者只在 action 读取的视频上不同。
 
-| 条件 | 训练集 R2 | 训练集 R1 | 验证集 R2 | 验证集 R1 |
-|---|---|---|---|---|
-| `oracle` / `gt` | 16.5 / 17.5 | 15.7 / 17.5 | 17.8 / 18.7 | 17.8 / 18.6 |
-| `generated` | 16.5 / 13.1 | 15.7 / 13.0 | 17.8 / 14.6 | 17.8 / 13.8 |
+| 条件 | 训练集 | 验证集 |
+|---|---|---|
+| `oracle` / `gt` | 16.5 / 17.5 | 17.8 / 18.7 |
+| `generated` | 16.5 / 13.1 | 17.8 / 14.6 |
 
 ### 3.4 手部投影
 
@@ -103,19 +94,19 @@
 
 投影本身的正确性：GT action 解码后重投影，与直接投影 zarr 原始关键点相比，中位差 ≤ 2.4 px。
 
-下表是预测手与 GT 手的平均像素距离（画面 640×360，两只手、全部 128 帧平均）。这里的预测手是从首帧积分得到的，包含累积漂移。
+预测手与 GT 手的平均像素距离（画面 640×360，两只手、全部 128 帧平均；预测手从首帧积分，包含累积漂移）：
 
-| 条件 | 训练集 R2 | 训练集 R1 | 验证集 R2 | 验证集 R1 |
-|---|---|---|---|---|
-| `oracle` | 22 | 20 | 23 | 22 |
-| `gt` | 61 | 68 | 46 | 68 |
-| `generated` | 71 | 49 | 41 | 43 |
+| 条件 | 训练集 | 验证集 |
+|---|---|---|
+| `oracle` | 22 | 23 |
+| `gt` | 61 | 46 |
+| `generated` | 71 | 41 |
 
 视频文件：各评测目录下的 `<index>_<history>_overlay.mp4`。
 
 ## 4. 推理耗时
 
-测量条件：单卡 H800，R2 `iter_000001200`，T=129（8 个 chunk），C=4，视频与 action 各 20 步。
+测量条件：单卡 H800，上述 `iter_000001200`，T=129（8 个 chunk），C=4，视频与 action 各 20 步。
 
 推理流程如下：
 - 每个 chunk 先做 20 步视频去噪，再做 20 步 action 去噪。
@@ -144,7 +135,7 @@
 
 ## 5. 结论
 
-1. **看到真实视频时，动作学得好**：`oracle` 下 chunk 2–8 的手腕误差为 12–18 mm，约为"不动"的 1/5。头部 4 mm，手形 MPJPE 6–14 mm。在验证集上也明显低于"不动"。
+1. **看到真实视频时，动作学得好**：`oracle` 下训练集 chunk 2–8 的右手腕误差 18 mm，约为"不动"的 1/4；头部 4 mm，手形 MPJPE 8–14 mm。验证集右手腕 26 mm，低于"不动"的 43 mm。
 2. **瓶颈在生成视频到动作这一步**：从 `oracle` 换成 `gt` 后，误差回到"不动"的水平甚至更高。原因有两种可能，目前还分不开：
    - 生成视频不准，动作跟着出错；
    - 生成视频走向了另一个合理的未来，动作和生成视频是一致的，只是和 GT 对不上。
@@ -156,13 +147,8 @@
    - action 除首帧 state 外都是逐帧增量，解码时从首帧开始连乘到末帧。第 k 个 chunk 的起点，就是前面所有 chunk 预测增量累加的结果。
    - `generated` 整段漂移到第 128 帧达到 10–19 cm。
    - 首帧 state 只在第 0 组出现。rollout 更长、首帧超出注意力窗口后，模型就失去绝对位置参考。部署时拿到的新观测也没有位置可以放进去。
-5. **R1 和 R2**：
-   - `oracle` 下 R1 在训练集上略好，因为 v0.6 已学过这批数据的动作。
-   - 验证集上两者相当。
-   - `generated` 下两者互有高低，差距在样本波动范围内。
-   - 从 Nano 直接初始化（R2）没有明显劣势。
-6. **视频**：真实历史下 PSNR 17–19 dB。完全自回归时降到 13–15 dB，但画面一直稳定，没有崩坏（见回放视频）。
-7. **速度**：见第 4 节。v0.1 的推理只能用于离线评测，要实时必须做 KV cache。
+5. **视频**：真实历史下 PSNR 17–19 dB。完全自回归时降到 13–15 dB，但画面一直稳定，没有崩坏（见回放视频）。
+6. **速度**：见第 4 节。v0.1 的推理只能用于离线评测，要实时必须做 KV cache。
 
 ## 6. v0.2 改进方向（动作）
 
@@ -190,7 +176,7 @@ cd /mnt/lzh/cosmos-EgoWAM
 export PYTHONPATH=$PWD:$PWD/packages/cosmos3 PYTORCH_ALLOC_CONF=expandable_segments:True
 # 回放评测：每个 T=129 clip 三种条件约 12 分钟，单卡约 50 GiB。多个 clip 时每个 clip 单独起一个进程
 CUDA_VISIBLE_DEVICES=0 torchrun --nproc_per_node=1 -m cosmos3_joint_video_hand_pose.src.ar_inference \
-    --ckpt outputs/joint_video_hand_pose/ar/ar_v0.1_r2_nano/checkpoints/iter_000001200/model \
+    --ckpt outputs/joint_video_hand_pose/ar/ar_v0.1_sft48464/checkpoints/iter_000001200/model \
     --toml cosmos3_joint_video_hand_pose/configs/ar_v0_1.toml --output <dir> --indices 0 \
     --history oracle,gt,generated
 # 验证集：加 --episodes-manifest / --segments-manifest outputs/joint_video_hand_pose/ar/eval/heldout_manifest/*.csv --split heldout
@@ -203,5 +189,5 @@ CUDA_VISIBLE_DEVICES=0 torchrun --nproc_per_node=1 -m cosmos3_joint_video_hand_p
 ```
 
 **产物**：`outputs/joint_video_hand_pose/ar/eval/`
-- `iter1200_{r1,r2}_{train,heldout}/`：npz、`*_model_time.mp4`、`*_real_time.mp4`、`*_overlay.mp4`、`run.log`、`overlay_report.json`
-- `benchmark_iter1200_r2/benchmark.json`
+- `iter1200_{train,heldout}/`：npz、`*_model_time.mp4`、`*_real_time.mp4`、`*_overlay.mp4`、`run.log`、`overlay_report.json`
+- `benchmark_iter1200/benchmark.json`

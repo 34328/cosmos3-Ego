@@ -8,7 +8,7 @@
 
 Loss 专项结论：当前尺度不一致，但尚未证明已造成学习失衡（第六节）；推荐验证“受保护尺度校准＋单一 action loss”，暂不增加其他损失项（第七节）。
 
-已阅读 Claude 的“cosmos AR 方案设计”对话、本地方案，并通过 SSH MCP 检查远端代码、提交和运行记录。两轮审阅均未修改远端源码、提交或 push，未启动正式 R1/R2 训练，也未干扰现有训练；仅运行独立诊断。
+已阅读 Claude 的“cosmos AR 方案设计”对话、本地方案，并通过 SSH MCP 检查远端代码、提交和运行记录。两轮审阅均未修改远端源码、提交或 push，未启动正式训练，也未干扰现有训练；仅运行独立诊断。
 
 ## 审阅范围与快照变化
 
@@ -202,7 +202,6 @@ Claude 最后一次结果位于 `/tmp/egowam/consistency_nano/consistency.json`�
 
 - `src/codec.py` 目前仍是具体的 `FrozenHandMLPAE15`，数据/推理直接使用 57D 的 `Action57Builder`；方案要求的统一可插拔 `ActionCodec` 尚未完成。
 - 当前推理导出 GT/预测左右视频，不等于方案要求的完整四格回放与固定 4 样本单 chunk/整段 rollout 验收。
-- R1/R2 配置已存在。第一轮审阅时尚未找到各 1200 步正式训练完成证据；第二轮期间 Tdebug1 已有八卡任务运行，本次未核验该任务身份及完成情况，因此不能继续把“尚未运行”作为最新状态，也不能认定正式训练已完成。
 - 正式训练 launcher `launch_ar_v0_1.sh:20` 拒绝已有任务目录，若需要断点续训，应另行明确恢复入口，不能直接假定原命令可重跑恢复。
 
 ## 五、统一后续顺序
@@ -213,7 +212,7 @@ Claude 最后一次结果位于 `/tmp/egowam/consistency_nano/consistency.json`�
 4. **完成训练可靠性检查**：八卡 50 步、原始梯度有限性、checkpoint 保存—退出—恢复—下一步验证；明确正式 launcher 的恢复入口。
 5. **评估自由生成**：同权重比较“GT 历史＋GT 当前视频”“GT 历史＋生成当前视频”“生成历史＋生成当前视频”，记录逐 chunk 误差、末端漂移及视频—动作一致性，不能只用全片平均值。
 6. **明确 cache 范围并落实**：补齐持久 KV cache，与完整历史参考路径逐步对照，特别验证窗口首次淘汰；不能简单截掉历史再重算，假定与保留历史形成的多层 KV 等价。若暂缓，需确认方案范围并统一正文与实现记录。
-7. **再解释正式实验结果**：R1/R2 是有意义的初始化对照；需结合上述验收判断结果，而不是仅看 1200 steps 是否结束。后续逐项比较条件扰动、speed_factor、窗口等因素；36 episode 训练集过拟合只证明机制和容量，不证明泛化。
+7. **再解释正式实验结果**：需结合上述验收判断结果，而不是仅看 1200 steps 是否结束。后续逐项比较条件扰动、speed_factor、窗口等因素；36 episode 训练集过拟合只证明机制和容量，不证明泛化。
 8. **同步实现与文档**：推理代码和实现文档已由 Claude 提交；未来修复应记录独立提交和测试证据。push 仍按用户另行授权执行。
 
 诊断产物保留在远端独立目录：Tdebug1 `/tmp/codex-ar-v01-review.abv6O9/`，Tdebug4 `/tmp/codex-ar-macro-review.jdkqK2/`。本文仅合并审阅记录，不代表上述修复已实施。
@@ -250,7 +249,7 @@ Claude 最后一次结果位于 `/tmp/egowam/consistency_nano/consistency.json`�
 
 统计是完整 segment 的帧加权结果，不是实际训练窗口曝光分布。是否学习失衡，需结合分部位的训练／验证物理误差和共享参数梯度判断。
 
-证据：远端快照 `dae9842`；`src/loss.py:8、84–105`、`src/normalization.py:17–42`、`src/codec.py:18–33`、`src/ar_model.py:162`；R1/R2 实际保存配置。CPU 诊断成功，产物保留于 Tdebug4 `/tmp/codex-ar-loss-review.RHNbw2/`（脚本、日志及 `stats.json`）。
+证据：远端快照 `dae9842`；`src/loss.py:8、84–105`、`src/normalization.py:17–42`、`src/codec.py:18–33`、`src/ar_model.py:162`；正式训练实际保存配置。CPU 诊断成功，产物保留于 Tdebug4 `/tmp/codex-ar-loss-review.RHNbw2/`（脚本、日志及 `stats.json`）。
 
 ## 七、推荐方案：尺度校准＋一个 action loss
 

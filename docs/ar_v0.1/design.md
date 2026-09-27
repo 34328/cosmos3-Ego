@@ -132,9 +132,7 @@ Qwen-RobotManip 原文写的是"EgoVerse 降到原帧率的 45%（约慢 2.2×�
   - 动作沿用 v0.3 的独立 action noise schedule。
   - 另有可选开关：以 50% 概率给干净的视频历史加 σ∈[0.5, 1] 的噪声（lingbot 的 `noisy_cond_prob`）。v0.1 默认关闭，作为消融实验 A。
 - **loss**：沿用 `src/loss.py`：video 权重 1.0、action 权重 0.7，画外手权重 0，visibility mask 保持不变。
-- **初始化**：跑两个对照实验。
-  - **R1**：从 v0.6 `iter_000001200` 开始。
-  - **R2**：从 Nano SFT `iter_000048464` 开始。Nano 预训练时混合了 fd/id/wam 三种模式，action 头见过"预测 action"这类目标。
+- **初始化**：从 Cosmos3-Nano 初始化（实际使用的权重见第 11 节）。
 - **并行与预算**：CP1 / FSDP8，75K token 上限，1200 步，每 300 步保存一次（沿用现有配方）。
   - 序列变成干净 + 带噪两份后 token 数翻倍；按第 3 节核算，T = 129 约 16.4K，在预算内。分档 T 导致 batch 内样本长度不同，按现有 packing 拼接（每样本独立 seq_id）。
 
@@ -174,7 +172,7 @@ Qwen-RobotManip 原文写的是"EgoVerse 降到原帧率的 45%（约慢 2.2×�
   - RoPE：视频标签 7.5、action 标签 15 时，每组 8 个 action 的时间位置落在对应 latent 帧的时间段内；fps 标签乘以 0.5 后，时间位置正好变为原来的 2 倍；prompt 字段与标签一致。
   - 现有 38 项测试继续通过。
 - **Smoke**：8 卡跑 50 步，检查 loss 有限、原始 NaN/Inf 计数为 0，checkpoint 能保存并恢复。
-- **过拟合**：R1、R2 各跑 1200 步。看训练集上 video/action 的 loss 曲线，并对固定的 4 个样本做单 chunk 和整段 rollout 回放。
+- **过拟合**：跑 1200 步。看训练集上 video/action 的 loss 曲线，并对固定的 4 个样本做单 chunk 和整段 rollout 回放。
 - **对照**：和 v0.6 整段生成的回放做比较，重点关注长时漂移。
 
 ## 9. 后续版本（不在 v0.1 内）
@@ -187,7 +185,7 @@ Qwen-RobotManip 原文写的是"EgoVerse 降到原帧率的 45%（约慢 2.2×�
 ## 10. 风险
 
 - **P0 合并量大**：我们本地改过的 attention 文件，官方也改过。P0 单独提交，先保证 v0.6 能在新框架上复现，或者至少 checkpoint 能加载、测试能通过，再开始做 AR。
-- **从双向切到因果，初期效果会下降**。如果 R1 和 R2 都收敛很慢，考虑官方的 `enable_moba`，让双向训练和因果训练交替进行。
+- **从双向切到因果，初期效果会下降**。如果收敛很慢，考虑官方的 `enable_moba`，让双向训练和因果训练交替进行。
 - **token 翻倍**：按第 3 节核算在预算内，但随机 C 与窗口让 flex block mask 每步都要重建，编译和构建开销需要在 smoke 时测量。
 - **一致性测试与随机 C**：训练的 C 是随机的，推理固定 C = 4。第 8 节的 TF 一致性测试在 C = 4 下做。
 - **CP2 下的非有限梯度问题可能在新框架里复现**，所以继续使用 CP1。
@@ -205,13 +203,14 @@ Qwen-RobotManip 原文写的是"EgoVerse 降到原帧率的 45%（约慢 2.2×�
 - **注意力（第 4 节）**：`src/ar_attention.py`，按 lingbot-va 的 clean/noisy 规则加 `|block_id 差| ≤ window`，每层一次 FlexAttention；GPU 单测与稠密参考实现逐项对照，数值与梯度一致。
 - **训练（P2）**：`src/ar_model.py` 的 `EgoVerseARModel`，基于官方 replayed teacher forcing（Pass 1 干净、Pass 2 带噪，等价于 lingbot 的 [clean, noisy] 单序列）。每步随机 C ∈ {1,2,3,4}、窗口 ∈ [4,64]；视频与 action 各自按 chunk 独立采样 σ；每步 1 个样本（官方 replay 要求）；干净 K/V 保留梯度。EgoVerse 57D loss 抽成 `EgoVerseLossMixin` 复用。
 - **推理（P3）**：`src/ar_inference.py`。每个 chunk 先视频后 action，各用 Euler 流匹配求解；每一步在"截断到当前 chunk 末尾"的片段上重跑 teacher-forcing 前向，前面的 chunk 作为干净条件。在 lingbot mask 下这与训练感受野完全一致，因此 v0.1 不单独维护 KV cache（以速度换正确性）。`--consistency-check` 在 Nano、T=65 上验证：同一 chunk 训练布局与推理布局的预测相对误差 ≤ 1.9%（视频）/ 1.2%（action），为 bf16 精度量级。输出 npz、模型时间与真实时间两版对比视频、轨迹指标。
-- **配置（P4）**：`configs/ar_v0_1.toml`（R2，Nano 初始化）、`configs/ar_v0_1_r1_v0_6.toml`（R1，v0.6 初始化）；`scripts/launch_ar_v0_1.sh`、`scripts/launch_ar_v0_1_smoke.sh`。8 卡冒烟 4 步：loss 有限，显存峰值 41 GiB。
-- **评测（P5）**：R1/R2 各 1200 步已完成（仅保留 `iter_000001200`），推理耗时见实验记录第 4 节（`src/ar_benchmark.py`），结果见 [experiment.md](experiment.md)。
+- **配置（P4）**：`configs/ar_v0_1.toml`；`scripts/launch_ar_v0_1.sh`、`scripts/launch_ar_v0_1_smoke.sh`。8 卡冒烟 4 步：loss 有限，显存峰值 41 GiB。
+- **训练与评测（P5）**：1200 步已完成（仅保留 `iter_000001200`），推理耗时见实验记录第 4 节（`src/ar_benchmark.py`），结果见 [experiment.md](experiment.md)。
   - `ar_inference --history` 支持三种条件：`oracle`（真值历史 + 真值当前视频供动作读取）、`gt`（真值历史 + 生成的当前视频）、`generated`（完全自回归），并输出逐 chunk 误差。
   - 修复：`gt` 模式原先把前面 chunk 的预测覆盖成真值（`dae9842`），现在每个 chunk 的预测单独保存。
   - 推理按官方推理模式加载 bf16 权重（不保留 fp32 主副本），T=129 单卡约 50 GiB。
   - 验证集：原 36 ep 子集全部为 train；评测另取同任务同场景、未参与训练的 4 个 episode（`outputs/joint_video_hand_pose/ar/eval/heldout_manifest/`）。这些 episode 没有预先生成 `palm_in_fov` 字段，数据集加载时按同一投影现算。
   - 手部投影：`src/ar_overlay.py`，用 episode 内参和 GT 相机位姿把 GT / 预测手部投到 GT 视频与生成视频上。
+- **初始化权重**：v0.1 这次训练用的是 `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464`（沿用自仓库早期 v0.x 配置的默认 `BASE_CHECKPOINT_PATH`），不是官方原始权重：与官方 Cosmos3-Nano 相比，理解通路完全相同，生成通路（`*_moe_gen`、`llm2vae` / `vae2llm`、`time_embedder`）不同，相对差中位数 2.7%，比对结果见实验记录第 1 节。**之后的训练全部从官方原始 Nano 开始**：官方 HF 权重 `/mnt/checkpoints/Cosmos3-Nano` 用官方 `convert_model_to_dcp` 离线转成 DCP，放在 `/mnt/lzh/checkpoints/Cosmos3-Nano-dcp`（转换脚本 `/mnt/lzh/checkpoints/convert_nano_offline.py`：节点无外网，把 Qwen3-VL tokenizer 配置和 Wan VAE 指向 `/mnt/checkpoints` 下的本地文件）。用 AR 模型加载：缺失 0、形状不匹配 0，只多出 5 个声音模块参数（本配置不用），前向正常。
 - **已知偏差（留到 v0.2 修）**：
   - 首帧 state 的时间位置：第 0 组 8 个槽位放首帧 state 后，action 行数等于 `T×K`，官方打包据此按"AR 接续"处理，使视频整体时间后移一帧、同一个首帧 state 被编码为首帧之前的 8 个时刻（Codex review 一.3）。未来视频与 action 的相对对齐不受影响，训练与推理一致；改动会改变位置编码，需要重训。
   - 一致性检查只输出误差数字，没有判定阈值；smoke 只跑 4 步，未验证 checkpoint 保存—恢复。

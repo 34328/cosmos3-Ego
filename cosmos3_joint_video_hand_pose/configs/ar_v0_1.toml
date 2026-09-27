@@ -1,11 +1,11 @@
 # AR v0.1 joint video-action overfit (docs/ar_v0.1/design.md).
-# R2 (this file): init from Cosmos3-Nano SFT. R1: experiment ..._ar_v0_1_r1_v0_6.
+# Initialized from the official Cosmos3-Nano release (converted to DCP).
 [job]
 task       = "vfm"
 experiment = "egoverse_joint_video_hand_pose_ar_v0_1"
 project    = "joint_video_hand_pose"
 group      = "ar"
-name       = "ar_v0.1_r2_nano"
+name       = "ar_v0.1_nano"
 wandb_mode = "online"
 
 [model]

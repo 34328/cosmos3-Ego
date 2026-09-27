@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # AR v0.1 overfit training (8 GPUs, CP1/FSDP-8).
-# Usage: launch_ar_v0_1.sh [recipe.toml] [extra overrides...]   (default: configs/ar_v0_1.toml = R2 from Nano)
+# Usage: launch_ar_v0_1.sh [recipe.toml] [extra overrides...]   (default: configs/ar_v0_1.toml)
 set -euo pipefail
 
 readonly REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
