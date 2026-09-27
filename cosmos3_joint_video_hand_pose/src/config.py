@@ -174,7 +174,7 @@ egoverse_joint_video_hand_pose_overfit_v0_0 = LazyDict(
             keys_not_to_resume=[],
             keys_to_skip_loading=["net_ema."],
             load_ema_to_reg=False,
-            load_path="${oc.env:BASE_CHECKPOINT_PATH,/mnt/lzh/checkpoints/Cosmos3-Nano-dcp}",
+            load_path="${oc.env:BASE_CHECKPOINT_PATH,/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp}",
             load_training_state=False,
             only_load_scheduler_state=False,
             save_iter=300,
@@ -314,8 +314,8 @@ _v0_5_dataset["future_normalizer"] = (
 # ~ [4, 64], per-chunk video/action noise, EgoVerse speed factor 0.5.
 AR_V0_1_FRAME_STRIDE = 2
 AR_V0_1_ACTION_TOKENS_PER_LATENT = 4 * AR_V0_1_FRAME_STRIDE
-# Official Cosmos3-Nano HF release converted with cosmos_framework.scripts.convert_model_to_dcp.
-AR_V0_1_NANO_CHECKPOINT = "/mnt/lzh/checkpoints/Cosmos3-Nano-dcp"
+# Official Cosmos3-Nano release in DCP format (convert_model_to_dcp of /mnt/checkpoints/Cosmos3-Nano).
+AR_V0_1_NANO_CHECKPOINT = "/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp"
 
 
 def _ar_v0_1_model_config() -> OmniMoTCausalModelConfig:

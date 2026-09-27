@@ -29,7 +29,7 @@ PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 "$PYTHON" cosmos3_joint_video_hand_pose/artifacts/cosmos3_action_contract/v2/validate_manifest.py
 ```
 
-预训练权重：官方 Cosmos3-Nano（`/mnt/checkpoints/Cosmos3-Nano`）转换成的 DCP `/mnt/lzh/checkpoints/Cosmos3-Nano-dcp`（2026-09-27 起所有训练的默认值；转换脚本 `/mnt/lzh/checkpoints/convert_nano_offline.py`）。此前的 v0.x 与 AR v0.1 用的是 `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464`，它与官方权重的理解通路完全相同，生成通路（`*_moe_gen`、`llm2vae`/`vae2llm`、`time_embedder`）不同，相对差中位数 2.7%；VAE：`/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth`。数据路径由 episode CSV 中的 `abs_zarr_path` 指定。
+预训练权重：官方 Cosmos3-Nano（`/mnt/checkpoints/Cosmos3-Nano`）的 DCP 版本 `/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp`（2026-09-27 起所有训练的默认值；已逐参数核对与本地用官方 `convert_model_to_dcp` 转换的结果完全一致，离线转换脚本 `/mnt/lzh/checkpoints/convert_nano_offline.py`）。此前的 v0.x 与 AR v0.1 用的是 `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464`，它与官方权重的理解通路完全相同，生成通路（`*_moe_gen`、`llm2vae`/`vae2llm`、`time_embedder`）不同，相对差中位数 2.7%；VAE：`/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth`。数据路径由 episode CSV 中的 `abs_zarr_path` 指定。
 
 联合训练配方位于 `cosmos3_joint_video_hand_pose/configs/*.toml`，启动入口为该项目 `scripts/launch_overfit_*.sh`，配套回放为 `scripts/run_*replay*.sh`。历史 YAML 仅为描述快照，不作为启动依据。已有输出会触发部分脚本的防覆盖检查；新实验先建立独立配方，不复用旧 run 名称。启动前检查 GPU，现有 joint 配方需要 8 张空闲 GPU。
 

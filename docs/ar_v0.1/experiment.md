@@ -33,7 +33,7 @@
   - 393 个不同，集中在生成通路（`*_moe_gen`、`llm2vae` / `vae2llm`、`time_embedder`），相对差中位数 2.7%，最大 31%；
   - 目录里还带 optimizer、scheduler、trainer 状态。
 
-  所以它是官方 Nano 的生成通路又接着训练过的版本。**之后的训练全部从官方原始 Nano 开始**：`/mnt/checkpoints/Cosmos3-Nano` 用官方 `convert_model_to_dcp` 转成 `/mnt/lzh/checkpoints/Cosmos3-Nano-dcp`，`configs/ar_v0_1.toml` 已默认加载它。本文数字都来自这次非官方初始化的训练。
+  所以它是官方 Nano 的生成通路又接着训练过的版本。**之后的训练全部从官方原始 Nano 开始**：即 `/mnt/checkpoints/Cosmos3-Nano` 的 DCP 版本 `/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp`，`configs/ar_v0_1.toml` 已默认加载它。本文数字都来自这次非官方初始化的训练。
 
 ## 2. 评测设置
 
@@ -168,6 +168,7 @@
 5. **loss 与尺度**：按 Codex review 第七节，先统一校准各维度尺度，再把 8 个分块 loss 合成一个整体 MSE。按 A/B/C 三组对照验证。
 6. **数据**：扩大训练数据，正式划分验证集。
 7. **推理速度**：实现 KV cache，以当前"截断重算"的实现为参考路径逐步对照。
+8. **训练 packing**：v0.1 每步每卡只放 1 个 clip，显卡利用率低，见 `docs/ar_v0.2/README.md`。
 
 ## 7. 复现
 

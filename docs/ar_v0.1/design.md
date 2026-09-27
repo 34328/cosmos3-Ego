@@ -210,8 +210,9 @@ Qwen-RobotManip 原文写的是"EgoVerse 降到原帧率的 45%（约慢 2.2×�
   - 推理按官方推理模式加载 bf16 权重（不保留 fp32 主副本），T=129 单卡约 50 GiB。
   - 验证集：原 36 ep 子集全部为 train；评测另取同任务同场景、未参与训练的 4 个 episode（`outputs/joint_video_hand_pose/ar/eval/heldout_manifest/`）。这些 episode 没有预先生成 `palm_in_fov` 字段，数据集加载时按同一投影现算。
   - 手部投影：`src/ar_overlay.py`，用 episode 内参和 GT 相机位姿把 GT / 预测手部投到 GT 视频与生成视频上。
-- **初始化权重**：v0.1 这次训练用的是 `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464`（沿用自仓库早期 v0.x 配置的默认 `BASE_CHECKPOINT_PATH`），不是官方原始权重：与官方 Cosmos3-Nano 相比，理解通路完全相同，生成通路（`*_moe_gen`、`llm2vae` / `vae2llm`、`time_embedder`）不同，相对差中位数 2.7%，比对结果见实验记录第 1 节。**之后的训练全部从官方原始 Nano 开始**：官方 HF 权重 `/mnt/checkpoints/Cosmos3-Nano` 用官方 `convert_model_to_dcp` 离线转成 DCP，放在 `/mnt/lzh/checkpoints/Cosmos3-Nano-dcp`（转换脚本 `/mnt/lzh/checkpoints/convert_nano_offline.py`：节点无外网，把 Qwen3-VL tokenizer 配置和 Wan VAE 指向 `/mnt/checkpoints` 下的本地文件）。用 AR 模型加载：缺失 0、形状不匹配 0，只多出 5 个声音模块参数（本配置不用），前向正常。
+- **初始化权重**：v0.1 这次训练用的是 `/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464`（沿用自仓库早期 v0.x 配置的默认 `BASE_CHECKPOINT_PATH`），不是官方原始权重：与官方 Cosmos3-Nano 相比，理解通路完全相同，生成通路（`*_moe_gen`、`llm2vae` / `vae2llm`、`time_embedder`）不同，相对差中位数 2.7%，比对结果见实验记录第 1 节。**之后的训练全部从官方原始 Nano 开始**：官方 HF 权重 `/mnt/checkpoints/Cosmos3-Nano` 的 DCP 版本 `/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp`，已逐参数核对与本地用官方 `convert_model_to_dcp` 重新转换的结果完全一致（814/814；离线转换脚本 `/mnt/lzh/checkpoints/convert_nano_offline.py`，节点无外网，把 Qwen3-VL tokenizer 配置和 Wan VAE 指向 `/mnt/checkpoints` 下的本地文件）。用 AR 模型加载：缺失 0、形状不匹配 0，只多出 5 个声音模块参数（本配置不用），前向正常。
 - **已知偏差（留到 v0.2 修）**：
   - 首帧 state 的时间位置：第 0 组 8 个槽位放首帧 state 后，action 行数等于 `T×K`，官方打包据此按"AR 接续"处理，使视频整体时间后移一帧、同一个首帧 state 被编码为首帧之前的 8 个时刻（Codex review 一.3）。未来视频与 action 的相对对齐不受影响，训练与推理一致；改动会改变位置编码，需要重训。
+  - 训练每步每卡只放 1 个 clip，没用上 Cosmos 的动态 packing，T=129 只占 75K token 上限的约 22%（见 `docs/ar_v0.2/README.md`）。
   - 一致性检查只输出误差数字，没有判定阈值；smoke 只跑 4 步，未验证 checkpoint 保存—恢复。
 - **推迟到后续版本**：推理端持久 KV cache（第 6 节）、`ActionCodec` 统一接口（第 2 节）、闭环真实观测替换、attention sink（第 9 节）。
