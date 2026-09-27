@@ -34,8 +34,11 @@ def _visibility_from_batch(data_batch: dict[str, Any]) -> list[torch.Tensor]:
     return result
 
 
-class EgoVerseOmniMoTModel(OmniMoTModel):
-    """Thin loss adapter; the Cosmos Generator architecture is unchanged."""
+class EgoVerseLossMixin:
+    """57D visibility-weighted action loss and loss logging shared by EgoVerse models.
+
+    Mix in before a Cosmos ``OmniMoTModel`` subclass; the generator architecture is unchanged.
+    """
 
     def __init__(self, config, lambda_out_of_fov: float = 0.0, subblock_equal_weight: bool = False):
         super().__init__(config)
@@ -45,88 +48,8 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
         self.subblock_equal_weight = bool(subblock_equal_weight)
         self._current_hand_visibility: list[torch.Tensor] | None = None
         self._cp_local_hand_visibility: list[torch.Tensor] | None = None
-        self._fixed_pack_action_intervention = "original"
         # Sub-block action losses written by the current _compute_losses call only.
         self._last_visibility_loss_metrics: dict[str, torch.Tensor] = {}
-
-    def _add_noise_to_input(self, *args, **kwargs):
-        result = super()._add_noise_to_input(*args, **kwargs)
-        mode = self._fixed_pack_action_intervention
-        if mode == "original":
-            return result
-        if mode not in {"zero", "reverse"}:
-            raise ValueError(f"Unknown fixed-pack action intervention: {mode}")
-        packed_sequence = args[1] if len(args) > 1 else kwargs["packed_sequence"]
-        if result.xt_tokens_action is None or packed_sequence.action is None:
-            raise RuntimeError("Fixed-pack action intervention requires future action tokens")
-        for noisy_action, condition_mask in zip(
-            result.xt_tokens_action,
-            packed_sequence.action.condition_mask,
-            strict=True,
-        ):
-            future = condition_mask.reshape(-1) == 0
-            if mode == "zero":
-                noisy_action[future] = 0
-            else:
-                noisy_action[future] = noisy_action[future].flip(0)
-        return result
-
-    @staticmethod
-    def _relative_l2(reference: list[torch.Tensor], candidate: list[torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-        squared_diff = sum((lhs.float() - rhs.float()).square().sum() for lhs, rhs in zip(reference, candidate, strict=True))
-        squared_ref = sum(lhs.float().square().sum() for lhs in reference)
-        max_abs = torch.stack(
-            [(lhs.float() - rhs.float()).abs().max() for lhs, rhs in zip(reference, candidate, strict=True)]
-        ).max()
-        return torch.sqrt(squared_diff / squared_ref.clamp_min(1e-20)), max_abs
-
-    def training_step(self, data_batch: dict[str, torch.Tensor], iteration: int):
-        diagnose = os.environ.get("EGOVERSE_FIXED_PACK_ACTION_INTERVENTION") == "1" and iteration == int(
-            os.environ.get("EGOVERSE_FIXED_PACK_ACTION_INTERVENTION_ITER", "0")
-        )
-        if not diagnose:
-            return super().training_step(data_batch, iteration)
-
-        cpu_rng_before = torch.get_rng_state()
-        cuda_rng_before = torch.cuda.get_rng_state_all()
-        metrics: dict[str, float] = {}
-        try:
-            reference_video: list[torch.Tensor] | None = None
-            original_action_loss: torch.Tensor | None = None
-            for label, mode in (
-                ("original", "original"),
-                ("repeat", "original"),
-                ("zero", "zero"),
-                ("reverse", "reverse"),
-            ):
-                torch.set_rng_state(cpu_rng_before)
-                torch.cuda.set_rng_state_all(cuda_rng_before)
-                self._fixed_pack_action_intervention = mode
-                with torch.no_grad():
-                    candidate_output, candidate_loss = super().training_step(data_batch, iteration)
-                if label == "original":
-                    reference_video = [tensor.detach().clone() for tensor in candidate_output["model_pred"]]
-                    original_action_loss = candidate_output["egoverse_loss_action_raw"].detach().float()
-                    del candidate_output, candidate_loss
-                    continue
-                assert reference_video is not None and original_action_loss is not None
-                relative_l2, max_abs = self._relative_l2(reference_video, candidate_output["model_pred"])
-                action_loss_delta = (
-                    candidate_output["egoverse_loss_action_raw"].detach().float() - original_action_loss
-                ).abs()
-                metrics[f"video_{label}_relative_l2"] = float(relative_l2.item())
-                metrics[f"video_{label}_max_abs"] = float(max_abs.item())
-                metrics[f"action_loss_{label}_abs_delta"] = float(action_loss_delta.item())
-                del candidate_output, candidate_loss
-        finally:
-            self._fixed_pack_action_intervention = "original"
-            torch.set_rng_state(cpu_rng_before)
-            torch.cuda.set_rng_state_all(cuda_rng_before)
-
-        if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
-            print("FIXED_PACK_ACTION_INTERVENTION " + json.dumps(metrics, sort_keys=True), flush=True)
-        original_output, original_loss = super().training_step(data_batch, iteration)
-        return original_output, original_loss
 
     def _get_training_inputs(self, data_batch: dict[str, torch.Tensor], iteration: int):
         cp_enabled = self.parallel_dims is not None and self.parallel_dims.cp_enabled
@@ -282,3 +205,90 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
             if name.endswith("_loss"):
                 losses[f"egoverse_loss_action_{name.removesuffix('_loss')}_raw"] = value * sample_scale
         return total_loss, losses
+
+
+class EgoVerseOmniMoTModel(EgoVerseLossMixin, OmniMoTModel):
+    """Thin loss adapter; the Cosmos Generator architecture is unchanged."""
+
+    def __init__(self, config, lambda_out_of_fov: float = 0.0, subblock_equal_weight: bool = False):
+        super().__init__(config, lambda_out_of_fov=lambda_out_of_fov, subblock_equal_weight=subblock_equal_weight)
+        self._fixed_pack_action_intervention = "original"
+
+    def _add_noise_to_input(self, *args, **kwargs):
+        result = super()._add_noise_to_input(*args, **kwargs)
+        mode = self._fixed_pack_action_intervention
+        if mode == "original":
+            return result
+        if mode not in {"zero", "reverse"}:
+            raise ValueError(f"Unknown fixed-pack action intervention: {mode}")
+        packed_sequence = args[1] if len(args) > 1 else kwargs["packed_sequence"]
+        if result.xt_tokens_action is None or packed_sequence.action is None:
+            raise RuntimeError("Fixed-pack action intervention requires future action tokens")
+        for noisy_action, condition_mask in zip(
+            result.xt_tokens_action,
+            packed_sequence.action.condition_mask,
+            strict=True,
+        ):
+            future = condition_mask.reshape(-1) == 0
+            if mode == "zero":
+                noisy_action[future] = 0
+            else:
+                noisy_action[future] = noisy_action[future].flip(0)
+        return result
+
+    @staticmethod
+    def _relative_l2(reference: list[torch.Tensor], candidate: list[torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+        squared_diff = sum((lhs.float() - rhs.float()).square().sum() for lhs, rhs in zip(reference, candidate, strict=True))
+        squared_ref = sum(lhs.float().square().sum() for lhs in reference)
+        max_abs = torch.stack(
+            [(lhs.float() - rhs.float()).abs().max() for lhs, rhs in zip(reference, candidate, strict=True)]
+        ).max()
+        return torch.sqrt(squared_diff / squared_ref.clamp_min(1e-20)), max_abs
+
+    def training_step(self, data_batch: dict[str, torch.Tensor], iteration: int):
+        diagnose = os.environ.get("EGOVERSE_FIXED_PACK_ACTION_INTERVENTION") == "1" and iteration == int(
+            os.environ.get("EGOVERSE_FIXED_PACK_ACTION_INTERVENTION_ITER", "0")
+        )
+        if not diagnose:
+            return super().training_step(data_batch, iteration)
+
+        cpu_rng_before = torch.get_rng_state()
+        cuda_rng_before = torch.cuda.get_rng_state_all()
+        metrics: dict[str, float] = {}
+        try:
+            reference_video: list[torch.Tensor] | None = None
+            original_action_loss: torch.Tensor | None = None
+            for label, mode in (
+                ("original", "original"),
+                ("repeat", "original"),
+                ("zero", "zero"),
+                ("reverse", "reverse"),
+            ):
+                torch.set_rng_state(cpu_rng_before)
+                torch.cuda.set_rng_state_all(cuda_rng_before)
+                self._fixed_pack_action_intervention = mode
+                with torch.no_grad():
+                    candidate_output, candidate_loss = super().training_step(data_batch, iteration)
+                if label == "original":
+                    reference_video = [tensor.detach().clone() for tensor in candidate_output["model_pred"]]
+                    original_action_loss = candidate_output["egoverse_loss_action_raw"].detach().float()
+                    del candidate_output, candidate_loss
+                    continue
+                assert reference_video is not None and original_action_loss is not None
+                relative_l2, max_abs = self._relative_l2(reference_video, candidate_output["model_pred"])
+                action_loss_delta = (
+                    candidate_output["egoverse_loss_action_raw"].detach().float() - original_action_loss
+                ).abs()
+                metrics[f"video_{label}_relative_l2"] = float(relative_l2.item())
+                metrics[f"video_{label}_max_abs"] = float(max_abs.item())
+                metrics[f"action_loss_{label}_abs_delta"] = float(action_loss_delta.item())
+                del candidate_output, candidate_loss
+        finally:
+            self._fixed_pack_action_intervention = "original"
+            torch.set_rng_state(cpu_rng_before)
+            torch.cuda.set_rng_state_all(cuda_rng_before)
+
+        if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+            print("FIXED_PACK_ACTION_INTERVENTION " + json.dumps(metrics, sort_keys=True), flush=True)
+        original_output, original_loss = super().training_step(data_batch, iteration)
+        return original_output, original_loss

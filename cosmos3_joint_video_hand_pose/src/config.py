@@ -11,6 +11,10 @@ from cosmos_framework.data.generator.joint_dataloader import PackingDataLoader, 
 from cosmos_framework.utils.lazy_config import LazyCall as L
 from cosmos_framework.utils.lazy_config import LazyDict
 
+from cosmos_framework.model.generator.omni_mot_causal_model import OmniMoTCausalModelConfig
+
+from .ar_dataset import get_egoverse_ar_dataset
+from .ar_model import EgoVerseARModel
 from .dataset import get_egoverse_cosmos_dataset
 from .dataloader_state import EgoVerseDataLoaderStateCallback, RecoverablePackingDataLoader
 from .model import EgoVerseOmniMoTModel
@@ -304,6 +308,92 @@ _v0_5_dataset["future_normalizer"] = (
 )
 
 
+# AR v0.1 (docs/ar_v0.1_design.md): lingbot-va style chunked causal joint video-action
+# generation on Cosmos' replayed teacher forcing. Continuous windows with video
+# frame_stride=2 and K=8 actions per latent, per-step chunk C ~ {1..4} and window
+# ~ [4, 64], per-chunk video/action noise, EgoVerse speed factor 0.5.
+AR_V0_1_FRAME_STRIDE = 2
+AR_V0_1_ACTION_TOKENS_PER_LATENT = 4 * AR_V0_1_FRAME_STRIDE
+AR_V0_1_NANO_CHECKPOINT = "/mnt/checkpoints/Cosmos3-Nano-dcp-sft/iter_000048464"
+AR_V0_1_V0_6_CHECKPOINT = (
+    f"{COSMOS_REPO_ROOT}/outputs/joint_video_hand_pose/overfit/"
+    "overfit_v0.6_frame_delta_temporal_mask/checkpoints/iter_000001200"
+)
+
+
+def _ar_v0_1_model_config() -> OmniMoTCausalModelConfig:
+    base = copy.deepcopy(egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["model"]["config"])
+    base.update(
+        video_temporal_causal=True,
+        joint_attn_implementation="three_way",
+        causal_training_strategy="teacher_forcing",
+        action_tokens_per_latent=AR_V0_1_ACTION_TOKENS_PER_LATENT,
+        supervise_temporal_causal_actions=True,
+    )
+    base["parallelism"].update(
+        data_parallel_shard_degree=8,
+        data_parallel_replicate_degree=1,
+        context_parallel_shard_degree=1,
+    )
+    # Cosmos' fixed-C chunkwise truncation stays off (frames_per_chunk=1); the lingbot
+    # mask owns chunking. Clean K/V keep gradients (lingbot trains both halves).
+    return OmniMoTCausalModelConfig(
+        **base,
+        teacher_forcing_kv_implementation="singleview_threeway_kv",
+        teacher_forcing_frames_per_chunk=1,
+        teacher_forcing_detach_clean_kv=False,
+    )
+
+
+egoverse_joint_video_hand_pose_ar_v0_1 = copy.deepcopy(egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3)
+egoverse_joint_video_hand_pose_ar_v0_1["job"].update(group="ar", name="ar_v0.1_r2_nano")
+egoverse_joint_video_hand_pose_ar_v0_1["model"] = L(EgoVerseARModel)(
+    config=_ar_v0_1_model_config(),
+    lambda_out_of_fov=0.0,
+    subblock_equal_weight=True,
+    train_chunk_sizes=(1, 2, 3, 4),
+    train_window_range=(4, 64),
+    seed=42,
+    _recursive_=False,
+)
+egoverse_joint_video_hand_pose_ar_v0_1["checkpoint"]["load_path"] = (
+    "${oc.env:BASE_CHECKPOINT_PATH," + AR_V0_1_NANO_CHECKPOINT + "}"
+)
+# Replayed teacher forcing packs exactly one clip per step (one temporal-causal video layout).
+egoverse_joint_video_hand_pose_ar_v0_1["dataloader_train"]["max_sequence_length"] = None
+egoverse_joint_video_hand_pose_ar_v0_1["dataloader_train"]["max_samples_per_batch"] = 1
+_ar_v0_1_datasets = egoverse_joint_video_hand_pose_ar_v0_1["dataloader_train"]["dataloader"]["datasets"]
+_ar_v0_1_datasets["egoverse"]["dataset"] = L(get_egoverse_ar_dataset)(
+    episodes_manifest=_ar_v0_1_datasets["egoverse"]["dataset"]["episodes_manifest"],
+    segments_manifest=_ar_v0_1_datasets["egoverse"]["dataset"]["segments_manifest"],
+    tokenizer_config="${model.config.vlm_config.tokenizer}",
+    cfg_dropout_rate=0.1,
+    iterable_shuffle=True,
+    seed=42,
+    max_sequence_length="${model.config.max_num_tokens_after_packing}",
+    prompt_mode="episode_context_and_segment",
+    state_normalizer=(
+        f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
+        "cosmos3_action_contract/v2/normalizers/state_normalizer.json"
+    ),
+    future_normalizer=(
+        f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
+        "cosmos3_action_contract/v4_frame_delta_30hz/normalizers/future_frame_delta_normalizer.json"
+    ),
+    frame_stride=AR_V0_1_FRAME_STRIDE,
+    clip_frame_tiers=(129, 65, 33),
+    speed_factors={"egoverse": 0.5},
+    random_window=True,
+)
+
+# R1: same recipe, initialized from the v0.6 overfit checkpoint (weights only).
+egoverse_joint_video_hand_pose_ar_v0_1_r1_v0_6 = copy.deepcopy(egoverse_joint_video_hand_pose_ar_v0_1)
+egoverse_joint_video_hand_pose_ar_v0_1_r1_v0_6["job"]["name"] = "ar_v0.1_r1_v0_6"
+egoverse_joint_video_hand_pose_ar_v0_1_r1_v0_6["checkpoint"]["load_path"] = (
+    "${oc.env:BASE_CHECKPOINT_PATH," + AR_V0_1_V0_6_CHECKPOINT + "}"
+)
+
+
 ConfigStore.instance().store(
     group="experiment",
     package="_global_",
@@ -322,6 +412,9 @@ ConfigStore.instance().store(
     name="egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3",
     node=egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3,
 )
+
+for _name in ("egoverse_joint_video_hand_pose_ar_v0_1", "egoverse_joint_video_hand_pose_ar_v0_1_r1_v0_6"):
+    ConfigStore.instance().store(group="experiment", package="_global_", name=_name, node=globals()[_name])
 
 
 def make_config():

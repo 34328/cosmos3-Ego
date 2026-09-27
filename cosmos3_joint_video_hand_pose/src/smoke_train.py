@@ -85,6 +85,7 @@ def main() -> None:
     grad_accum_iter = 0
     records = []
     configured_cap = config.dataloader_train.max_sequence_length
+    # One-sample-per-step AR batches set max_sequence_length=None; audit against the model cap.
     cap = int(configured_cap or config.model.config.max_num_tokens_after_packing)
     for step in range(args.steps):
         current_iteration = iteration + step + 1
@@ -93,7 +94,7 @@ def main() -> None:
         trainer.callbacks.on_after_dataloading(current_iteration)
         if stop:
             raise RuntimeError(f"dataloader stopped before smoke step {step}")
-        batch_audit = audit_batch(cpu_batch, cap)
+        batch_audit = audit_batch(cpu_batch, cap, config.model.config.get("action_tokens_per_latent"))
         batch = misc.to(cpu_batch, device="cuda")
         trainer._cp_data_window.store_device_batch(batch)
         trainer.callbacks.on_training_step_start(model, batch, iteration=current_iteration)
@@ -123,6 +124,11 @@ def main() -> None:
             "action_loss_weighted": float(output["egoverse_loss_action_weighted"].detach().cpu()),
             "total_loss_metric": float(output["egoverse_loss_total"].detach().cpu()),
             "finite": bool(torch.isfinite(loss).item()),
+            **{
+                name.removeprefix("egoverse_"): float(output[name].detach().float().cpu())
+                for name in ("egoverse_ar_chunk_size", "egoverse_ar_window", "egoverse_sigma_action_mean")
+                if name in output
+            },
             "peak_memory_gib": torch.cuda.max_memory_allocated() / 2**30,
             "elapsed_seconds": time.perf_counter() - started,
         }

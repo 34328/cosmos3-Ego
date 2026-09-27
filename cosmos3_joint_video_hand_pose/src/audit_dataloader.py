@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 import torch
+from .ar_dataset import ar_latent_frames, ar_token_count
 from .temporal import cosmos_wam_token_count
 
 
@@ -47,7 +48,12 @@ def _squeeze_media_batch(value, name: str, expected_ndim: int) -> torch.Tensor:
     return value
 
 
-def audit_batch(batch: dict, cap: int) -> dict:
+def audit_batch(batch: dict, cap: int, action_tokens_per_latent: int | None = None) -> dict:
+    """Validate one packed batch.
+
+    ``action_tokens_per_latent=None`` checks the legacy contract (one action row per
+    video frame); an integer ``K`` checks the AR contract (``K`` rows per latent frame).
+    """
     required = (
         "text_token_ids",
         "video",
@@ -76,19 +82,23 @@ def audit_batch(batch: dict, cap: int) -> dict:
         frames = int(video.shape[1])
         if (frames - 1) % 4:
             raise ValueError(f"video length must be 1+4n, got {frames}")
-        if tuple(action.shape) != (frames, 64):
-            raise ValueError(f"action must be [T,64], got {tuple(action.shape)} for T={frames}")
-        if tuple(action_raw.shape) != (frames, 57):
-            raise ValueError(f"action_raw must be [T,57], got {tuple(action_raw.shape)} for T={frames}")
-        if tuple(visible.shape) != (frames, 2):
-            raise ValueError(f"visibility must be [T,2], got {tuple(visible.shape)} for T={frames}")
+        rows = frames if action_tokens_per_latent is None else ar_latent_frames(frames) * action_tokens_per_latent
+        if tuple(action.shape) != (rows, 64):
+            raise ValueError(f"action must be [{rows},64], got {tuple(action.shape)} for T={frames}")
+        if tuple(action_raw.shape) != (rows, 57):
+            raise ValueError(f"action_raw must be [{rows},57], got {tuple(action_raw.shape)} for T={frames}")
+        if tuple(visible.shape) != (rows, 2):
+            raise ValueError(f"visibility must be [{rows},2], got {tuple(visible.shape)} for T={frames}")
         if torch.count_nonzero(action[:, 57:]).item() != 0:
             raise ValueError("action padding channels [57:64] are not all zero")
         raw_dim = torch.as_tensor(batch["raw_action_dim"][index]).reshape(-1)
         if raw_dim.numel() != 1 or int(raw_dim.item()) != 57:
             raise ValueError(f"raw_action_dim must be 57, got {raw_dim.tolist()}")
         frame_counts.append(frames)
-        num_tokens += cosmos_wam_token_count(int(text_ids.numel()), frames)
+        if action_tokens_per_latent is None:
+            num_tokens += cosmos_wam_token_count(int(text_ids.numel()), frames)
+        else:
+            num_tokens += ar_token_count(int(text_ids.numel()), frames, action_tokens_per_latent)
         if "sample_id" in batch:
             sample_ids.append(str(batch["sample_id"][index]))
 
