@@ -143,7 +143,14 @@ class ARSampler:
 
     @torch.no_grad()
     def sample(self, video_steps: int, action_steps: int, video_shift: float, action_shift: float, history: str, seed: int):
-        """Generate every chunk; ``history='gt'`` resets earlier chunks to ground truth before each chunk."""
+        """Generate every chunk and return the predictions.
+
+        ``history='gt'`` conditions each chunk on ground-truth history (teacher forcing) and
+        ``history='generated'`` on the model's own earlier chunks. Predictions are copied to a
+        separate output buffer per chunk, so GT history never overwrites earlier predictions.
+        """
+        if history not in ("gt", "generated"):
+            raise ValueError(f"unknown history mode {history!r}")
         generator = torch.Generator(device=self.gt_video.device).manual_seed(seed)
         video = self.gt_video.clone()
         action = self.gt_action.clone()
@@ -152,6 +159,7 @@ class ARSampler:
             action[self.tokens_per_latent :].shape, generator=generator, device=action.device
         )
         self._zero_padding(action)
+        out_video, out_action = self.gt_video.clone(), self.gt_action.clone()
         video_sigmas, action_sigmas = flow_sigmas(video_steps, video_shift), flow_sigmas(action_steps, action_shift)
         for start, end in chunk_frame_ranges(self.num_frames, self.chunk_size):
             if history == "gt":
@@ -168,7 +176,10 @@ class ARSampler:
                 rows = self.rows(start, end)
                 action[rows] += (action_sigmas[i + 1] - action_sigmas[i]) * pred_action[rows]
                 self._zero_padding(action)
-        return video, action
+            out_video[:, :, start:end] = video[:, :, start:end]
+            out_action[self.rows(start, end)] = action[self.rows(start, end)]
+        self._zero_padding(out_action)
+        return out_video, out_action
 
     @torch.no_grad()
     def consistency_check(self, chunk_index: int, seed: int) -> dict:
