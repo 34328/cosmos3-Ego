@@ -2,7 +2,7 @@
 
 - 日期：2026-09-26
 - 分支：`ar-video-action`（基于 main `d90219e`，清理后为 `497723f`）
-- 状态：已确认（2026-09-26）；P0–P4 已实现（2026-09-27），实现记录见文末第 11 节。标 **【待定】** 的部分本版不定。
+- 状态：已确认（2026-09-26）；P0–P5 已完成（2026-09-27），实现记录见第 11 节，实验结果见 [experiment.md](experiment.md)。标 **【待定】** 的部分本版不定，标 **【推迟】** 的部分移到后续版本。
 
 ## 0. 目标与范围
 
@@ -32,7 +32,7 @@ v0.1 要跑通的是**分块因果自回归**：每个 chunk 先对视频 latent
 - **21 DoF 手部如何编码进 action 向量**：【待定】。现在的做法是每只手 wrist 9 维 + MLP-AE-15，需要调研后重新定。
 
 v0.1 对这部分的处理：
-- 把动作编码做成可插拔接口：`ActionCodec.encode(raw) -> [T, D]` / `decode`。
+- 把动作编码做成可插拔接口：`ActionCodec.encode(raw) -> [T, D]` / `decode`。**【推迟】** v0.1 直接使用 `Action57Builder`，统一接口随 v0.2 动作向量重新设计一起做。
 - 模型只依赖 `D ≤ max_action_dim = 64`，以及每个维度的有效 mask。
 - **开发和调试阶段先用现有的 57D B3 编码占位**，这样可以直接复用 v0.6 的 normalizer、loss 和回放。编码定下来后只替换 codec，不改模型代码。
 
@@ -140,7 +140,11 @@ Qwen-RobotManip 原文写的是"EgoVerse 降到原帧率的 45%（约慢 2.2×�
 
 ## 6. 推理
 
-在 AR 推理入口中新增 `image2video_joint_action` 模式。每个 chunk 的步骤：
+在 AR 推理入口中新增 `image2video_joint_action` 模式。每个 chunk 的步骤如下。
+
+> **【推迟】持久 KV cache**：v0.1 实际实现（`src/ar_inference.py`）不维护 KV cache，每一步去噪都在"截断到当前 chunk"的片段上重跑 teacher-forcing 前向，与训练感受野完全一致但较慢（T=129 单个条件约 4 分钟）。下述第 1–3 步中的 cache 预填、刷新和第 6 步的窗口淘汰移到后续版本，届时以当前实现为参考路径逐步对照。
+
+
 
 1. 首帧：文本、V0、首帧 state 一起预填进 KV cache。如果还有真实历史前缀，也一并预填。
 2. 对当前 chunk 的视频去噪 N 步（CFG 可选），然后用干净的 V_k 刷新 cache。
@@ -190,7 +194,7 @@ Qwen-RobotManip 原文写的是"EgoVerse 降到原帧率的 45%（约慢 2.2×�
 
 ## 11. 实现记录（2026-09-27）
 
-分支 `ar-video-action`，提交 `04f43d2`…`4d491e6`。与上文方案的差异和实现细节如下。
+分支 `ar-video-action`，提交 `04f43d2` 起。与上文方案的差异和实现细节如下。
 
 - **框架同步（P0）**：`packages/cosmos3` 整体同步到官方 `cf5d68c`（`UPSTREAM.md` 记录上游版本与全部本地补丁）。v0.4/v0.6 的 joint video-action mask 实验连同配置、TOML、启动/回放脚本已删除，原实现见 `8525625`；非 AR 基线为 v0.5。
 - **框架补丁（默认关闭，关闭时与官方一致）**：
@@ -202,4 +206,13 @@ Qwen-RobotManip 原文写的是"EgoVerse 降到原帧率的 45%（约慢 2.2×�
 - **训练（P2）**：`src/ar_model.py` 的 `EgoVerseARModel`，基于官方 replayed teacher forcing（Pass 1 干净、Pass 2 带噪，等价于 lingbot 的 [clean, noisy] 单序列）。每步随机 C ∈ {1,2,3,4}、窗口 ∈ [4,64]；视频与 action 各自按 chunk 独立采样 σ；每步 1 个样本（官方 replay 要求）；干净 K/V 保留梯度。EgoVerse 57D loss 抽成 `EgoVerseLossMixin` 复用。
 - **推理（P3）**：`src/ar_inference.py`。每个 chunk 先视频后 action，各用 Euler 流匹配求解；每一步在"截断到当前 chunk 末尾"的片段上重跑 teacher-forcing 前向，前面的 chunk 作为干净条件。在 lingbot mask 下这与训练感受野完全一致，因此 v0.1 不单独维护 KV cache（以速度换正确性）。`--consistency-check` 在 Nano、T=65 上验证：同一 chunk 训练布局与推理布局的预测相对误差 ≤ 1.9%（视频）/ 1.2%（action），为 bf16 精度量级。输出 npz、模型时间与真实时间两版对比视频、轨迹指标。
 - **配置（P4）**：`configs/ar_v0_1.toml`（R2，Nano 初始化）、`configs/ar_v0_1_r1_v0_6.toml`（R1，v0.6 初始化）；`scripts/launch_ar_v0_1.sh`、`scripts/launch_ar_v0_1_smoke.sh`。8 卡冒烟 4 步：loss 有限，显存峰值 41 GiB。
-- **尚未完成（P5）**：R1/R2 各 1200 步过拟合训练与回放评测；推理端 KV cache 加速、闭环真实观测替换、attention sink 仍在第 9 节后续版本中。
+- **评测（P5）**：R1/R2 各 1200 步已完成（仅保留 `iter_000001200`），推理耗时见实验记录第 4 节（`src/ar_benchmark.py`），结果见 [experiment.md](experiment.md)。
+  - `ar_inference --history` 支持三种条件：`oracle`（真值历史 + 真值当前视频供动作读取）、`gt`（真值历史 + 生成的当前视频）、`generated`（完全自回归），并输出逐 chunk 误差。
+  - 修复：`gt` 模式原先把前面 chunk 的预测覆盖成真值（`dae9842`），现在每个 chunk 的预测单独保存。
+  - 推理按官方推理模式加载 bf16 权重（不保留 fp32 主副本），T=129 单卡约 50 GiB。
+  - 验证集：原 36 ep 子集全部为 train；评测另取同任务同场景、未参与训练的 4 个 episode（`outputs/joint_video_hand_pose/ar/eval/heldout_manifest/`）。这些 episode 没有预先生成 `palm_in_fov` 字段，数据集加载时按同一投影现算。
+  - 手部投影：`src/ar_overlay.py`，用 episode 内参和 GT 相机位姿把 GT / 预测手部投到 GT 视频与生成视频上。
+- **已知偏差（留到 v0.2 修）**：
+  - 首帧 state 的时间位置：第 0 组 8 个槽位放首帧 state 后，action 行数等于 `T×K`，官方打包据此按"AR 接续"处理，使视频整体时间后移一帧、同一个首帧 state 被编码为首帧之前的 8 个时刻（Codex review 一.3）。未来视频与 action 的相对对齐不受影响，训练与推理一致；改动会改变位置编码，需要重训。
+  - 一致性检查只输出误差数字，没有判定阈值；smoke 只跑 4 步，未验证 checkpoint 保存—恢复。
+- **推迟到后续版本**：推理端持久 KV cache（第 6 节）、`ActionCodec` 统一接口（第 2 节）、闭环真实观测替换、attention sink（第 9 节）。

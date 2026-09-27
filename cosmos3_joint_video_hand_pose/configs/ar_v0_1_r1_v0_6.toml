@@ -1,4 +1,4 @@
-# AR v0.1 joint video-action overfit (docs/ar_v0.1_design.md).
+# AR v0.1 joint video-action overfit (docs/ar_v0.1/design.md).
 # R1 (this file): init from the v0.6 overfit checkpoint. R2: ar_v0_1.toml.
 [job]
 task       = "vfm"

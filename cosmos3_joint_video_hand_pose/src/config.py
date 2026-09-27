@@ -308,7 +308,7 @@ _v0_5_dataset["future_normalizer"] = (
 )
 
 
-# AR v0.1 (docs/ar_v0.1_design.md): lingbot-va style chunked causal joint video-action
+# AR v0.1 (docs/ar_v0.1/design.md): lingbot-va style chunked causal joint video-action
 # generation on Cosmos' replayed teacher forcing. Continuous windows with video
 # frame_stride=2 and K=8 actions per latent, per-step chunk C ~ {1..4} and window
 # ~ [4, 64], per-chunk video/action noise, EgoVerse speed factor 0.5.

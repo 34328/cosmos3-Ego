@@ -1,4 +1,4 @@
-# AR v0.1 joint video-action overfit (docs/ar_v0.1_design.md).
+# AR v0.1 joint video-action overfit (docs/ar_v0.1/design.md).
 # R2 (this file): init from Cosmos3-Nano SFT. R1: experiment ..._ar_v0_1_r1_v0_6.
 [job]
 task       = "vfm"

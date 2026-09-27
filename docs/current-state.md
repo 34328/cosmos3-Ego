@@ -54,24 +54,17 @@ PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 - `tests/` 纳入 Git。
 - `outputs/` 仅保留 v0.2 与 v0.6 的 `iter_000001200` 模型权重（不含 optimizer），其余 checkpoint 与本地 W&B、dataloader trace 已删除，删除清单见 `outputs/maintenance/2026-09-26-checkpoint-prune/`。训练曲线以远端 W&B 为准。
 
-## AR v0.1 方案（2026-09-26）
+## AR v0.1（2026-09-26 → 2026-09-27，已完成）
 
-- 方案文档：`docs/ar_v0.1_design.md`（已确认，动作向量内容与 camera pose 仍为【待定】）。
-- 要点：对齐 lingbot-va demo 配置，frame_stride = 2、每 latent 帧 K = 8 个 action、推理 chunk C = 4；训练随机 C ∈ [1, 4]、窗口 ∈ [4, 64]；T 按 segment 长度分档 129 / 65 / 33；人手速度通过 fps 标签 × 0.5 放慢（视频 7.5、action 15）。
-- 下一步：P0 框架同步官方 cosmos-framework `cf5d68c`，并把 action_tokens_per_latent 从 tcf 解耦。
+全部文档在 `docs/ar_v0.1/`（[README](ar_v0.1/README.md)：方案 `design.md`、实验记录 `experiment.md`、Codex 审阅）。
 
-## P0 框架同步（2026-09-27）
+- 框架：`packages/cosmos3` 同步官方 `cf5d68c`（`packages/cosmos3/UPSTREAM.md` 记录上游版本与本地补丁）；v0.4/v0.6 mask 实验已删除，非 AR 基线为 v0.5。
+- 默认关闭的框架补丁：`action_tokens_per_latent`（K 与 tcf 解耦）、`supervise_temporal_causal_actions`、`gen_attention_override`。
+- 代码：`src/ar_dataset.py`、`ar_attention.py`、`ar_model.py`、`ar_inference.py`（`--history oracle,gt,generated`）、`ar_overlay.py`（GT 相机位姿下的手部投影）、`ar_benchmark.py`（推理耗时）。
+- 训练：R2（Nano 初始化）、R1（v0.6 初始化）各 1200 步，仅保留 `iter_000001200`，输出 `outputs/joint_video_hand_pose/ar/<run>`；评测产物 `outputs/joint_video_hand_pose/ar/eval/`。
+- 结论：动作在读取真实视频时单 chunk 手腕误差 12–18 mm，换成生成视频后回到"不动"水平；第 1 个 chunk 最差；逐帧增量从首帧积分会累积漂移。640×368、T=129 单卡推理约 3 分钟（无 KV cache）。
+- 测试：`tests/` 共 114 项（4 项 GPU 测试在 CPU 上跳过）。
 
-- `packages/cosmos3` 整体同步到官方 `cf5d68c`，上游版本与本地补丁清单见 `packages/cosmos3/UPSTREAM.md`。
-- 本地补丁仅保留：dataloader 断点续训、grad clip 触发统计、`omni_mot_model` action loss 走子类覆盖、`action_tokens_per_latent`（K）与 tcf 解耦。
-- v0.4/v0.6 的 joint video-action mask 实验连同 v0.6 TOML 与启动/回放脚本删除；非 AR 基线为 v0.5。
-- `scripts/check_ckpt_load_cf5d68c.py`：Nano SFT 与 v0.6 checkpoint 在新框架下均可加载（missing 0、shape mismatch 0）。
+## 下一步：AR v0.2
 
-## AR v0.1 实现（2026-09-27）
-
-- 数据 `src/ar_dataset.py`、注意力 `src/ar_attention.py`、模型 `src/ar_model.py`、推理 `src/ar_inference.py`；细节见 `docs/ar_v0.1_design.md` 第 11 节。
-- 框架补丁（默认关闭）：`supervise_temporal_causal_actions`、`gen_attention_override`，见 `packages/cosmos3/UPSTREAM.md`。
-- normalizer v4（30Hz B3 增量）：`artifacts/cosmos3_action_contract/v4_frame_delta_30hz`。
-- 训练输出：`outputs/joint_video_hand_pose/ar/<run>`，启动日志 `outputs/joint_video_hand_pose/ar/launch_logs/`。每步 1 个样本、CP1/FSDP8，8 卡 H800 显存峰值约 55 GiB。
-- 测试：`tests/` 共 111 项（其中 4 项 GPU 测试在 CPU 上跳过）。
-
+重点改动作（表示、首 chunk、对生成视频的稳健性、loss 尺度），见 `docs/ar_v0.1/experiment.md` 第 6 节。
