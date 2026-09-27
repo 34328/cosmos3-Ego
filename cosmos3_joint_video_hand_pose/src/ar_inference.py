@@ -430,6 +430,8 @@ def main() -> None:
             record["seconds"] = time.time() - started
             results.append(record)
             print("AR_SAMPLE " + json.dumps(record), flush=True)
+        del sampler, batch
+        torch.cuda.empty_cache()
     summary = {"ckpt": args.ckpt, "toml": str(args.toml), "args": {k: str(v) for k, v in vars(args).items()}, "samples": results}
     name = "consistency.json" if args.consistency_check else f"results_{'_'.join(histories)}.json"
     (args.output / name).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
