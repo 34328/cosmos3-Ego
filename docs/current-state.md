@@ -66,3 +66,12 @@ PYTHON=/home/lzh/miniconda3/envs/cosmos3/bin/python
 - 本地补丁仅保留：dataloader 断点续训、grad clip 触发统计、`omni_mot_model` action loss 走子类覆盖、`action_tokens_per_latent`（K）与 tcf 解耦。
 - v0.4/v0.6 的 joint video-action mask 实验连同 v0.6 TOML 与启动/回放脚本删除；非 AR 基线为 v0.5。
 - `scripts/check_ckpt_load_cf5d68c.py`：Nano SFT 与 v0.6 checkpoint 在新框架下均可加载（missing 0、shape mismatch 0）。
+
+## AR v0.1 实现（2026-09-27）
+
+- 数据 `src/ar_dataset.py`、注意力 `src/ar_attention.py`、模型 `src/ar_model.py`、推理 `src/ar_inference.py`；细节见 `docs/ar_v0.1_design.md` 第 11 节。
+- 框架补丁（默认关闭）：`supervise_temporal_causal_actions`、`gen_attention_override`，见 `packages/cosmos3/UPSTREAM.md`。
+- normalizer v4（30Hz B3 增量）：`artifacts/cosmos3_action_contract/v4_frame_delta_30hz`。
+- 训练输出：`outputs/joint_video_hand_pose/ar/<run>`，启动日志 `outputs/joint_video_hand_pose/ar/launch_logs/`。每步 1 个样本、CP1/FSDP8，8 卡 H800 显存峰值约 55 GiB。
+- 测试：`tests/` 共 111 项（其中 4 项 GPU 测试在 CPU 上跳过）。
+

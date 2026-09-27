@@ -2,7 +2,7 @@
 
 - 日期：2026-09-26
 - 分支：`ar-video-action`（基于 main `d90219e`，清理后为 `497723f`）
-- 状态：已确认（2026-09-26）。标 **【待定】** 的部分本版不定，其余可以直接实现。
+- 状态：已确认（2026-09-26）；P0–P4 已实现（2026-09-27），实现记录见文末第 11 节。标 **【待定】** 的部分本版不定。
 
 ## 0. 目标与范围
 
@@ -187,3 +187,19 @@ Qwen-RobotManip 原文写的是"EgoVerse 降到原帧率的 45%（约慢 2.2×�
 - **token 翻倍**：按第 3 节核算在预算内，但随机 C 与窗口让 flex block mask 每步都要重建，编译和构建开销需要在 smoke 时测量。
 - **一致性测试与随机 C**：训练的 C 是随机的，推理固定 C = 4。第 8 节的 TF 一致性测试在 C = 4 下做。
 - **CP2 下的非有限梯度问题可能在新框架里复现**，所以继续使用 CP1。
+
+## 11. 实现记录（2026-09-27）
+
+分支 `ar-video-action`，提交 `04f43d2`…`4d491e6`。与上文方案的差异和实现细节如下。
+
+- **框架同步（P0）**：`packages/cosmos3` 整体同步到官方 `cf5d68c`（`UPSTREAM.md` 记录上游版本与全部本地补丁）。v0.4/v0.6 的 joint video-action mask 实验连同配置、TOML、启动/回放脚本已删除，原实现见 `8525625`；非 AR 基线为 v0.5。
+- **框架补丁（默认关闭，关闭时与官方一致）**：
+  - `action_tokens_per_latent`（K）与 VAE tcf 解耦；视频 mRoPE 与 action 的 `base_temporal_compression_factor` 仍用 tcf。K ≠ tcf 时要求 `fps_action = fps_video × K / tcf`，否则报错。
+  - `supervise_temporal_causal_actions`：时间因果打包中，非条件帧的 action 组作为带噪、计 loss 的目标。
+  - `KVTrainMemoryValue.gen_attention_override`：由调用方计算单视频项的完整视频注意力（GEN 自注意力与视频→文本交叉注意力同一个 softmax）。
+- **数据（P1）**：`src/ar_dataset.py`。第 0 组 8 个槽位为首帧 state 重复 8 次（方案第 3 节二选一中的"重复"）。36 ep 子集实际分档：T=129 共 99 条、T=65 共 17 条、T=33 共 32 条、丢弃 33 条。normalizer v4：`artifacts/cosmos3_action_contract/v4_frame_delta_30hz`，按 30Hz 相邻帧增量统计（181 段、79,436 个增量）。
+- **注意力（第 4 节）**：`src/ar_attention.py`，按 lingbot-va 的 clean/noisy 规则加 `|block_id 差| ≤ window`，每层一次 FlexAttention；GPU 单测与稠密参考实现逐项对照，数值与梯度一致。
+- **训练（P2）**：`src/ar_model.py` 的 `EgoVerseARModel`，基于官方 replayed teacher forcing（Pass 1 干净、Pass 2 带噪，等价于 lingbot 的 [clean, noisy] 单序列）。每步随机 C ∈ {1,2,3,4}、窗口 ∈ [4,64]；视频与 action 各自按 chunk 独立采样 σ；每步 1 个样本（官方 replay 要求）；干净 K/V 保留梯度。EgoVerse 57D loss 抽成 `EgoVerseLossMixin` 复用。
+- **推理（P3）**：`src/ar_inference.py`。每个 chunk 先视频后 action，各用 Euler 流匹配求解；每一步在"截断到当前 chunk 末尾"的片段上重跑 teacher-forcing 前向，前面的 chunk 作为干净条件。在 lingbot mask 下这与训练感受野完全一致，因此 v0.1 不单独维护 KV cache（以速度换正确性）。`--consistency-check` 在 Nano、T=65 上验证：同一 chunk 训练布局与推理布局的预测相对误差 ≤ 1.9%（视频）/ 1.2%（action），为 bf16 精度量级。输出 npz、模型时间与真实时间两版对比视频、轨迹指标。
+- **配置（P4）**：`configs/ar_v0_1.toml`（R2，Nano 初始化）、`configs/ar_v0_1_r1_v0_6.toml`（R1，v0.6 初始化）；`scripts/launch_ar_v0_1.sh`、`scripts/launch_ar_v0_1_smoke.sh`。8 卡冒烟 4 步：loss 有限，显存峰值 41 GiB。
+- **尚未完成（P5）**：R1/R2 各 1200 步过拟合训练与回放评测；推理端 KV cache 加速、闭环真实观测替换、attention sink 仍在第 9 节后续版本中。
