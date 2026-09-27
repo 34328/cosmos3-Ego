@@ -1495,6 +1495,39 @@ def three_way_attention_with_kv_cache(
     video_k = video_k[:video_len]
     video_v = video_v[:video_len]
 
+    if gen_attention_override is not None:
+        # Caller-supplied GEN visibility (e.g. joint video-action teacher forcing). The
+        # override owns the complete video attention -- GEN keys plus the text keys the
+        # built-in video->text cross-attention would read -- in one softmax, so there
+        # is no LSE merge and no reliance on the merge's storage-patching backward.
+        if memory_value.uses_rolling_gen_cache:
+            raise ValueError("gen_attention_override does not support a rolling generated-video cache.")
+        override_text_k, _ = get_causal_seq(
+            packed_key_states_normalized if packed_key_states_normalized is not None else packed_key_states
+        )  # [S_text,H_kv,D]
+        override_text_v, _ = get_causal_seq(packed_value_states)  # [S_text,H_kv,D]
+        override_text_k = torch.where(
+            has_new_caption, override_text_k.unsqueeze(0), memory_value.cached_und_k
+        )  # [1,S_text,H_kv,D]
+        override_text_v = torch.where(
+            has_new_caption, override_text_v.unsqueeze(0), memory_value.cached_und_v
+        )  # [1,S_text,H_kv,D]
+        override_out = gen_attention_override(
+            video_q.reshape(1, T, S_super, num_heads, head_dim),
+            video_k.reshape(1, T, S_super, num_kv_heads, head_dim),
+            video_v.reshape(1, T, S_super, num_kv_heads, head_dim),
+            override_text_k,
+            override_text_v,
+            memory_value,
+        )  # [1,T,S_super,H,D]
+        video_out = override_out.reshape(video_len, num_heads * head_dim)  # [video_len,H*D]
+        if padded_video_len > video_len:
+            video_out = torch.nn.functional.pad(video_out, (0, 0, 0, padded_video_len - video_len))
+        text_out = _three_way_text_self_attention(
+            packed_query_states, packed_key_states, packed_value_states, text_kv_offsets
+        )
+        return from_mode_splits(text_out, video_out, packed_query_states)
+
     # Naming: ``_sa`` = self-attention, ``_ca`` = cross-attention, ``_lse`` = log-sum-exp.
     attn_outputs: list[torch.Tensor]
     lse_outputs: list[torch.Tensor]
@@ -1519,10 +1552,7 @@ def three_way_attention_with_kv_cache(
         video_v_2d = video_v.reshape(1, T, S_super, num_kv_heads, head_dim)  # [1,T,S_super,H_kv,D]
 
         video_components: list[tuple[torch.Tensor, torch.Tensor]]
-        if gen_attention_override is not None:
-            # Caller-supplied GEN visibility (e.g. joint video-action teacher forcing).
-            video_components = gen_attention_override(video_q_2d, video_k_2d, video_v_2d, memory_value)
-        elif isinstance(memory_value, TFNoisyMemoryValue):
+        if isinstance(memory_value, TFNoisyMemoryValue):
             # Teacher forcing: two merge components framewise, four chunkwise
             # (frames_per_chunk > 1, chunk partition [1, C, C, ...]).
             video_components = teacher_forcing_gen_attention(
@@ -1665,6 +1695,33 @@ def three_way_attention_with_kv_cache(
     assert isinstance(text_res, torch.Tensor)
     text_out = text_res.squeeze(0).flatten(-2, -1)
     return from_mode_splits(text_out, video_out, packed_query_states)
+
+
+def _three_way_text_self_attention(
+    packed_query_states: SequencePack,
+    packed_key_states: SequencePack,
+    packed_value_states: SequencePack,
+    text_kv_offsets: torch.Tensor,
+) -> torch.Tensor:
+    """Causal varlen text self-attention, identical to the tail of ``three_way_attention_with_kv_cache``."""
+    text_q, _ = get_causal_seq(packed_query_states)
+    text_k, _ = get_causal_seq(packed_key_states)
+    text_v, _ = get_causal_seq(packed_value_states)
+    padded_text_len = text_q.shape[0]
+    text_res = attention(
+        text_q.unsqueeze(0),
+        text_k.unsqueeze(0),
+        text_v.unsqueeze(0),
+        cumulative_seqlen_Q=text_kv_offsets,
+        cumulative_seqlen_KV=text_kv_offsets,
+        max_seqlen_Q=padded_text_len,
+        max_seqlen_KV=padded_text_len,
+        is_causal=True,
+        causal_type=CausalType.TopLeft,
+        backend="natten",
+    )
+    assert isinstance(text_res, torch.Tensor)
+    return text_res.squeeze(0).flatten(-2, -1)
 
 
 class _ACSafeMergeAttentionsFn(torch.autograd.Function):

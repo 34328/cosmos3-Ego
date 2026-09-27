@@ -33,4 +33,4 @@
 
 - `configs/base/defaults/model_config.py`、`configs/toml_config/sft_config.py`、`configs/toml_config/toml_config_helper.py`：新增 `supervise_temporal_causal_actions`（默认 False）。
 - `data/generator/sequence_packing/temporal_causal.py`、`packers.py`、`model/generator/omni_mot_model.py`：`supervise_action_tokens=True` 时，非条件帧的 action 组成为带噪、计 loss 的目标（写入 condition mask、noisy_frame_indexes、mse_loss_indexes 与逐帧 timestep），条件帧的 action 组保持干净。
-- `model/generator/utils/kv_cache.py`、`model/generator/mot/causal_attention.py`：`KVTrainMemoryValue.gen_attention_override`（默认 None）；非 None 时替换 `three_way_attention_with_kv_cache` 中单视频项的 GEN 自注意力分量，文本交叉注意力与 merge 不变。
+- `model/generator/utils/kv_cache.py`、`model/generator/mot/causal_attention.py`：`KVTrainMemoryValue.gen_attention_override`（默认 None）；非 None 时由它计算单视频项的完整视频注意力（GEN 自注意力与视频→文本交叉注意力在同一个 softmax 中，不经过 LSE merge），文本自注意力不变。

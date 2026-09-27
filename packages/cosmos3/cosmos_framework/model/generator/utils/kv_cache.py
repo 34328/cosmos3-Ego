@@ -1347,11 +1347,12 @@ class KVTrainMemoryValue(MemoryValue):
     max_gen_cache_tokens: int
     clamp_empty_varlen_kv: bool
     uses_rolling_gen_cache: bool = field(default=True, kw_only=True)
-    # Optional replacement for the single-item GEN self-attention components of
-    # ``three_way_attention_with_kv_cache`` (text cross-attention, rolling cache
-    # and the merge are unchanged). Called as ``override(q_2d, k_2d, v_2d,
-    # memory_value)`` with ``[1,T,S_super,H(_kv),D]`` tensors; returns a list of
-    # ``(out [1,T,S_super,H,D], lse [1,T,S_super,H])``. None keeps the built-in path.
+    # Optional replacement for the complete single-item video attention of
+    # ``three_way_attention_with_kv_cache`` (GEN self-attention and video->text
+    # cross-attention in one softmax; text self-attention is unchanged). Called as
+    # ``override(q_2d, k_2d, v_2d, text_k, text_v, memory_value)`` with GEN tensors
+    # ``[1,T,S_super,H(_kv),D]`` and the selected text K/V ``[1,S_text,H_kv,D]``;
+    # returns the video output ``[1,T,S_super,H,D]``. None keeps the built-in path.
     gen_attention_override: Any = field(default=None, kw_only=True)
 
     @property
