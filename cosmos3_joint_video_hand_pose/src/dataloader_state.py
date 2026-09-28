@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 import random
 from collections import deque
@@ -43,27 +44,33 @@ class RecoverablePackingDataLoader(PackingDataLoader):
 
     @staticmethod
     def _checkpoint_metadata(sample: dict[str, Any]) -> dict[str, Any]:
-        # Video/action are deterministic from dataset_index and can be decoded
-        # again. Preserve everything else (notably CFG-dropout text/plan) exactly.
+        # AR media are deterministic only from dataset_index AND the saved
+        # source window. Preserve window/state hashes and CFG text/plan exactly.
+        if "ar_layout_version" in sample and "source_frame_indices" not in sample:
+            raise ValueError("AR packing checkpoint requires exact source_frame_indices")
         return copy.deepcopy({key: value for key, value in sample.items() if key not in _LARGE_SAMPLE_KEYS})
 
     def state_dict(self) -> dict[str, Any]:
         buffer = list(self.buffers[0]) if self._child_iterators_initialized else []
         return {
-            "version": 1,
+            "version": 2,
             "global_id": self.global_id,
             "inner": self.dataloader_list[0].state_dict(),
-            "buffer": [self._checkpoint_metadata(sample) for sample in buffer],
+            "buffer": (
+                [self._checkpoint_metadata(sample) for sample in buffer]
+                if self._child_iterators_initialized
+                else copy.deepcopy(self._restored_buffer_metadata or [])
+            ),
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         if self._child_iterators_initialized:
             raise RuntimeError("Dataloader state must be restored before worker iterators are initialized.")
-        if int(state_dict.get("version", 0)) != 1:
+        if int(state_dict.get("version", 0)) not in (1, 2):
             raise ValueError(f"Unsupported dataloader checkpoint version: {state_dict.get('version')!r}")
         self.dataloader_list[0].load_state_dict(state_dict["inner"])
         self.global_id = int(state_dict["global_id"])
-        self._restored_buffer_metadata = list(state_dict.get("buffer", []))
+        self._restored_buffer_metadata = copy.deepcopy(list(state_dict.get("buffer", [])))
         self._state_was_restored = True
         log.info(
             f"Restored packed dataloader at global_id={self.global_id} with "
@@ -100,6 +107,39 @@ class RecoverablePackingDataLoader(PackingDataLoader):
                 sample[key] = value[0:1]
         return sample
 
+    @staticmethod
+    def _assert_rebuilt_metadata(actual, saved, key):
+        """Never hide a changed physical/state/source payload behind old metadata."""
+        if isinstance(saved, torch.Tensor):
+            if (
+                not isinstance(actual, torch.Tensor)
+                or actual.shape != saved.shape
+                or not torch.equal(actual.cpu(), saved.cpu())
+            ):
+                raise ValueError(f"restored dataset differs from checkpoint: {key}")
+        elif isinstance(saved, np.ndarray):
+            if not isinstance(actual, np.ndarray) or not np.array_equal(actual, saved):
+                raise ValueError(f"restored dataset differs from checkpoint: {key}")
+        elif isinstance(saved, (list, tuple)):
+            if not isinstance(actual, (list, tuple)) or len(actual) != len(saved):
+                raise ValueError(f"restored dataset differs from checkpoint: {key}")
+            for left, right in zip(actual, saved, strict=True):
+                RecoverablePackingDataLoader._assert_rebuilt_metadata(left, right, key)
+        elif isinstance(saved, dict):
+            if not isinstance(actual, dict) or actual.keys() != saved.keys():
+                raise ValueError(f"restored dataset differs from checkpoint: {key}")
+            for name, value in saved.items():
+                RecoverablePackingDataLoader._assert_rebuilt_metadata(actual[name], value, f"{key}.{name}")
+        elif dataclasses.is_dataclass(saved):
+            if type(actual) is not type(saved):
+                raise ValueError(f"restored dataset differs from checkpoint: {key}")
+            for field in dataclasses.fields(saved):
+                RecoverablePackingDataLoader._assert_rebuilt_metadata(
+                    getattr(actual, field.name), getattr(saved, field.name), f"{key}.{field.name}"
+                )
+        elif actual != saved:
+            raise ValueError(f"restored dataset differs from checkpoint: {key}")
+
     def _rebuild_buffer(self, metadata_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # Re-decoding must not perturb trainer-side noise/timestep RNG state.
         python_state = random.getstate()
@@ -110,8 +150,44 @@ class RecoverablePackingDataLoader(PackingDataLoader):
             rebuilt = []
             for metadata in metadata_items:
                 index = self._dataset_index(metadata)
-                sample = self._split_single_sample(dataset[index])
-                sample.update(copy.deepcopy(metadata))
+                exact_window = getattr(dataset, "get_item_at_window", None)
+                is_windowed = "window_start" in metadata or "ar_layout_version" in metadata
+                if is_windowed:
+                    if exact_window is None or "source_frame_indices" not in metadata:
+                        raise ValueError("windowed checkpoint needs get_item_at_window and saved source indexes")
+                    first = metadata.get("window_start")
+                    while isinstance(first, (list, tuple)) and len(first) == 1:
+                        first = first[0]
+                    source = metadata["source_frame_indices"]
+                    while isinstance(source, (list, tuple)) and len(source) == 1:
+                        source = source[0]
+                    raw = exact_window(index, window_start=first, source_frame_indices=source)
+                else:
+                    # Compatibility for legacy datasets with deterministic index lookup.
+                    raw = dataset[index]
+                sample = self._split_single_sample(raw)
+                # These fields can change when re-running the tokenizer's CFG
+                # dropout. Restore them, but never overwrite reconstructed media,
+                # source indexes, visibility, boundary states or artifact hashes.
+                stochastic = {
+                    "ai_caption",
+                    "text_token_ids",
+                    "text_token_lengths",
+                    "sequence_plan",
+                    "ar_num_tokens",
+                    "num_tokens",
+                    "text",
+                    "caption",
+                }
+                for key, value in metadata.items():
+                    if key in stochastic or key in _BATCH_TIMING_KEYS:
+                        continue
+                    if key not in sample:
+                        raise ValueError(f"restored dataset missing checkpoint field: {key}")
+                    self._assert_rebuilt_metadata(sample[key], value, key)
+                for key in stochastic:
+                    if key in metadata:
+                        sample[key] = copy.deepcopy(metadata[key])
                 rebuilt.append(sample)
             return rebuilt
         finally:

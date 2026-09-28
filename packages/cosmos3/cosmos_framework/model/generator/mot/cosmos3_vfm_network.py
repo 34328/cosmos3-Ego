@@ -71,6 +71,8 @@ class Cosmos3VFMNetworkConfig(PretrainedConfig):
         enable_vision_modality_embeddings: bool = False,
         enable_media_modality_embedding: bool = False,
         enable_action_modality_embedding: bool = True,
+        enable_action_state_embedding: bool = False,
+        enable_vision_condition_embedding: bool = False,
         enable_sound_modality_embedding: bool = True,
         base_fps=24,
         vit_max_num_patch_per_side=70,
@@ -109,6 +111,8 @@ class Cosmos3VFMNetworkConfig(PretrainedConfig):
         self.enable_vision_modality_embeddings = enable_vision_modality_embeddings
         self.enable_media_modality_embedding = enable_media_modality_embedding
         self.enable_action_modality_embedding = enable_action_modality_embedding
+        self.enable_action_state_embedding = enable_action_state_embedding
+        self.enable_vision_condition_embedding = enable_vision_condition_embedding
         self.enable_sound_modality_embedding = enable_sound_modality_embedding
         if self.enable_vision_modality_embeddings and self.enable_media_modality_embedding:
             raise ValueError(
@@ -244,6 +248,8 @@ class Cosmos3VFMNetwork(PreTrainedModel):
             _input_bias = config.enable_input_bias
             self.time_embedder = TimestepEmbedder(self.hidden_size, bias=_input_bias)
             self.vae2llm = nn.Linear(self.patch_latent_dim, self.hidden_size, bias=_input_bias)
+            if config.enable_vision_condition_embedding:
+                self.vision_condition_embed = nn.Parameter(torch.zeros(self.hidden_size))
             self.llm2vae = nn.Linear(self.hidden_size, self.patch_latent_dim)
 
             # LiDAR is its own modality: a range clip enters and leaves the sequence through
@@ -275,6 +281,8 @@ class Cosmos3VFMNetwork(PreTrainedModel):
 
             if config.enable_action_modality_embedding:
                 self.action_modality_embed = nn.Parameter(torch.zeros(self.hidden_size))  # [hidden_size]
+            if config.enable_action_state_embedding:
+                self.action_state_embed = nn.Parameter(torch.zeros(self.hidden_size))
 
         if config.sound_gen:
             self.sound_dim = config.sound_dim
@@ -292,6 +300,8 @@ class Cosmos3VFMNetwork(PreTrainedModel):
 
         if self.config.vision_gen:
             std = 1.0 / math.sqrt(self.patch_latent_dim)
+            if self.config.enable_vision_condition_embedding:
+                torch.nn.init.zeros_(self.vision_condition_embed)
             torch.nn.init.trunc_normal_(self.vae2llm.weight, std=std, a=-3 * std, b=3 * std)
             if self.config.enable_input_bias:
                 torch.nn.init.zeros_(self.vae2llm.bias)
@@ -330,6 +340,8 @@ class Cosmos3VFMNetwork(PreTrainedModel):
             if self.config.enable_action_modality_embedding:
                 std = 1.0 / math.sqrt(self.hidden_size)
                 torch.nn.init.trunc_normal_(self.action_modality_embed, std=std, a=-3 * std, b=3 * std)  # [hidden_size]
+            if self.config.enable_action_state_embedding:
+                torch.nn.init.zeros_(self.action_state_embed)
 
         if self.config.sound_gen:
             # sound2llm: input_size=sound_dim, output_size=hidden_size
@@ -771,7 +783,7 @@ class Cosmos3VFMNetwork(PreTrainedModel):
             modality_embed = self.media_modality_embed
         else:
             modality_embed = None
-        return self._encode_grid_stream(
+        shapes = self._encode_grid_stream(
             packed_seq,
             packed_seq.vision,
             packed_sequence,
@@ -780,6 +792,16 @@ class Cosmos3VFMNetwork(PreTrainedModel):
             modality_embed=modality_embed,
             target_dtype=target_dtype,
         )
+
+        if packed_seq.vision_condition_type_mask is not None:
+            if not self.config.enable_vision_condition_embedding or packed_seq.vision is None:
+                raise ValueError("condition image mask requires enabled vision embedding")
+            mask = packed_seq.vision_condition_type_mask.to(packed_sequence.device)
+            indexes = packed_seq.vision.sequence_indexes
+            if mask.dtype != torch.bool or mask.numel() != indexes.numel():
+                raise ValueError("condition image mask must cover all vision patches")
+            packed_sequence[indexes] = packed_sequence[indexes] + mask[:, None] * self.vision_condition_embed[None]
+        return shapes
 
     def _encode_lidar(
         self,
@@ -991,6 +1013,14 @@ class Cosmos3VFMNetwork(PreTrainedModel):
             packed_tokens_action = packed_tokens_action + self.action_modality_embed.view(
                 1, -1
             )  # [B_action*T_action,hidden_size]
+
+        if packed_seq.action_state_mask is not None:
+            if not self.config.enable_action_state_embedding:
+                raise ValueError("state token mask requires enable_action_state_embedding=True")
+            state_mask = packed_seq.action_state_mask.to(device=packed_tokens_action.device)
+            if state_mask.shape != (packed_tokens_action.shape[0],) or state_mask.dtype != torch.bool:
+                raise ValueError("action_state_mask must be boolean and cover every action/state row")
+            packed_tokens_action = packed_tokens_action + state_mask[:, None] * self.action_state_embed[None]
 
         has_noisy_actions = has_noisy_tokens(action)
         if has_noisy_actions:
@@ -1359,7 +1389,10 @@ class Cosmos3VFMNetwork(PreTrainedModel):
             all_gen_indexes.append(packed_seq.action.sequence_indexes)
         if packed_seq.sound is not None and isinstance(packed_seq.sound.sequence_indexes, torch.Tensor):
             all_gen_indexes.append(packed_seq.sound.sequence_indexes)
-        vision_sequence_indexes = torch.cat(all_gen_indexes, dim=0) if all_gen_indexes else None  # [N_gen_tokens]
+        # A text-only prefill has an explicitly empty GEN stream. The sequence
+        # builder moves these indexes to the device even when no GEN rows exist.
+        vision_sequence_indexes = (torch.cat(all_gen_indexes, dim=0) if all_gen_indexes
+                                   else packed_seq.text_indexes.new_empty((0,)))  # [N_gen_tokens]
 
         # When temporal causal is enabled the buffer is [action_t0, vision_t0, action_t1, vision_t1, ...].
         # After torch.cat([vision_indexes, action_indexes]) the interleaved order is lost; sorting restores it.

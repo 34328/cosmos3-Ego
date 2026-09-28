@@ -42,6 +42,8 @@ class DiffusionExpertConfig:
     # Whether to add a learned modality embedding to action generation tokens.
     # Enabled by default to preserve legacy checkpoints and model behavior.
     enable_action_modality_embedding: bool = True
+    enable_action_state_embedding: bool = False
+    enable_vision_condition_embedding: bool = False
     # Whether to add a learned modality embedding to sound generation tokens.
     # Enabled by default
     enable_sound_modality_embedding: bool = True

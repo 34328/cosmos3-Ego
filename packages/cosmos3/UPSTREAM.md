@@ -9,6 +9,27 @@
 
 ## 本地补丁
 
+### AR v0.2 逐块图像／state 条件与多样本（2026-09-28，验收中）
+
+- 新布局为 `joint_chunk_cond_v1`：每块独立编码 `U/S/V/A`，替代下节旧单首帧布局。项目层改动位于 `cosmos3_joint_video_hand_pose/src/ar_v02_*`，旧布局的测试结果不能作为新布局验收依据。
+- `model_config.py`、`omni_mot_model.py`、`cosmos3_vfm_network.py`：新增默认关闭的 `enable_vision_condition_embedding`，仅对块首图像注入零初始化可学习类型向量；与 `action_state_embed` 一起进入优化器。
+- `sequence.py`：新增 `vision_condition_type_mask` 并随 pack 迁移设备；它区分 U/V 类型，不替代 attention mask 或 loss mask。
+- `causal_attention.py`：有显式 GEN override 时，不再把两个视频项误判成 control/target transfer；项目层另修 teacher-forcing memory 的逐样本文本 offsets，保证多 clip 文本隔离。
+- `cosmos3_vfm_network.py`／`causal_attention.py`：纯文本预填显式使用空 GEN 索引，支持 `flat_gen_tokens=0`，避免未给视频时的 `.to(None)` 和空 GEN 重塑错误。
+- 项目层沿用官方动态 packer 和 replay，预算覆盖条件 token 与两次前向；loss 按模态有效样本全局平均，不能对各卡的均值直接平均。官方初始化与续训采用不同的 checkpoint 校验，续训绑定布局、有效窗口及归一化统计。
+- 项目层新增 `ar_v02_compact.py`：第二遍仅计算未来 V/A query，复用带梯度的 clean 文本与 GEN K/V；完整 query 路径保留作参考。packer 准入暂保留双完整 pass 的保守预算，未依据节约量扩大 batch。
+
+
+### AR v0.2 单 state 与显式 joint 布局（2026-09-28，开发中）
+
+- `configs/base/defaults/model_config.py`、`model/generator/omni_mot_model.py`、`mot/cosmos3_vfm_network.py`：新增默认关闭的 `enable_action_state_embedding`。开启时 state 复用 action 投影，并增加零初始化的可学习类型向量；只在 `action_state_mask` 对应行注入，未来 action 的输入／输出维度不变。
+- `data/generator/sequence_packing/sequence.py`：`PackedSequence.action_state_mask` 显式记录 state 行，并参与设备迁移、clean replay 深拷贝；state 的 condition／noisy／loss 范围由项目 V0.2 packer 构建。
+- `mot/causal_attention.py`：允许 GEN override 声明 `flat_gen_tokens`，不再强迫可变 state 布局重塑为 `T×(K+HW)`；保留真实视频几何，支持无视频的 state-only prefill。持续缓存读取已缓存文本时跳过文本 query，后续前向仅投影当前 GEN token。
+- 上述字段默认关闭／为空，V0.1 与非 AR 打包保持原有路径。项目层 `ar_v02_*` 提供显式角色／源帧索引、训练 joint mask、30 步采样、单 state 初始预填、15 chunk 淘汰和显式解包。旧版重复 8 次属于打包实现选择，不是 flow matching 要求。
+- 当前 torch 2.10 环境下，编译 `create_block_mask` 并交替使用 clean/noisy 布局会出现前向一致、文本 K 梯度不一致；V0.2 使用 eager mask 构建，FlexAttention 前后向仍编译。覆盖交替布局的 GPU 梯度测试必须保留；未验证前不能重新开启 mask 构建编译。
+
+以下为之前移植的补丁：
+
 以下改动在 cf5d68c 之上重新移植（来源：旧提交 186398c、f695588），保持官方代码结构，改动最小：
 
 - `cosmos_framework/data/generator/action/datasets/action_sft_dataset.py`：`ActionIterableShuffleDataset` 增加 `state_dict` / `load_state_dict`，记录 epoch、分片内样本偏移与 worker RNG，供 `StatefulDataLoader` 精确续训。
@@ -34,3 +55,9 @@
 - `configs/base/defaults/model_config.py`、`configs/toml_config/sft_config.py`、`configs/toml_config/toml_config_helper.py`：新增 `supervise_temporal_causal_actions`（默认 False）。
 - `data/generator/sequence_packing/temporal_causal.py`、`packers.py`、`model/generator/omni_mot_model.py`：`supervise_action_tokens=True` 时，非条件帧的 action 组成为带噪、计 loss 的目标（写入 condition mask、noisy_frame_indexes、mse_loss_indexes 与逐帧 timestep），条件帧的 action 组保持干净。
 - `model/generator/utils/kv_cache.py`、`model/generator/mot/causal_attention.py`：`KVTrainMemoryValue.gen_attention_override`（默认 None）；非 None 时由它计算单视频项的完整视频注意力（GEN 自注意力与视频→文本交叉注意力在同一个 softmax 中，不经过 LSE merge），文本自注意力不变。
+### V0.2 action bias 梯度汇总（2026-09-28）
+
+`model/generator/mot/domain_aware_linear.py`：grouped bf16 投影的重复 domain bias
+先用 FP32 gather，再转回输出 dtype；forward 值和 checkpoint key 不变，反向先累加
+再做 bf16 舍入。修复删除零 loss 条件行导致 bias 梯度变化的问题。
+回归：`tests/test_ar_v02_domain_bias_gpu.py`、`tests/test_ar_v02_compact_gpu.py`。

@@ -1,0 +1,41 @@
+# 已暂停，不可运行：旧版 no-state 消融配置，仅保留供历史实验溯源。
+# joint_chunk_cond_v1 要求每个 chunk 都有 S_k；模型会明确拒绝无 state 模式。
+# 当前唯一完整 V0.2 入口为 ar_v0_2.toml，勿用本文件启动训练。
+[job]
+task = "vfm"
+experiment = "egoverse_joint_video_hand_pose_ar_v0_2_c_no_chunk_state"
+project = "joint_video_hand_pose"
+group = "ar_v0_2"
+name = "C_no_chunk_state"
+wandb_mode = "disabled"
+
+[model]
+precision = "bfloat16"
+
+[model.parallelism]
+data_parallel_shard_degree = 8
+data_parallel_replicate_degree = 1
+context_parallel_shard_degree = 1
+
+[model.activation_checkpointing]
+mode = "full"
+
+[model.compile]
+enabled = false
+
+[optimizer]
+lr = 2.0e-5
+
+[scheduler]
+warm_up_steps = [100]
+cycle_lengths = [1200]
+f_start = [0.0]
+f_max = [1.0]
+f_min = [0.1]
+
+[trainer]
+max_iter = 1200
+logging_iter = 1
+
+[checkpoint]
+save_iter = 300

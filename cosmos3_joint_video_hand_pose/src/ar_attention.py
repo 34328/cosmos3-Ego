@@ -214,10 +214,15 @@ class LingbotTeacherForcingAttention:
         if not noisy and not isinstance(memory_value, TFReplayCleanMemoryValue):
             raise TypeError(f"lingbot teacher forcing expects replay TF memory, got {type(memory_value).__name__}")
         _, num_frames, tokens_per_frame, num_heads, head_dim = q_2d.shape
-        if (num_frames, tokens_per_frame) != (self.layout.num_frames, self.layout.tokens_per_frame):
+        expected_shape = (
+            (1, self.flat_gen_tokens)
+            if hasattr(self, "flat_gen_tokens")
+            else (self.layout.num_frames, self.layout.tokens_per_frame)
+        )
+        if (num_frames, tokens_per_frame) != expected_shape:
             raise ValueError(
                 f"packed GEN layout {(num_frames, tokens_per_frame)} does not match the attention layout "
-                f"{(self.layout.num_frames, self.layout.tokens_per_frame)}"
+                f"{expected_shape}"
             )
         num_kv_heads = k_2d.shape[3]
         gen_len, gen_pad = self.gen_len, self.gen_pad_len

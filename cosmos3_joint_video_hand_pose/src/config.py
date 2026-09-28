@@ -15,6 +15,7 @@ from cosmos_framework.model.generator.omni_mot_causal_model import OmniMoTCausal
 
 from .ar_dataset import get_egoverse_ar_dataset
 from .ar_model import EgoVerseARModel
+from .ar_v02_model import EgoVerseARV02Model
 from .dataset import get_egoverse_cosmos_dataset
 from .dataloader_state import EgoVerseDataLoaderStateCallback, RecoverablePackingDataLoader
 from .model import EgoVerseOmniMoTModel
@@ -30,8 +31,7 @@ ensure_wandb_generate_id()
 # Retain console progress and training housekeeping, but omit the expensive
 # diagnostic callbacks that create thousands of unrelated W&B charts.
 _EGOVERSE_BASIC_CALLBACKS = {
-    _name: copy.deepcopy(BASIC_CALLBACKS[_name])
-    for _name in ("iter_speed", "manual_gc", "load_pretrained")
+    _name: copy.deepcopy(BASIC_CALLBACKS[_name]) for _name in ("iter_speed", "manual_gc", "load_pretrained")
 }
 _EGOVERSE_BASIC_CALLBACKS["wandb"] = L(LossOnlyWandBCallback)()
 _EGOVERSE_BASIC_CALLBACKS["egoverse_loss_wandb"] = L(EgoVerseLossWandbCallback)()
@@ -55,8 +55,7 @@ def _model_config(action_loss_weight: float = 7.0) -> dict:
     config["vlm_config"]["tokenizer"]["pretrained_model_name"] = "/mnt/checkpoints/Cosmos3-Nano/text_tokenizer"
     config["vlm_config"]["tokenizer"]["config_variant"] = "hf"
     config["vlm_config"]["model_instance"]["config"]["base_config"]["json_file"] = str(
-        COSMOS_REPO_ROOT
-        / "packages/cosmos3/cosmos_framework/model/generator/reasoner/"
+        COSMOS_REPO_ROOT / "packages/cosmos3/cosmos_framework/model/generator/reasoner/"
         "qwen3_vl/configs/Qwen3-VL-8B-Instruct.json"
     )
     config["parallelism"].update(
@@ -240,9 +239,7 @@ egoverse_joint_video_hand_pose_overfit_v0_0 = LazyDict(
 
 # Same data/model/loss contract as overfit_v0.0, with the requested balanced
 # effective learning rates: shared/video 4x and action 5x from a 2e-5 base.
-egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced = copy.deepcopy(
-    egoverse_joint_video_hand_pose_overfit_v0_0
-)
+egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced = copy.deepcopy(egoverse_joint_video_hand_pose_overfit_v0_0)
 egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["job"]["name"] = "overfit_v0.2_lr_balanced"
 egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["optimizer"]["lr"] = 2.0e-5
 egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["optimizer"]["lr_multipliers"] = {
@@ -255,13 +252,11 @@ egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["optimizer"]["lr_multipl
     "action_modality_embed": 5.0,
 }
 egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["scheduler"]["warm_up_steps"] = [100]
-egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["model"]["config"][
-    "rectified_flow_training_config"
-].update(loss_scale=1.0, action_loss_weight=0.7)
+egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["model"]["config"]["rectified_flow_training_config"].update(
+    loss_scale=1.0, action_loss_weight=0.7
+)
 egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["dataloader_train"]["_target_"] = RecoverablePackingDataLoader
-egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["dataloader_train"][
-    "lazy_initialize_child_iterators"
-] = True
+egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["dataloader_train"]["lazy_initialize_child_iterators"] = True
 egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["dataloader_train"]["dataloader"]["stateful"] = True
 egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["dataloader_train"]["dataloader"]["in_order"] = True
 egoverse_joint_video_hand_pose_overfit_v0_2_lr_balanced["trainer"]["callbacks"]["dataloader_state"] = L(
@@ -295,12 +290,10 @@ egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action["mode
 egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3 = copy.deepcopy(
     egoverse_joint_video_hand_pose_overfit_v0_3_active_norm_independent_action
 )
-egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["job"]["name"] = (
-    "overfit_v0.5_frame_delta_b3"
-)
-_v0_5_dataset = egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3[
-    "dataloader_train"
-]["dataloader"]["datasets"]["egoverse"]["dataset"]
+egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["job"]["name"] = "overfit_v0.5_frame_delta_b3"
+_v0_5_dataset = egoverse_joint_video_hand_pose_overfit_v0_5_frame_delta_b3["dataloader_train"]["dataloader"][
+    "datasets"
+]["egoverse"]["dataset"]
 _v0_5_dataset["rigid_pose_frame_delta"] = True
 _v0_5_dataset["future_normalizer"] = (
     f"{COSMOS_REPO_ROOT}/cosmos3_joint_video_hand_pose/artifacts/"
@@ -409,6 +402,55 @@ ConfigStore.instance().store(
     name="egoverse_joint_video_hand_pose_ar_v0_1",
     node=egoverse_joint_video_hand_pose_ar_v0_1,
 )
+
+
+def _ar_v02_experiment(chunk_state_conditioning: bool):
+    from .ar_v02_dataloader import JointChunkPackingDataLoader
+    from .ar_v02_contract import ARTrainingContractCallback
+
+    experiment = copy.deepcopy(egoverse_joint_video_hand_pose_ar_v0_1)
+    model_config = _ar_v0_1_model_config()
+    model_config.diffusion_expert_config.enable_action_state_embedding = True
+    model_config.diffusion_expert_config.enable_vision_condition_embedding = True
+    model_config.max_num_tokens_after_packing = 70000
+    model_config.rectified_flow_training_config.loss_scale = 1.0
+    model_config.rectified_flow_training_config.action_loss_weight = 0.7
+    experiment["model"] = L(EgoVerseARV02Model)(
+        config=model_config, chunk_state_conditioning=chunk_state_conditioning, seed=42, _recursive_=False
+    )
+    experiment["optimizer"]["keys_to_select"].extend(["action_state_embed", "vision_condition_embed"])
+    experiment["optimizer"]["lr_multipliers"]["action_state_embed"] = 5.0
+    experiment["optimizer"]["lr_multipliers"]["vision_condition_embed"] = 5.0
+    # The DCP loader applies skips only to official warm-start, never same-run resume.
+    experiment["checkpoint"]["keys_to_skip_loading"].extend(["action_state_embed", "vision_condition_embed"])
+    dataset = experiment["dataloader_train"]["dataloader"]["datasets"]["egoverse"]["dataset"]
+    data_root = COSMOS_REPO_ROOT / "outputs/joint_video_hand_pose/ar_v0_2/data_v2"
+    dataset["chunk_state_normalizer"] = str(data_root / "chunk_state_normalizer.json")
+    dataset["valid_windows_manifest"] = str(data_root / "valid_windows.json")
+    experiment["checkpoint"]["strict_resume"] = True
+    experiment["trainer"]["callbacks"]["ar_v02_contract"] = L(ARTrainingContractCallback)(
+        state_normalizer=dataset["chunk_state_normalizer"],
+        action_normalizer=dataset["future_normalizer"],
+        valid_windows_manifest=dataset["valid_windows_manifest"],
+        official_checkpoint="/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp",
+        check_raw_gradients=True,
+    )
+    experiment["job"].update(group="ar_v0_2", name="joint_chunk_cond_v1")
+    model_config.max_num_tokens_after_packing = 70000
+    experiment["dataloader_train"]["_target_"] = JointChunkPackingDataLoader
+    experiment["dataloader_train"]["joint_max_samples"] = 4
+    experiment["dataloader_train"]["max_samples_per_batch"] = None
+    experiment["dataloader_train"]["max_sequence_length"] = "${model.config.max_num_tokens_after_packing}"
+    return experiment
+
+
+for _name, _states in (("ar_v0_2", True), ("ar_v0_2_c", True)):
+    ConfigStore.instance().store(
+        group="experiment",
+        package="_global_",
+        name="egoverse_joint_video_hand_pose_" + _name,
+        node=_ar_v02_experiment(_states),
+    )
 
 
 def make_config():

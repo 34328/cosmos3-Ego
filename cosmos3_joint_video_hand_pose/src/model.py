@@ -6,7 +6,8 @@ from typing import Any
 
 import torch
 
-from .loss import visibility_weighted_action_flow_loss
+from .loss import visibility_weighted_action_flow_loss, whole_action_flow_loss, whole_video_flow_loss
+from .ar_v02_contract import GlobalSampleMeanWindow, assert_optimizer_covers_trainable
 
 
 try:
@@ -25,7 +26,10 @@ def _visibility_from_batch(data_batch: dict[str, Any]) -> list[torch.Tensor]:
     items = raw if isinstance(raw, list) else [raw]
     result = []
     for item in items:
-        tensor = torch.as_tensor(item, dtype=torch.bool)
+        tensor = torch.as_tensor(item)
+        if not ((tensor == 0) | (tensor == 1)).all():
+            raise ValueError("hand_visibility must be binary, not missing/NaN labels")
+        tensor = tensor.bool()
         while tensor.ndim > 2 and tensor.shape[0] == 1:
             tensor = tensor.squeeze(0)
         if tensor.ndim != 2 or tensor.shape[1] != 2:
@@ -40,16 +44,155 @@ class EgoVerseLossMixin:
     Mix in before a Cosmos ``OmniMoTModel`` subclass; the generator architecture is unchanged.
     """
 
-    def __init__(self, config, lambda_out_of_fov: float = 0.0, subblock_equal_weight: bool = False):
+    def __init__(
+        self,
+        config,
+        lambda_out_of_fov: float = 0.0,
+        subblock_equal_weight: bool = False,
+        whole_action_loss: bool = False,
+    ):
         super().__init__(config)
         if not 0 <= lambda_out_of_fov <= 1:
             raise ValueError("lambda_out_of_fov must be in [0,1]")
         self.lambda_out_of_fov = float(lambda_out_of_fov)
         self.subblock_equal_weight = bool(subblock_equal_weight)
+        self.whole_action_loss = bool(whole_action_loss)
+        if self.whole_action_loss and (self.lambda_out_of_fov != 0 or self.subblock_equal_weight):
+            raise ValueError("whole_action_loss requires binary visibility and no sub-block weighting")
         self._current_hand_visibility: list[torch.Tensor] | None = None
         self._cp_local_hand_visibility: list[torch.Tensor] | None = None
         # Sub-block action losses written by the current _compute_losses call only.
         self._last_visibility_loss_metrics: dict[str, torch.Tensor] = {}
+        self._ar_loss_window = None
+        self._ar_gradient_accumulation = 1
+        self._ar_backward_loss = None
+
+    def configure_ar_loss_accumulation(self, microsteps: int):
+        """Trainer/callback must pass its actual grad_accum_iter before training."""
+        if not isinstance(microsteps, int) or microsteps < 1:
+            raise ValueError("gradient accumulation must be a positive integer")
+        window = getattr(self, "_ar_loss_window", None)
+        if window is not None and not window.complete:
+            raise RuntimeError("cannot reconfigure an unfinished loss window")
+        self._ar_gradient_accumulation = microsteps
+
+    def begin_ar_loss_window(self, local_counts, *, device=None):
+        """Main trainer preplans [microsteps,2] effective modality sample counts.
+
+        Call once on ALL ranks before a multi-microbatch optimizer update.
+        With grad_accum_iter=1, the loss path obtains counts automatically.
+        """
+        previous = getattr(self, "_ar_loss_window", None)
+        if previous is not None and not previous.complete:
+            raise RuntimeError("previous loss window is unfinished")
+        cp = getattr(self, "parallel_dims", None)
+        if cp is not None and cp.cp_enabled:
+            raise ValueError("v0.2 global sample loss currently requires CP1")
+        group, size = self._loss_averaging_group()
+        window = GlobalSampleMeanWindow(local_counts, device=device, group=group)
+        if window.world_size != size:
+            raise ValueError("loss count group must match the gradient averaging group")
+        if window.microsteps != getattr(self, "_ar_gradient_accumulation", 1):
+            raise ValueError("planned microsteps must match configured trainer grad_accum_iter")
+        self._ar_loss_window = window
+
+    def training_step(self, data_batch, iteration):
+        self._ar_backward_loss = None
+        try:
+            output, loss = super().training_step(data_batch, iteration)
+            if self._ar_backward_loss is not None:
+                output["_backward_loss"] = self._ar_backward_loss
+            return output, loss
+        finally:
+            self._ar_backward_loss = None
+
+    def on_before_optimizer_step(self, optimizer, scheduler, iteration):
+        window = getattr(self, "_ar_loss_window", None)
+        if getattr(self, "whole_action_loss", False) and window is not None and not window.complete:
+            raise RuntimeError("optimizer step before the planned loss window completed")
+        return super().on_before_optimizer_step(optimizer, scheduler, iteration)
+
+    def init_optimizer_scheduler(self, optimizer_config, scheduler_config):
+        # Save names before Cosmos keys_to_select can silently freeze them.
+        required = [
+            name
+            for name, _ in self.net.named_parameters()
+            if any(tag in name for tag in ("state_embed", "condition_embed", "observation_embed"))
+        ]
+        optimizer, scheduler = super().init_optimizer_scheduler(optimizer_config, scheduler_config)
+        if getattr(self, "whole_action_loss", False):
+            assert_optimizer_covers_trainable(self.net, optimizer, required_names=required)
+        return optimizer, scheduler
+
+    def _compute_whole_losses(self, out_net, packed, noised, timesteps, is_image_batch):
+        """v0.2 owns both reductions; bypass the parent's whole-pack multiplier."""
+        cfg = self.config
+        rf = cfg.rectified_flow_training_config
+        if (
+            is_image_batch
+            or not cfg.vision_gen
+            or not cfg.action_gen
+            or getattr(cfg, "sound_gen", False)
+            or getattr(cfg, "lidar_gen", False)
+        ):
+            raise ValueError("v0.2 whole loss requires paired video/action only")
+        if rf.loss_scale != 1.0 or rf.action_loss_weight != 0.7:
+            raise ValueError("v0.2 objective is L_video + 0.7 * L_action")
+        for kind in ("und", "gen"):
+            if out_net.get(f"lbl_metadata_{kind}") is not None and getattr(
+                getattr(cfg, "lbl", None), f"coeff_{kind}", 0
+            ):
+                raise ValueError("v0.2 two-term objective does not include auxiliary load balancing")
+        if packed.vision is None or packed.action is None:
+            raise ValueError("v0.2 pack must retain both modalities, even when fully conditioned")
+        n = len(out_net["preds_action"])
+        if len(out_net["preds_vision"]) != n or len(packed.sample_lens) != n:
+            raise ValueError("v0.2 loss needs one video/action item per logical sample")
+        dims = packed.action.raw_action_dim
+        if len(dims) != n or any(d is None or int(d) != 57 for d in dims):
+            raise ValueError("v0.2 loss requires explicit raw_action_dim=57 for every sample")
+        if self._current_hand_visibility is None:
+            raise RuntimeError("action loss reached without synchronized hand visibility")
+
+        def video_weight(index, frames, reference):
+            ts = timesteps[index, :frames] if timesteps.ndim > 1 else timesteps[index]
+            return self.rectified_flow_video.train_time_weight(ts, self.tensor_kwargs_fp32)
+
+        _, video = whole_video_flow_loss(
+            pred=out_net["preds_vision"],
+            target=noised.vt_target_vision,
+            condition_mask=packed.vision.condition_mask,
+            time_weight=video_weight,
+        )
+        _, action = whole_action_flow_loss(
+            pred=out_net["preds_action"],
+            target=noised.vt_target_action,
+            condition_mask=packed.action.condition_mask,
+            visibility=self._current_hand_visibility,
+            valid_mask=packed.action.action_valid_mask,
+        )
+        window = getattr(self, "_ar_loss_window", None)
+        if window is None or window.complete:
+            if getattr(self, "_ar_gradient_accumulation", 1) != 1:
+                raise RuntimeError("call begin_ar_loss_window with all microbatch counts before accumulation")
+            counts = torch.stack((video["active_samples"].sum(), action["active_samples"].sum()))[None]
+            self.begin_ar_loss_window(counts, device=counts.device)
+            window = self._ar_loss_window
+        backward, stats = window.reduce(
+            video["per_sample_losses"], video["active_samples"], action["per_sample_losses"], action["active_samples"]
+        )
+        self._ar_backward_loss = backward
+        # Rank-mean of these metrics, SUMMED over microsteps, is the update mean.
+        v = stats["video_contribution"] * window.world_size
+        a = stats["action_contribution"] * window.world_size
+        logged_loss = backward / window.microsteps
+        return logged_loss, {
+            "flow_matching_loss_vision": v,
+            "flow_matching_loss_action": a,
+            "flow_matching_loss_vision_per_instance": video["unweighted_per_sample_losses"].detach(),
+            "egoverse_global_video_samples": stats["global_video_samples"],
+            "egoverse_global_action_samples": stats["global_action_samples"],
+        }
 
     def _get_training_inputs(self, data_batch: dict[str, torch.Tensor], iteration: int):
         cp_enabled = self.parallel_dims is not None and self.parallel_dims.cp_enabled
@@ -101,9 +244,13 @@ class EgoVerseLossMixin:
             )
         # EgoVerse samples carry no per-channel action_valid_mask; its 57D
         # visibility-weighted objective owns channel selection itself.
-        if action_valid_mask is not None and any(mask is not None for mask in action_valid_mask):
+        if (
+            not getattr(self, "whole_action_loss", False)
+            and action_valid_mask is not None
+            and any(mask is not None for mask in action_valid_mask)
+        ):
             raise NotImplementedError("EgoVerse action loss does not support action_valid_mask")
-        if exclude_fully_conditioned_items:
+        if exclude_fully_conditioned_items and not getattr(self, "whole_action_loss", False):
             raise NotImplementedError("EgoVerse action loss does not support exclude_fully_conditioned_items")
         # action_slot_stats only collects unified-schema (raw_action_dim == 59)
         # slot losses; for the 57D EgoVerse contract they stay zero, matching
@@ -124,15 +271,24 @@ class EgoVerseLossMixin:
 
         # This 57D path is normalized by visibility_weighted_action_flow_loss
         # itself; ``normalize_by_active`` (rf_cfg.normalize_loss_by_active) does not apply here.
-        loss, metrics = visibility_weighted_action_flow_loss(
-            pred=pred,
-            target=target,
-            condition_mask=condition_mask,
-            visibility=self._current_hand_visibility,
-            time_weight=time_weight,
-            lambda_out_of_fov=self.lambda_out_of_fov,
-            subblock_equal_weight=self.subblock_equal_weight,
-        )
+        if getattr(self, "whole_action_loss", False):
+            loss, metrics = whole_action_flow_loss(
+                pred=pred,
+                target=target,
+                condition_mask=condition_mask,
+                visibility=self._current_hand_visibility,
+                valid_mask=action_valid_mask,
+            )
+        else:
+            loss, metrics = visibility_weighted_action_flow_loss(
+                pred=pred,
+                target=target,
+                condition_mask=condition_mask,
+                visibility=self._current_hand_visibility,
+                time_weight=time_weight,
+                lambda_out_of_fov=self.lambda_out_of_fov,
+                subblock_equal_weight=self.subblock_equal_weight,
+            )
         per_sample_losses = metrics["per_sample_losses"]
         self._last_visibility_loss_metrics = {
             name: value.detach() for name, value in metrics.items() if name != "per_sample_losses"
@@ -154,19 +310,28 @@ class EgoVerseLossMixin:
         # Only report sub-block losses produced by this step's 57D action loss;
         # steps without it (no action, dummy branch) must not repeat stale values.
         self._last_visibility_loss_metrics = {}
-        total_loss, losses = super()._compute_losses(
-            out_net=out_net,
-            data_batch_packed=data_batch_packed,
-            gen_data_noised=gen_data_noised,
-            timesteps=timesteps,
-            is_image_batch=is_image_batch,
-            timesteps_action=timesteps_action,
-            timesteps_sound=timesteps_sound,
-            timesteps_lidar=timesteps_lidar,
-        )
+        if getattr(self, "whole_action_loss", False):
+            total_loss, losses = self._compute_whole_losses(
+                out_net, data_batch_packed, gen_data_noised, timesteps, is_image_batch
+            )
+        else:
+            total_loss, losses = super()._compute_losses(
+                out_net=out_net,
+                data_batch_packed=data_batch_packed,
+                gen_data_noised=gen_data_noised,
+                timesteps=timesteps,
+                is_image_batch=is_image_batch,
+                timesteps_action=timesteps_action,
+                timesteps_sound=timesteps_sound,
+                timesteps_lidar=timesteps_lidar,
+            )
         rf_cfg = self.config.rectified_flow_training_config
         sample_scale = torch.ones((), device=total_loss.device, dtype=total_loss.dtype)
-        if rf_cfg.sample_level_loss_averaging and self.config.vision_gen:
+        if (
+            not getattr(self, "whole_action_loss", False)
+            and rf_cfg.sample_level_loss_averaging
+            and self.config.vision_gen
+        ):
             sample_scale = self._sample_level_loss_scale(
                 is_image_batch=is_image_batch,
                 num_samples=len(out_net["preds_vision"]),
@@ -176,9 +341,7 @@ class EgoVerseLossMixin:
         video_raw = losses["flow_matching_loss_vision"] * sample_scale
         action_raw = losses["flow_matching_loss_action"] * sample_scale
         video_weight = (
-            rf_cfg.image_loss_scale
-            if is_image_batch and rf_cfg.image_loss_scale is not None
-            else rf_cfg.loss_scale
+            rf_cfg.image_loss_scale if is_image_batch and rf_cfg.image_loss_scale is not None else rf_cfg.loss_scale
         )
         losses.update(
             egoverse_loss_video_raw=video_raw,
@@ -238,7 +401,9 @@ class EgoVerseOmniMoTModel(EgoVerseLossMixin, OmniMoTModel):
 
     @staticmethod
     def _relative_l2(reference: list[torch.Tensor], candidate: list[torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-        squared_diff = sum((lhs.float() - rhs.float()).square().sum() for lhs, rhs in zip(reference, candidate, strict=True))
+        squared_diff = sum(
+            (lhs.float() - rhs.float()).square().sum() for lhs, rhs in zip(reference, candidate, strict=True)
+        )
         squared_ref = sum(lhs.float().square().sum() for lhs in reference)
         max_abs = torch.stack(
             [(lhs.float() - rhs.float()).abs().max() for lhs, rhs in zip(reference, candidate, strict=True)]

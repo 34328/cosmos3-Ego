@@ -17,6 +17,77 @@ ACTION_SUBBLOCKS = {
 }
 
 
+def whole_action_flow_loss(
+    *,
+    pred: list[torch.Tensor],
+    target: list[torch.Tensor],
+    condition_mask: list[torch.Tensor],
+    visibility: list[torch.Tensor],
+    valid_mask: list[torch.Tensor | None] | None = None,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    """v0.2: one masked mean over all valid future (time, coordinate) pairs.
+
+    Conditions, unseen hands, structural padding and the last seven padded
+    coordinates contribute neither numerator nor denominator. Samples have
+    equal weight; empty samples are reported separately for global reduction.
+    Action timestep weighting is uniform. v0.1's block reduction is unchanged.
+    """
+    if not pred or not (len(pred) == len(target) == len(condition_mask) == len(visibility)):
+        raise ValueError("action loss requires matching non-empty sample lists")
+    masks = [None] * len(pred) if valid_mask is None else valid_mask
+    if len(masks) != len(pred):
+        raise ValueError("valid_mask must have one entry per sample")
+    losses, counts = [], []
+    for prediction, label, condition, visible, valid in zip(
+        pred, target, condition_mask, visibility, masks, strict=True
+    ):
+        if prediction.ndim != 2 or prediction.shape != label.shape or prediction.shape[1] not in (57, 64):
+            raise ValueError("prediction and target must match [T,57] or [T,64]")
+        rows = len(prediction)
+        if condition.numel() != rows or visible.shape != (rows, 2):
+            raise ValueError("condition must have T entries and visibility must be [T,2]")
+        if not torch.isfinite(prediction).all() or not torch.isfinite(label).all():
+            raise ValueError("non-finite action loss input; reject corrupt data before forward")
+        condition = condition.reshape(rows).to(prediction.device).detach()
+        if not ((condition == 0) | (condition == 1)).all():
+            raise ValueError("condition mask must be binary")
+        visible = visible.to(prediction.device).detach()
+        if not ((visible == 0) | (visible == 1)).all():
+            raise ValueError("visibility mask must be binary")
+        keep = (~condition.bool())[:, None].expand(rows, 57).clone()
+        keep[:, 9:33] &= visible[:, 0:1].bool()
+        keep[:, 33:57] &= visible[:, 1:2].bool()
+        if valid is not None:
+            # Native Cosmos masks may be channel-only; v0.2 also needs
+            # coordinate-level masks for adjacent-label validity and padding.
+            if valid.ndim == 1:
+                valid = valid.unsqueeze(0)
+            if valid.ndim != 2 or valid.shape[0] not in (1, rows) or valid.shape[1] not in (57, prediction.shape[1]):
+                raise ValueError("valid_mask must be [57/D], [1,57/D] or [T,57/D]")
+            valid = valid.to(prediction.device).detach()
+            if not ((valid == 0) | (valid == 1)).all():
+                raise ValueError("valid_mask must be binary")
+            keep &= valid[:, :57].bool()
+        # Mask BEFORE subtraction/square: finite extreme masked coordinates
+        # can otherwise overflow and produce NaN gradients (0 * inf).
+        prediction_valid = torch.where(keep, prediction[:, :57].float(), 0)
+        label_valid = torch.where(keep, label[:, :57].float(), 0)
+        error = (prediction_valid - label_valid).square()
+        count = keep.sum()
+        numerator = error.sum()
+        losses.append(numerator / count.clamp_min(1))
+        counts.append(count)
+    per_sample = torch.stack(losses)
+    valid_coordinates = torch.stack(counts)
+    active = valid_coordinates > 0
+    total = per_sample.sum() / active.sum().clamp_min(1)
+    return total, {
+        "per_sample_losses": per_sample,
+        "active_samples": active,
+        "valid_coordinates": valid_coordinates,
+    }
+
+
 def visibility_weighted_action_flow_loss(
     *,
     pred: list[torch.Tensor],
@@ -69,9 +140,7 @@ def visibility_weighted_action_flow_loss(
             elif raw_temporal.numel() == frames:
                 temporal = raw_temporal.reshape(frames)
             else:
-                raise ValueError(
-                    f"time_weight must return one value or {frames} values, got {raw_temporal.numel()}"
-                )
+                raise ValueError(f"time_weight must return one value or {frames} values, got {raw_temporal.numel()}")
             temporal = temporal.detach()
         # Visibility weights participate in both numerator and denominator so
         # changing lambda does not dilute the hand loss.  Cosmos' rectified-flow
@@ -92,7 +161,9 @@ def visibility_weighted_action_flow_loss(
             block_loss = (per_frame * temporal * weight).sum() / denominator.clamp_min(1e-12)
             # The legacy reduction aggregates camera/right/left groups by
             # native action width. overfit_v0.0 uses equal physical sub-blocks.
-            aggregation_weight = active if subblock_equal_weight else active * float(channel_slice.stop - channel_slice.start)
+            aggregation_weight = (
+                active if subblock_equal_weight else active * float(channel_slice.stop - channel_slice.start)
+            )
             sample_block_sum = sample_block_sum + block_loss * aggregation_weight
             sample_block_weight = sample_block_weight + aggregation_weight
             block_loss_sums[name] = block_loss_sums[name] + block_loss * active
@@ -113,3 +184,49 @@ def visibility_weighted_action_flow_loss(
         "per_sample_losses": per_sample_losses_tensor,
     }
     return total, metrics
+
+
+def whole_video_flow_loss(*, pred, target, condition_mask, time_weight):
+    """FP32 per-sample weighted video MSE over future coordinates only.
+
+    Shapes follow Cosmos predictions [C,T,H,W] (optional leading singleton).
+    The rectified-flow weight remains numerator-only; U_k contributes nothing.
+    Returns weighted per-sample losses, unlike Cosmos' unweighted log vector.
+    """
+    if not pred or not (len(pred) == len(target) == len(condition_mask)):
+        raise ValueError("video loss requires matching non-empty sample lists")
+    values, unweighted, counts = [], [], []
+    for i, (prediction, label, condition) in enumerate(zip(pred, target, condition_mask, strict=True)):
+        if prediction.shape != label.shape or prediction.ndim not in (4, 5):
+            raise ValueError("video prediction/target must match [C,T,H,W] or [1,C,T,H,W]")
+        if prediction.ndim == 5 and prediction.shape[0] != 1:
+            raise ValueError("each video item must contain one sample")
+        frames = prediction.shape[-3]
+        if condition.numel() != frames:
+            raise ValueError("video condition mask must contain one entry per frame")
+        condition = condition.detach().to(prediction.device).reshape(frames)
+        if not ((condition == 0) | (condition == 1)).all():
+            raise ValueError("video condition mask must be binary")
+        if not torch.isfinite(prediction).all() or not torch.isfinite(label).all():
+            raise ValueError("non-finite video loss input")
+        keep = (~condition.bool()).reshape(frames, 1, 1).expand_as(prediction)
+        squared = (torch.where(keep, prediction.float(), 0) - torch.where(keep, label.float(), 0)).square()
+        weight = torch.as_tensor(
+            time_weight(i, frames, prediction), device=prediction.device, dtype=torch.float32
+        ).detach()
+        if weight.numel() not in (1, frames) or not torch.isfinite(weight).all() or (weight < 0).any():
+            raise ValueError("video time weight must be finite non-negative scalar or one per frame")
+        weight = weight.reshape(-1, 1, 1)
+        count = keep.sum()
+        unweighted.append(squared.sum() / count.clamp_min(1))
+        values.append((squared * weight).sum() / count.clamp_min(1))
+        counts.append(count)
+    per_sample = torch.stack(values)
+    valid_coordinates = torch.stack(counts)
+    active = valid_coordinates > 0
+    return per_sample.sum() / active.sum().clamp_min(1), {
+        "per_sample_losses": per_sample,
+        "active_samples": active,
+        "valid_coordinates": valid_coordinates,
+        "unweighted_per_sample_losses": torch.stack(unweighted),
+    }

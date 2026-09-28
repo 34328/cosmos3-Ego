@@ -104,5 +104,9 @@ class DomainAwareLinear(nn.Module):
             permutation[:, None].expand(-1, self.output_size),
             sorted_output,
         )
-        output = output + self.bias.weight.index_select(0, flat_domain_id)
+        # Repeated domain IDs reduce thousands of token gradients into one bias.
+        # Accumulating index_select backward directly in bf16 loses updates and
+        # changes the result when zero-gradient condition rows are removed.
+        # Preserve forward dtype/values but reduce in FP32 before casting once.
+        output = output + self.bias.weight.float().index_select(0, flat_domain_id).to(output.dtype)
         return output.view(*x.shape[:-1], self.output_size)

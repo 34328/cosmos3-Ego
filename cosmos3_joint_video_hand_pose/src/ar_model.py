@@ -55,8 +55,14 @@ class EgoVerseARModel(EgoVerseLossMixin, OmniMoTCausalModel):
         train_chunk_sizes: tuple[int, ...] = (1, 2, 3, 4),
         train_window_range: tuple[int, int] = (4, 64),
         seed: int = 0,
+        whole_action_loss: bool = False,
     ):
-        super().__init__(config, lambda_out_of_fov=lambda_out_of_fov, subblock_equal_weight=subblock_equal_weight)
+        super().__init__(
+            config,
+            lambda_out_of_fov=lambda_out_of_fov,
+            subblock_equal_weight=subblock_equal_weight,
+            whole_action_loss=whole_action_loss,
+        )
         self._validate_ar_config()
         chunk_sizes = tuple(int(size) for size in train_chunk_sizes)
         if not chunk_sizes or min(chunk_sizes) < 1:
@@ -164,7 +170,9 @@ class EgoVerseARModel(EgoVerseLossMixin, OmniMoTCausalModel):
         if step is None or step.chunk_ids is None:
             return super()._get_train_noise_level_action(batch_size=batch_size, iteration=iteration)
         num_chunks = int(step.chunk_ids.max()) + 1
-        timesteps, sigmas = super()._get_train_noise_level_action(batch_size=batch_size * num_chunks, iteration=iteration)
+        timesteps, sigmas = super()._get_train_noise_level_action(
+            batch_size=batch_size * num_chunks, iteration=iteration
+        )
         step.action_sigmas = sigmas.reshape(batch_size, num_chunks)
         # The caller keeps [B,1] bookkeeping only; the per-chunk values are applied in
         # _add_noise_to_input (noise and timestep embedding) and _compute_losses.
@@ -237,9 +245,9 @@ class EgoVerseARModel(EgoVerseLossMixin, OmniMoTCausalModel):
         step = self._ar_step
         if step is not None and step.action_timesteps is not None:
             rows = max(t.numel() for t in step.action_timesteps)
-            timesteps_action = torch.stack(
-                [F.pad(t, (0, rows - t.numel())) for t in step.action_timesteps]
-            ).to(timesteps.device)  # [n_action,rows]
+            timesteps_action = torch.stack([F.pad(t, (0, rows - t.numel())) for t in step.action_timesteps]).to(
+                timesteps.device
+            )  # [n_action,rows]
         total_loss, losses = super()._compute_losses(
             out_net=out_net,
             data_batch_packed=data_batch_packed,
@@ -276,7 +284,9 @@ class EgoVerseARModel(EgoVerseLossMixin, OmniMoTCausalModel):
         )
         step = self._ar_step
         if step is None:
-            raise RuntimeError("lingbot teacher forcing needs a chunk size and window; use training_step or ar_context()")
+            raise RuntimeError(
+                "lingbot teacher forcing needs a chunk size and window; use training_step or ar_context()"
+            )
         vision = packed_sequence.vision
         if vision is None or len(vision.token_shapes) != 1 or len(packed_sequence.sample_lens) != 1:
             raise ValueError("lingbot teacher forcing packs exactly one sample with one video item")

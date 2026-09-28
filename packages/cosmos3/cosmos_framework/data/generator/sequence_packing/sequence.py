@@ -1201,6 +1201,10 @@ class PackedSequence:
     # num_action_tokens_per_supertoken + H_p * W_p).
     num_action_tokens_per_supertoken: int = 0
 
+    # Optional state role in the flattened action payload; never a loss target.
+    action_state_mask: torch.Tensor | None = None
+    vision_condition_type_mask: torch.Tensor | None = None
+
     # Generation modalities - NAMED FIELDS for type safety
     vision: ModalityData | None = None
     lidar: ModalityData | None = None
@@ -1271,6 +1275,10 @@ class PackedSequence:
         self.text_ids = to_device_nonblocking(self.text_ids, "cuda")
         self.text_indexes = to_device_nonblocking(self.text_indexes, "cuda")
         self.position_ids = to_device_nonblocking(self.position_ids, "cuda")
+        if self.vision_condition_type_mask is not None:
+            self.vision_condition_type_mask = to_device_nonblocking(self.vision_condition_type_mask, "cuda")
+        if self.action_state_mask is not None:
+            self.action_state_mask = to_device_nonblocking(self.action_state_mask, "cuda")
         if isinstance(self.label_ids, torch.Tensor):
             self.label_ids = to_device_nonblocking(self.label_ids, "cuda")
         if isinstance(self.ce_loss_indexes, torch.Tensor):

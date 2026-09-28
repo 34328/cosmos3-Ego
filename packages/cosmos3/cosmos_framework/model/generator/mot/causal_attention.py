@@ -1464,7 +1464,8 @@ def three_way_attention_with_kv_cache(
 
     # --- video self-attention: temporal-causal via multi_dimensional_attention ---
     vision_token_shapes = memory_value.vision_token_shapes
-    is_transfer = len(vision_token_shapes) == 2
+    gen_attention_override = getattr(memory_value, "gen_attention_override", None)
+    is_transfer = len(vision_token_shapes) == 2 and gen_attention_override is None
     if is_transfer:
         if not isinstance(memory_value, (TFReplayCleanMemoryValue, TFNoisyMemoryValue)):
             raise TypeError("Two-item temporal-causal transfer is supported only by replay teacher forcing.")
@@ -1477,10 +1478,28 @@ def three_way_attention_with_kv_cache(
     gen_attention_override = getattr(memory_value, "gen_attention_override", None)
     if is_transfer and gen_attention_override is not None:
         raise ValueError("gen_attention_override supports single-item temporal-causal layouts only.")
-    T, H_p, W_p = vision_token_shapes[0]
-    S_super = num_action_tokens + H_p * W_p
-    item_len = T * S_super
-    video_len = item_len * (2 if is_transfer else 1)
+    # Variable GEN layouts (e.g. one state per joint chunk) own token counts.
+    # Keep the actual vision geometry unchanged for latent decode and metadata.
+    if gen_attention_override is not None and hasattr(gen_attention_override, "flat_gen_tokens"):
+        video_len = int(gen_attention_override.flat_gen_tokens)
+        if video_len < 0 or video_len > video_q.shape[0]:
+            raise ValueError("flat GEN override has an invalid real token count")
+        if video_len == 0:
+            # Text-only prefill: no fabricated GEN token or vision geometry.
+            # Preserve the padded GEN shape expected by from_mode_splits; the
+            # caller still writes real (empty GEN, normalized text) per-layer KV.
+            text_out = _three_way_text_self_attention(
+                packed_query_states, packed_key_states, packed_value_states, text_kv_offsets
+            )
+            video_out = video_q.new_zeros((video_q.shape[0], video_q.shape[1] * video_q.shape[2]))
+            return from_mode_splits(text_out, video_out, packed_query_states)
+        T, S_super = 1, video_len
+        item_len = video_len
+    else:
+        T, H_p, W_p = vision_token_shapes[0]
+        S_super = num_action_tokens + H_p * W_p
+        item_len = T * S_super
+        video_len = item_len * (2 if is_transfer else 1)
     num_heads = video_q.shape[1]
     num_kv_heads = video_k.shape[1]
     head_dim = video_q.shape[2]
@@ -1506,12 +1525,16 @@ def three_way_attention_with_kv_cache(
             packed_key_states_normalized if packed_key_states_normalized is not None else packed_key_states
         )  # [S_text,H_kv,D]
         override_text_v, _ = get_causal_seq(packed_value_states)  # [S_text,H_kv,D]
-        override_text_k = torch.where(
-            has_new_caption, override_text_k.unsqueeze(0), memory_value.cached_und_k
-        )  # [1,S_text,H_kv,D]
-        override_text_v = torch.where(
-            has_new_caption, override_text_v.unsqueeze(0), memory_value.cached_und_v
-        )  # [1,S_text,H_kv,D]
+        cached_text_only = getattr(gen_attention_override, "cached_text_only", False)
+        if cached_text_only:
+            override_text_k, override_text_v = memory_value.cached_und_k, memory_value.cached_und_v
+        else:
+            override_text_k = torch.where(
+                has_new_caption, override_text_k.unsqueeze(0), memory_value.cached_und_k
+            )  # [1,S_text,H_kv,D]
+            override_text_v = torch.where(
+                has_new_caption, override_text_v.unsqueeze(0), memory_value.cached_und_v
+            )  # [1,S_text,H_kv,D]
         override_out = gen_attention_override(
             video_q.reshape(1, T, S_super, num_heads, head_dim),
             video_k.reshape(1, T, S_super, num_kv_heads, head_dim),
@@ -1523,9 +1546,13 @@ def three_way_attention_with_kv_cache(
         video_out = override_out.reshape(video_len, num_heads * head_dim)  # [video_len,H*D]
         if padded_video_len > video_len:
             video_out = torch.nn.functional.pad(video_out, (0, 0, 0, padded_video_len - video_len))
-        text_out = _three_way_text_self_attention(
-            packed_query_states, packed_key_states, packed_value_states, text_kv_offsets
-        )
+        if cached_text_only:
+            text_q, _ = get_causal_seq(packed_query_states)
+            text_out = text_q.new_zeros((text_q.shape[0], num_heads * head_dim))
+        else:
+            text_out = _three_way_text_self_attention(
+                packed_query_states, packed_key_states, packed_value_states, text_kv_offsets
+            )
         return from_mode_splits(text_out, video_out, packed_query_states)
 
     # Naming: ``_sa`` = self-attention, ``_ca`` = cross-attention, ``_lse`` = log-sum-exp.

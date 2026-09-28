@@ -1,27 +1,49 @@
-# AR v0.2（待开始）
+# AR v0.2（实现与验证中）
 
-v0.1 的结论和改进方向见 [../ar_v0.1/experiment.md](../ar_v0.1/experiment.md) 第 6 节。初始化统一用官方原始 Cosmos3-Nano：`/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp`。
+目标：优先提高 action 质量，视频参与联合去噪并辅助检查一致性。详见 [design.md](design.md)。
 
-## 待解决
+代码入口与模块职责见 [代码导航](code_map.md)，验证脚本见 [脚本说明](../../scripts/README.md)。当前执行状态以本文末尾及复审记录的最新结果为准。
 
-### 训练多样本 packing
+**核心**：一个逐块预测的 API。每块给一个条件，扩散模型同时输出该块的抽帧视频和 30Hz action。
 
-**现状**：v0.1 每步每卡只放 1 个 clip（`max_samples_per_batch=1`），没用上 Cosmos `PackingDataLoader` 的动态 packing。
+| chunk k 的组成 | 内容 |
+|---|---|
+| U_k（条件） | 块首帧 b_k 的图像 latent，240 token，干净 |
+| S_k（条件） | 块首相机系下的双腕位姿 `H_bk⁻¹R_bk`＋手形 AE；相机槽为 0；1 token，干净 |
+| V_k（预测） | C 个视频 latent（源帧 b_k+2…b_k+8C，逐块 VAE 编码） |
+| A_k（预测） | C×K 条逐帧增量 action，从 S_k 积分解码 |
 
-| clip | token 数（干净 + 带噪） | 占 75K 上限 |
-|---|---|---|
-| T=129 | 约 16.4K | 22% |
-| T=65 | 约 8.4K | 11% |
-| T=33 | 约 4.4K | 6% |
+- 条件来源：训练与主评测取 GT（验证集是完整视频）；部署取真实相机与手部观测；`generated` 诊断取模型自己的末帧与末态。
+- 解码：`W(t)=S_k^腕·ΔW(1)…ΔW(t)`，相机 `C(t)=ΔC(1)…ΔC(t)`，当前相机系下腕部为 `C(t)⁻¹W(t)`。每块独立解码，不跨块积分。
+- 可视化：左栏用 GT 相对相机 `H_bk⁻¹H_t` 投影，右栏用预测相机 `C(t)` 投影；`gt` 模式下块边界跳回 GT 是预期现象。
 
-有效 batch 只有 8 个 clip / 步。每卡显存已用约 55 GiB（大部分是权重、优化器状态和激活），能多放几个 clip 要实测。
+**本版五项**：
+1. **联合去噪**：当前块带噪 V/A 双向可见，一个循环两路各 30 步；跨块因果，历史窗口 H=15 个 chunk。
+2. **逐块条件 U_k＋S_k**：替代旧的“首帧 V0＋F0 坐标系 state”方案。
+3. **持久 KV cache**：每块 1 次条件预填（241 token）＋30 次联合去噪＋1 次 V/A clean refresh；k=16 读取 chunk 1–15，k=17 时 chunk 1 整体淘汰。
+4. **多样本 packing**：每卡多个隔离 clip，全局样本平均 loss。
+5. **整体 action loss**：`L_video + 0.7 × L_action`，不做二次尺度校准。
 
-**原因**：
-1. 官方 `OmniMoTCausalModel` 的 replayed teacher forcing（先干净前向缓存 K/V，再带噪前向）只支持一个 batch 一个样本，多样本会直接报错。
-2. `src/ar_attention.py` 的 lingbot mask 按单个 clip 生成 block id，没有样本编号，多样本拼接后会互相看到。
+**评测**：主评测 `gt` 为逐块 GT 条件＋GT 历史，看块内误差。辅助诊断：`pred_history`（GT 条件＋模型预测的历史，对应部署保留预测历史的情况）、`oracle`（当前视频为 GT）、`generated`（全自回归漂移）。
 
-**要改**：
-1. 注意力 mask 加一项"同一样本才能互相看到"（FlexAttention 支持，改动小）。
-2. 官方 replay 路径改成按样本分段处理干净/带噪两次前向和缓存的 K/V（框架补丁，工作量较大）。每步随机的 C 和窗口可以全 batch 共用，也可以按样本分别设。
+指标中的 `local_*` 表示在 **GT 块首相机坐标系**下度量，不保证误差只来自当前块。`generated` 没有 GT state 重置，因此其中仍包含历史漂移；JSON 用 `local_metric_scope`、`boundary_state_reset_to_gt` 和 `local_metrics_include_history_drift` 明确区分。旧 `ar_v0_2_c_no_chunk_state.toml` 已标为暂停、不可运行，仅供历史溯源。
 
-**过渡办法**：梯度累积可以扩大有效 batch，但不提高单卡利用率。
+**训练安排**：先训练一个完整 V0.2 并评测；cache／重算、多样本／逐样本的数值对照和延迟必做，但不额外训练。有／无 state、joint／串行、尺度校准、历史加噪等独立训练对照暂缓，出现具体问题再做；因此不单独宣称收益来自 state 或 joint。
+
+**实现状态（2026-09-28）**：新方案已同步远端并修改数据、布局、逐块 VAE、条件 embedding、联合注意力、多样本 packing、整体 loss、缓存与评测模块；`data_v2/` 的块首相机系 state 统计已冻结，新版 272 项 CPU、43 项旧路径兼容、38 项 GPU 测试通过；官方 Nano 8 卡 2 个训练更新通过，每卡 2–4 条样本，覆盖 C=1…4，峰值约 58.2 GiB。真实 2 步保存—退出—恢复后 1 步也通过；50 步可靠性、完整 Nano 缓存数值／延迟仍待验收，尚不能称全部完成。旧 F0 布局测试不算新版通过，详见 design.md 第 6 节。
+
+本轮已加入紧凑 noisy 前向：第二遍只计算未来 V/A，U/S 和文本读取第一遍保留梯度的 K/V。动态 packer 暂保留双完整 pass 的保守准入预算，不据此增大 batch 上限。首 state 不重复 8 次；重复 8 次是旧布局的实现选择，不是 flow matching 要求。
+
+v0.1 的结果见 [experiment.md](../ar_v0.1/experiment.md)。
+
+离线采样、指标和双栏回放入口：`python -m cosmos3_joint_video_hand_pose.src.ar_v02_eval {sample,evaluate,overlay} --help`。新增 `src/ar_v02_streaming.py:StreamingJointSampler.step` 接收一个块的 U/S，返回该块视频与 action，固定 30 步，缓存与工作区不随总长度增长；固定长度离线入口保留。长 rollout 性能及完整 Nano 严格数值门槛仍需单独验收。完整修复和缺口见 [本轮 review](review_codex_2026-09-28.md)。
+
+**当前执行边界**：按用户最新要求，只完成代码与短 smoke，随后由 Claude 复审；不启动正式训练，50 次更新及长时验收暂不运行。不能将短 smoke 或小模型通过写成完整训练／缓存验收通过。
+
+用户后续明确：推理速度优化及延迟验收暂缓，本轮只处理正确性与评测口径，仍保持联合 30 步。
+
+**最新 KV 修复**：此前的严格对照失败已定位到 bf16 注意力计算顺序／key 分块对齐差异。统一训练与缓存的数值布局后，完整 Nano 原分辨率两块×30 步的 **680 项严格对照全部逐位一致**；仍保留原阈值，不将短测当作完整矩阵验收。紧凑训练仍只计算 V/A query，U/S 不重复计算；key 的零占位仅用于对齐，不是新增 token 或 loss。
+
+修复后专项检查：CPU 63 项缓存/流式检查、43 项评测检查、GPU 19 项前向/梯度检查通过；完整 Nano 流式 smoke 覆盖 C=1…4 共 8 块通过。历史完整套件、保存恢复、固定输入重复短测和本轮边界对照的具体结果、范围及未通过记录统一见 [review](review_codex_2026-09-28.md)，避免将历史结果当作当前完整验收。
+
+最终冻结代码：实际 640×368、GT 历史/shift5 下，首块短测及 C=1…4 首次淘汰/残块诊断 **4,540 项数值比较全部为 0 差异**；两次独立 2 步 FSDP8 短测梯度逐位一致。完整历史模式/schedule 矩阵、50 步可靠性及正式训练仍未执行；速度问题按用户要求后续再处理。

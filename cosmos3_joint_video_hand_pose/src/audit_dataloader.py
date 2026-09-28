@@ -82,7 +82,19 @@ def audit_batch(batch: dict, cap: int, action_tokens_per_latent: int | None = No
         frames = int(video.shape[1])
         if (frames - 1) % 4:
             raise ValueError(f"video length must be 1+4n, got {frames}")
-        rows = frames if action_tokens_per_latent is None else ar_latent_frames(frames) * action_tokens_per_latent
+        is_v02 = "ar_layout_version" in batch
+        if is_v02:
+            version = batch["ar_layout_version"][index]
+            while isinstance(version, list) and len(version) == 1:
+                version = version[0]
+            if version != "joint_chunk_cond_v1" or action_tokens_per_latent != 8:
+                raise ValueError("unsupported explicit v0.2 layout version or K")
+            rows = (ar_latent_frames(frames) - 1) * 8
+            states = _squeeze_media_batch(batch["ar_boundary_states"][index], "ar_boundary_states", 2)
+            if states.shape != (ar_latent_frames(frames) - 1, 64) or states[:, 57:].count_nonzero():
+                raise ValueError("invalid v0.2 boundary state candidates")
+        else:
+            rows = frames if action_tokens_per_latent is None else ar_latent_frames(frames) * action_tokens_per_latent
         if tuple(action.shape) != (rows, 64):
             raise ValueError(f"action must be [{rows},64], got {tuple(action.shape)} for T={frames}")
         if tuple(action_raw.shape) != (rows, 57):
@@ -98,7 +110,14 @@ def audit_batch(batch: dict, cap: int, action_tokens_per_latent: int | None = No
         if action_tokens_per_latent is None:
             num_tokens += cosmos_wam_token_count(int(text_ids.numel()), frames)
         else:
-            num_tokens += ar_token_count(int(text_ids.numel()), frames, action_tokens_per_latent)
+            count = ar_token_count(int(text_ids.numel()), frames, action_tokens_per_latent)
+            # Upper bound before the model chooses C: one state per future latent.
+            if is_v02:
+                from .ar_v02_dataloader import joint_training_token_budget
+
+                num_tokens += joint_training_token_budget(int(text_ids.numel()), frames, 368, 640)
+            else:
+                num_tokens += count
         if "sample_id" in batch:
             sample_ids.append(str(batch["sample_id"][index]))
 
