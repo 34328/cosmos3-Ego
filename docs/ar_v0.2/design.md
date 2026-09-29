@@ -483,7 +483,7 @@ loss 单测固定 `v_pred` 和 M，只扰动 M=0 位置的有限目标值，断�
 
 - 在 Cosmos3 官方 `_sft_launcher_common.sh` 上增加必要的项目入口扩展，版本化薄启动脚本；Trainer、优化器、调度器、checkpoint、W&B 仍走官方实现。保存／恢复验收必须经过官方 Trainer；数值夹具仅证明相应算子。
 - base checkpoint、VAE、text tokenizer 可从配置／环境变量覆盖，默认路径保留；tokenizer 分目录不是错误，但来源与词表必须核验。
-- 配方保持 video/action=1:1、Nano action head 初始化、无头部 LR 倍率、LambdaCosine、LR=2e-5、逐步 GC、文本 dropout=0.1。
+- 配方保持 video/action=1:1、Nano action head 初始化、LambdaCosine、基础LR=2e-5、逐步GC、文本dropout=0.1。2026-09-30用户授权正式配方：action2llm、llm2action、action_modality_embed、action_state_embed、vision_condition_embed均5倍，其余1倍；warmup100/cycle1000/max_iter1000/save_iter500，HSDP8×2，273/257/129/65/33混合档。具体数据hash、停机口径和运行状态见experiment当前节；旧配方/运行快照不改写。
 - hand MPJPE 主指标对原始 GT 关键点；decoded-GT 仅辅助。统一源帧、左右手、米与毫米、块首／整体坐标转换，并分别报告腕位姿和 wrist-local 手形误差。
 - H=15 不改；现有 T=129 只能覆盖最多7块历史。T=257覆盖15块历史，T=273覆盖首次淘汰，均为模型视频帧数；先审计有效窗口和显存，未验收不切换训练档位。
 - palm-in-FOV 不是跟踪有效性。用户已选择方案 A：仅新 wrist-local 路径取消 FOV loss 屏蔽，跟踪有效的 future 行全部监督；`invalid_frames` 继续拒绝跟踪无效的整窗。保留不可见连续段／恢复边界审计与 `hand_visibility` 元数据，可另按 FOV 分组评测，不把缺失标签当有效，也不声称已解决模型预测的积分漂移。

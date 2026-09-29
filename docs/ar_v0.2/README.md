@@ -2,6 +2,8 @@
 
 当前方案：`fixed_camera_wrist_local_delta_latent_v1`，57D action，固定 C=4、K=8（每块32条未来action），15个历史chunk，联合去噪30步，`L_video + L_action`。
 
+2026-09-30：用户已授权双节点1000步正式训练，正在完成启动准备。prepared273已在独立正式`t273/`目录重建，11个文件hash与删除前完全一致；固定配方改为273混合档、HSDP8×2、500步保存及指定五模块5倍LR。实时状态、监控停止条件与500/1000步评测口径统一见[experiment当前节](experiment.md#0-当前新表示wrist-local-pca15δz)，下文短测记录属于此前状态。
+
 | 文档 | 用途 |
 |---|---|
 | [design.md](design.md) | 当前设计；[第7节](design.md#7-代码导航)统一维护代码导航 |

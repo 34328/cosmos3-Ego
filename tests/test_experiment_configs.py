@@ -100,10 +100,13 @@ def test_every_toml_composes_through_native_cosmos_loader():
         assert config.trainer.type is ImaginaireTrainer
         assert config.job.wandb_mode == "online"
         assert config.model.config.rectified_flow_training_config.action_loss_weight == 1.0
-        assert config.checkpoint.save_iter == 600
-        assert config.optimizer.lr_multipliers == {}
-        assert config.trainer.max_iter == 1200
-        assert list(config.scheduler.cycle_lengths) == [1200]
+        fixed = name == "ar_v0_2_fixed_camera"
+        assert config.checkpoint.save_iter == (500 if fixed else 600)
+        assert dict(config.optimizer.lr_multipliers) == (dict.fromkeys(
+            ("action2llm", "llm2action", "action_modality_embed", "action_state_embed", "vision_condition_embed"), 5
+        ) if fixed else {})
+        assert config.trainer.max_iter == (1000 if fixed else 1200)
+        assert list(config.scheduler.cycle_lengths) == ([1000] if fixed else [1200])
         assert config.model.chunk_state_conditioning
         assert config.trainer.callbacks.wandb["_target_"] is WandBCallback
         assert set(NATIVE_CALLBACKS) <= set(config.trainer.callbacks)

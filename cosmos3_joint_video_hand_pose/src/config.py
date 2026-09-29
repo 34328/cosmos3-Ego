@@ -19,6 +19,7 @@ from .dataloader_state import EgoVerseDataLoaderStateCallback
 from .wandb_compat import ensure_wandb_generate_id
 from .wandb_metrics import EgoVerseLossWandbCallback
 from .pretrain_probe import PretrainProbeCallback
+from .formal_monitor import FormalTrainingMonitor
 
 
 COSMOS_REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -293,7 +294,7 @@ def _ar_v02_fixed_camera_experiment():
     # Autotuning produced different losses after restoring identical data/RNG.
     experiment["trainer"]["cudnn"].update(benchmark=False, deterministic=True)
     root = COSMOS_REPO_ROOT / "outputs/data_expansion_20260928"
-    prepared = root / "prepared_fixed_camera_wrist_local_delta_latent_v1"
+    prepared = root / "prepared_fixed_camera_wrist_local_delta_latent_v1_t273"
     codec_root = COSMOS_REPO_ROOT / "cosmos3_joint_video_hand_pose/artifacts/cosmos3_hand_codecs/v3_wrist_local_pca15_train744"
     fixed_hand_codecs = (
         str(codec_root / "right_pca15.pt"),
@@ -308,6 +309,14 @@ def _ar_v02_fixed_camera_experiment():
         name="multitask20h_fixed_camera_wrist_local_delta_latent_v1",
     )
     experiment["model"]["action_representation"] = FIXED_CAMERA_ACTION_REPRESENTATION
+    experiment["model"]["config"].parallelism.data_parallel_replicate_degree = 2
+    experiment["optimizer"]["lr_multipliers"] = dict.fromkeys(
+        ("action2llm", "llm2action", "action_modality_embed", "action_state_embed", "vision_condition_embed"), 5
+    )
+    experiment["scheduler"]["cycle_lengths"] = [1000]
+    experiment["trainer"]["max_iter"] = 1000
+    experiment["checkpoint"]["save_iter"] = 500
+    experiment["trainer"]["callbacks"]["formal_monitor"] = L(FormalTrainingMonitor)()
     dataset = experiment["dataloader_train"]["dataloader"]["datasets"]["egoverse"]["dataset"]
     dataset.update(
         action_representation=FIXED_CAMERA_ACTION_REPRESENTATION,
@@ -318,6 +327,7 @@ def _ar_v02_fixed_camera_experiment():
         chunk_state_normalizer=state_normalizer,
         future_normalizer=future_normalizer,
         valid_windows_manifest=valid_windows,
+        clip_frame_tiers=(273, 257, 129, 65, 33),
     )
     contract = experiment["trainer"]["callbacks"]["ar_v02_contract"]
     contract.update(

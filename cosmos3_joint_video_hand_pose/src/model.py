@@ -123,6 +123,8 @@ class EgoVerseLossMixin:
         optimizer, scheduler = super().init_optimizer_scheduler(optimizer_config, scheduler_config)
         if getattr(self, "whole_action_loss", False):
             assert_optimizer_covers_trainable(self.net, optimizer, required_names=required)
+            from .formal_monitor import optimizer_lr_receipt
+            self._optimizer_lr_receipt = optimizer_lr_receipt(self.net, optimizer, optimizer_config)
         return optimizer, scheduler
 
     def _compute_whole_losses(self, out_net, packed, noised, timesteps, is_image_batch):

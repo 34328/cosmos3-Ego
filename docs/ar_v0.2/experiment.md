@@ -12,6 +12,20 @@
 
 ## 0. 当前新表示：wrist-local PCA15＋Δz
 
+### 2026-09-30 正式训练准备：273混合档、双节点1000步
+
+用户已授权启动，当前处于提交前CPU回归阶段。数据准备输出为 `outputs/data_expansion_20260928/prepared_fixed_camera_wrist_local_delta_latent_v1_t273/`，保留129版本；复用冻结PCA，未重训codec。按原seed=42、每段8个窗口、C=4、tiers=(273,257,129,65,33)重新生成。
+
+- 资源：Tdebug6 CPU配额120核，空闲内存约1.4TiB。64窗口串行/8进程逐数组精确相等；全量使用32进程，35,272窗口编码72.37s、487.39窗口/s，全流程222.67s。4409训练段、642验证段；state 286,432行，future 9,165,824行。
+- **11/11文件SHA256与删除前prepared273完全一致**。清单 `e70d2d14…`、state统计 `43910942…`、future统计 `e76997fb…`；完整比较、命令、资源和吞吐证据在 `outputs/maintenance/formal_t273_20260930/`。新正式目录不再依赖validation测试目录。
+- 配方：官方 `launch_ar_v0_2.sh`；fixed-camera TOML及注册配置均为max_iter=1000、save_iter=500、warmup=100、cosine cycle=1000，HSDP shard8×replicate2。60K预算、最多4clip/卡、C4/K8/H15、联合30步、video/action=1:1、确定性cuDNN保持已验收设置。指定五项 `action2llm/llm2action/action_modality_embed/action_state_embed/vision_condition_embed` 倍率5，其余1；峰值分别1e-4/2e-5。warmup起点实际LR=0，不能把峰值写成首步LR。
+- 启动前原生optimizer创建后按参数身份逐组核对 `initial_lr`、实际 `lr`，写 `optimizer_lr_groups.json` 并打印。正式入口无CLI超参数覆盖；启动记录绑定已push的commit。
+- 原生Trainer回调扩展 `FormalTrainingMonitor` 只读记录，不更改loss、梯度或更新规则。每步 `formal_monitor.jsonl` 记录16rank实际clip数、global batch、显存峰值、同步训练段时间、实际原生GradClip事件、三个主loss及8个字段；原有 `loss_metrics.jsonl` 和在线W&B仍保留。前100步每10步汇报，之后每100步汇报。
+- 停止条件：非有限loss在反向前检查，原合同在梯度裁剪前检查非有限梯度；OOM由原生任务失败退出。最近10步至少9步裁剪（包括warmup）；任一主loss最近10步均值超过前10步均值3倍；步开始驻留allocated显存连续10步逐步增长且累计超过2GiB，均停止并报告，不自动调参/重启。显存缓存reserved的高水位本身不作为泄漏。普通单步loss波动不称为发散。
+- 500/1000 checkpoint评测固定使用新清单内全部1557个273帧heldout窗口（98个有合格长窗口的episode），每窗按清单seed，分别gt/generated、联合30步。主指标用原始GT关键点；按 `chunk>=17` 单列首次淘汰及后续误差，不能把第16块误当已淘汰。可拆分清单分配空闲节点并行，不能减少窗口或用decoded-GT替代主目标。模型训练不为评测重启。
+
+准备阶段22项针对性CPU回归通过，完整回归、启动空闲检查、实际LR与W&B API核实结果将在此补充。此段不是已启动或已完成训练的声明。
+
 ### 当前：训练前第5步，双节点16卡短测通过（2026-09-29，待Claude复审）
 
 仅短测，未启动正式训练。Tdebug2（10.3.12.18，MASTER）和Tdebug6（10.3.12.24）各8×H800；每轮启动前两台均8卡空闲，结束后也已释放。官方HSDP shard=8、replicate=2；实际trace核实节点内分片组[0…7]/[8…15]、跨节点复制组[0,8]。两端分别经MCP调用 `launch_ar_v0_2.sh`，NNODES=2、NODE_RANK=0/1、MASTER_ADDR=10.3.12.18。只设置NCCL_SOCKET_IFNAME=eth0与NCCL_IB_DISABLE=1，无其他NCCL调优。
