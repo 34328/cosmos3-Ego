@@ -1,0 +1,31 @@
+{
+  "right": {
+    "checkpoint_sha256": "7b32b7c69f1ce7e3cfc278296b382e1eedc312c9c555e76eca3622b5d9a78174",
+    "reanchor_invariance": {
+      "passed": true,
+      "latent_exact": true,
+      "full_chunks": 100,
+      "tail_frames": 8,
+      "max_point_error_m": 1.7881393432617188e-07,
+      "no_reencode": true,
+      "nonzero_wrist_rotation": true,
+      "nonzero_camera_rotation": true,
+      "protocol": "production decode_future_physical/reanchor_state; 3200 frames plus 8-frame tail"
+    }
+  },
+  "left": {
+    "checkpoint_sha256": "9f0fd9219e2bc9e0a312e8445fd84193652989df3fa978cd12eb0e70686a646e",
+    "reanchor_invariance": {
+      "passed": true,
+      "latent_exact": true,
+      "full_chunks": 100,
+      "tail_frames": 8,
+      "max_point_error_m": 1.4901161193847656e-07,
+      "no_reencode": true,
+      "nonzero_wrist_rotation": true,
+      "nonzero_camera_rotation": true,
+      "protocol": "production decode_future_physical/reanchor_state; 3200 frames plus 8-frame tail"
+    }
+  },
+  "geometry_sha256": "6b37d728b19ccbfa568d7bc34bcfe3b9191ab7c6098452a95cf802fd1dea35c8"
+}
