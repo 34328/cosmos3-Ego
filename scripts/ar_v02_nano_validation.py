@@ -8,8 +8,7 @@ import json
 import time
 from pathlib import Path
 import torch
-from cosmos3_joint_video_hand_pose.src.ar_v02_inference import JointARSampler, _schedule, _condition_encoding
-from cosmos3_joint_video_hand_pose.src.ar_chunk_state import decode_chunk_camera_state, decode_chunk_camera_action
+from cosmos3_joint_video_hand_pose.src.ar_v02_inference import JointARSampler, _schedule
 from cosmos3_joint_video_hand_pose.src.ar_v02_layout import ACTION, VIDEO, STATE, JointChunkLayout
 from cosmos3_joint_video_hand_pose.src.ar_v02_cache import JointKVCache
 from cosmos3_joint_video_hand_pose.src.ar_v02_packing import pack_joint_sequence
@@ -204,13 +203,13 @@ def condition(sampler, video, action, boundary, history, terminal, previous):
     u = sampler.layout.video_indexes(boundary.chunk_id, True).to(video.device)
     rows = (sampler.roles == STATE) & (sampler.chunks == boundary.chunk_id)
     if history != "generated" or boundary.chunk_id == 1:
-        terminal = decode_chunk_camera_state(
-            sampler.gt_states[boundary.latent_start - 1], sampler.state_normalizer, source_index=boundary.source_start
+        terminal = sampler.action_adapter.decode_state(
+            sampler.gt_states[boundary.latent_start - 1], source_index=boundary.source_start
         )
         video[:, :, u] = sampler.gt_video[:, :, u]
     else:
         video[:, :, u] = sampler._next_condition_video(previous)
-    action[rows, :57] = _condition_encoding(terminal, sampler.state_normalizer)
+    action[rows, :57] = sampler.action_adapter.encode_state(terminal)
     action[rows, 57:] = 0
     return terminal
 
@@ -344,8 +343,8 @@ def run_case(sampler, spec, output, seed=42):
                 output / f"chunk_{b.chunk_id:03d}.pt",
             )
             if spec["history"] == "generated":
-                ct = decode_chunk_camera_action(ct, ca[ar], sampler.future_normalizer).end_state
-                rt = decode_chunk_camera_action(rt, ra[ar], sampler.future_normalizer).end_state
+                ct = sampler.action_adapter.decode_action(ct, ca[ar]).end_state
+                rt = sampler.action_adapter.decode_action(rt, ra[ar]).end_state
                 block = layout.video_indexes(b.chunk_id).to(device)
                 cp = cv[:, :, block].clone()
                 rp = rv[:, :, block].clone()
@@ -389,17 +388,16 @@ def prepare_real_sampler(model, ds_cfg, chunk_size, root):
     from cosmos_framework.utils import misc
     from cosmos3_joint_video_hand_pose.src.ar_inference import _training_layout_batch
 
-    frozen = Path(root) / "outputs/joint_video_hand_pose/ar_v0_2/data_v2/eval_windows.json"
+    frozen = Path(ds_cfg.valid_windows_manifest).with_name("eval_windows.json")
     item = json.loads(frozen.read_text())[0]
-    heldout = Path(root) / "outputs/joint_video_hand_pose/ar/eval/heldout_manifest"
     dataset = instantiate(
         ds_cfg,
         iterable_shuffle=False,
         random_window=False,
         cfg_dropout_rate=0.0,
         split="heldout",
-        episodes_manifest=str(heldout / "episodes.csv"),
-        segments_manifest=str(heldout / "segments.csv"),
+        episodes_manifest=str(ds_cfg.episodes_manifest),
+        segments_manifest=str(ds_cfg.segments_manifest),
     )
     raw = dataset.dataset
     ids = {f"{r['episode_hash']}:{r['span_index']}:{r['start_idx']}:{r['end_idx']}": i for i, r in enumerate(raw.rows)}
@@ -413,7 +411,9 @@ def prepare_real_sampler(model, ds_cfg, chunk_size, root):
         model,
         batch,
         state_normalizer=raw.chunk_state_normalizer,
-        future_normalizer=raw.action_builder.future_normalizer,
+        future_normalizer=(raw.future_normalizer if getattr(raw, "fixed_camera_mode", False)
+                           else raw.action_builder.future_normalizer),
+        hand_codecs=getattr(raw, "fixed_hand_codecs", None),
         chunk_size=chunk_size,
         source_fps=float(raw.episodes[row["episode_hash"]]["fps"]),
     )

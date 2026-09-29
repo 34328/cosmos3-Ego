@@ -472,6 +472,10 @@ def render(args: argparse.Namespace) -> None:
     future_normalizer = args.future_normalizer or normalizer_metadata.get("future", {}).get("path")
     state_normalizer = Path(state_normalizer or DEFAULT_STATE_NORMALIZER)
     future_normalizer = Path(future_normalizer or DEFAULT_FUTURE_NORMALIZER)
+    for key, path in (("state", state_normalizer), ("future", future_normalizer)):
+        expected = normalizer_metadata.get(key, {}).get("sha256")
+        if expected is not None and _sha256(path) != expected:
+            raise ValueError(f"{key} normalizer content differs from prepared replay metadata: {path}")
     builder = Action57Builder(
         state_normalizer=state_normalizer,
         future_normalizer=future_normalizer,

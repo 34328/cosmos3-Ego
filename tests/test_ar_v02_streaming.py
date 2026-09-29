@@ -435,7 +435,8 @@ def replay_clean(net, packed, layout):
 
 @pytest.mark.parametrize("c,tail", [(1, 1), (2, 1), (3, 1), (3, 2), (4, 1), (4, 2), (4, 3)])
 @torch.no_grad()
-def test_native_mot_every_euler_step_and_kv_vs_complete_prefix(c, tail, monkeypatch):
+@pytest.mark.parametrize("source_start", [0, 137])
+def test_native_mot_every_euler_step_and_kv_vs_complete_prefix(c, tail, monkeypatch, source_start):
     model = native_model(monkeypatch)
     sampler = stream(
         model,
@@ -443,11 +444,12 @@ def test_native_mot_every_euler_step_and_kv_vs_complete_prefix(c, tail, monkeypa
         history="gt",
         video_schedule=torch.linspace(1, 0, 31),
         action_schedule=torch.linspace(1, 0, 31).square(),
+        source_start=source_start,
     )
     videos, actions = [], []
     original = model.denoise
     for chunk, frames in enumerate((c, c, tail), start=1):
-        source = (chunk - 1) * c * 8
+        source = source_start + (chunk - 1) * c * 8
         u = torch.full((1, 4, 1, 2, 2), 1.0 + chunk / 10)
         state = observation(source)
         encoded = torch.nn.functional.pad(encode_chunk_camera_state(state, sampler.state_normalizer), (0, 7))[None]
@@ -507,3 +509,50 @@ def test_native_mot_every_euler_step_and_kv_vs_complete_prefix(c, tail, monkeypa
         result = sampler.step(u, state, gt_video=gv, gt_action=ga, frames=frames)
         assert step == 30
         assert torch.isfinite(result.decoded.rigid_chunk).all()
+
+
+@pytest.mark.parametrize("dtype", [torch.uint8, torch.float32, torch.bfloat16])
+@torch.no_grad()
+def test_rgb_uses_native_normalization_without_mutating_input(dtype):
+    sampler = stream(history="pred_history")
+    pixels = torch.tensor([0, 64, 128, 255], dtype=torch.uint8).repeat(3).reshape(1, 3, 1, 2, 2)
+    expected = pixels.float() / 127.5 - 1
+    rgb = pixels if dtype == torch.uint8 else expected.to(dtype)
+    original = rgb.clone()
+    encoded_inputs = []
+
+    def encode(value):
+        encoded_inputs.append(value.clone())
+        return value[:, :1].expand(-1, 4, -1, -1, -1).float() * 0.1
+
+    sampler.model.encode = encode
+    result = sampler.step(rgb, observation(), input_is_latent=False)
+    assert len(encoded_inputs) == 1
+    torch.testing.assert_close(encoded_inputs[0], expected if dtype == torch.uint8 else original)
+    torch.testing.assert_close(rgb, original, rtol=0, atol=0)
+    torch.testing.assert_close(result.condition_video, encoded_inputs[0][:, :1].expand(-1, 4, -1, -1, -1).float() * 0.1)
+
+
+@torch.no_grad()
+def test_source_origin_and_reset_keep_rope_relative_and_metadata_absolute():
+    sampler = stream(history="pred_history", source_start=137, initial_temporal_offset=11.0)
+    phase_positions = []
+    sampler.model.observer = lambda p, memory: phase_positions.append((memory._phase, p.position_ids.clone()))
+    u = torch.ones(1, 4, 1, 2, 2)
+    for origin in (137, 901):
+        if origin != 137:
+            sampler.reset(source_start=origin)
+        for index, frames in enumerate((4, 2)):
+            boundary = origin + index * 32
+            phase_positions.clear()
+            result = sampler.step(u, observation(boundary), frames=frames)
+            assert result.report["boundary_source_index"] == boundary
+            assert result.report["boundary_time"] == boundary / sampler.source_fps
+            assert result.report["source_stop"] == boundary + frames * 8
+            assert result.decoded.end_state.source_index == boundary + frames * 8
+            for phase, positions in phase_positions:
+                if phase == "text":
+                    continue
+                key = (phase, 0 if phase == "condition" else frames)
+                relative = index * 32 + sampler.workspace.sources[key]
+                torch.testing.assert_close(positions[0], sampler.workspace.offset + relative * sampler.workspace.time_scale)

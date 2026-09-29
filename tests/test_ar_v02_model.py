@@ -263,6 +263,12 @@ def test_replay_adapter_preserves_text_boundaries_and_clean_gen_gradient(monkeyp
     (read.cached_clean_gen_k.sum() + read.cached_clean_gen_v.sum()).backward()
     torch.testing.assert_close(keys.grad, torch.ones_like(keys))
     torch.testing.assert_close(values.grad, torch.ones_like(values))
+    # Training caches must release immediately, without waiting for cyclic GC.
+    import weakref
+
+    memory_ref = weakref.ref(memory)
+    del memory
+    assert memory_ref() is None
 
 
 def test_vision_condition_embedding_affects_only_U_and_receives_gradient(monkeypatch):
@@ -302,3 +308,17 @@ def test_vision_condition_embedding_affects_only_U_and_receives_gradient(monkeyp
     assert rows[~mask].count_nonzero() == 0
     rows.sum().backward()
     torch.testing.assert_close(net.vision_condition_embed.grad, torch.full((4,), float(mask.sum())))
+
+
+def test_training_context_is_fixed_c4_without_random_sampling(monkeypatch):
+    import random
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("training chunk selection must not sample RNG")
+
+    model = bare_model()
+    monkeypatch.setattr(random, "Random", forbidden)
+    for iteration in (0, 1, 17, 600, 1200):
+        context = model._sample_step_context(iteration)
+        assert context.chunk_size == 4
+        assert context.window == 15

@@ -1,0 +1,44 @@
+# Current fixed-camera representation. Validated codecs + new statistics required.
+# Template only: the next formal experiment still requires user instruction.
+[job]
+task = "vfm"
+experiment = "rbs_wam_ar_v0_2_fixed_camera_wrist_local_delta_latent_v1"
+project = "joint_video_hand_pose"
+group = "ar_v0_2_fixed_camera"
+name = "multitask20h_fixed_camera_wrist_local_delta_latent_v1"
+wandb_mode = "online"
+
+[model]
+precision = "bfloat16"
+
+[model.parallelism]
+data_parallel_shard_degree = 8
+data_parallel_replicate_degree = 1
+context_parallel_shard_degree = 1
+
+[model.activation_checkpointing]
+mode = "full"
+
+[model.compile]
+enabled = false
+
+[model.tokenizer]
+vae_path = "${oc.env:WAN_VAE_PATH,/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth}"
+
+[optimizer]
+lr = 2.0e-5
+
+[scheduler]
+warm_up_steps = [100]
+cycle_lengths = [1200]
+f_start = [0.0]
+f_max = [1.0]
+f_min = [0.1]
+
+[trainer]
+max_iter = 1200
+logging_iter = 1
+
+[checkpoint]
+load_path = "${oc.env:BASE_CHECKPOINT_PATH,/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp}"
+save_iter = 600

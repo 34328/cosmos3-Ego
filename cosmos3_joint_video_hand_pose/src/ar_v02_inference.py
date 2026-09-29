@@ -10,7 +10,8 @@ import time
 
 import torch
 
-from .ar_chunk_state import decode_chunk_camera_action, decode_chunk_camera_state, encode_chunk_camera_state
+from .ar_chunk_state import encode_chunk_camera_state
+from .action_representation import ActionRepresentationAdapter, FIXED_CAMERA
 from .ar_inference import flow_sigmas
 from .ar_v02_layout import ACTION, CONDITION_VIDEO, STATE, VIDEO, LAYOUT_VERSION
 from .ar_v02_cache import JointKVCache
@@ -60,11 +61,15 @@ def _schedule(values, device):
 
 class JointARSampler:
     @torch.no_grad()
-    def __init__(self, model, batch, *, state_normalizer, future_normalizer, chunk_size=4, source_fps=30.0):
+    def __init__(self, model, batch, *, state_normalizer, future_normalizer, chunk_size=4, source_fps=30.0, hand_codecs=None):
         if chunk_size not in (1, 2, 3, 4) or not 0 < source_fps < float("inf"):
             raise ValueError("v0.2 requires C=1..4 and positive finite source_fps")
         self.model, self.chunk_size, self.source_fps = model, chunk_size, float(source_fps)
         self.state_normalizer, self.future_normalizer = state_normalizer, future_normalizer
+        self.action_adapter = ActionRepresentationAdapter(state_normalizer, future_normalizer, hand_codecs)
+        self.action_adapter.validate_model(model)
+        if self.action_adapter.representation == FIXED_CAMERA and chunk_size != 4:
+            raise ValueError("fixed-camera statistics require C=4")
         states = batch["ar_boundary_states"]
         while isinstance(states, list):
             if len(states) != 1:
@@ -265,13 +270,13 @@ class JointARSampler:
             sr = (self.roles == STATE) & (self.chunks == b.chunk_id)
             target = torch.where((gc == b.chunk_id) & ((gr == ACTION) | (gr == VIDEO)))[0]
             if history != "generated" or b.chunk_id == 1:
-                state = decode_chunk_camera_state(
-                    self.gt_states[b.latent_start - 1], self.state_normalizer, source_index=b.source_start
+                state = self.action_adapter.decode_state(
+                    self.gt_states[b.latent_start - 1], source_index=b.source_start
                 )
                 video[:, :, u] = self.gt_video[:, :, u]
             else:
                 video[:, :, u] = self._next_condition_video(previous_block)
-            encoded = _condition_encoding(state, self.state_normalizer)
+            encoded = self.action_adapter.encode_state(state)
             action[sr, :57] = encoded
             action[sr, 57:] = 0
             output_a[sr], output_v[:, :, u] = action[sr], video[:, :, u]
@@ -334,7 +339,7 @@ class JointARSampler:
                 action[rows] += (sa[i + 1] - sa[i]) * pa
                 action[rows, 57:] = 0
             output_v[:, :, vi], output_a[rows] = video[:, :, vi], action[rows]
-            terminal = decode_chunk_camera_action(state, action[rows], self.future_normalizer).end_state
+            terminal = self.action_adapter.decode_action(state, action[rows]).end_state
             if history == "generated":
                 state = terminal
                 previous_block = video[:, :, block_indexes].clone()

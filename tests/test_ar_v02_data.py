@@ -222,7 +222,7 @@ def test_old_f0_normalizer_and_manifest_remain_supported(inputs):
 
 @pytest.mark.parametrize("frames", [33, 65, 129])
 @pytest.mark.parametrize("c", [1, 2, 3, 4])
-def test_double_pass_budget_matches_native_pack_and_bounds_any_c(frames, c):
+def test_double_pass_budget_matches_native_pack_and_defaults_to_c4(frames, c):
     from cosmos_framework.model.generator.utils.data_and_condition import GenerationDataClean
     from cosmos_framework.model.generator.teacher_forcing import make_teacher_forcing_clean_pack
     from cosmos3_joint_video_hand_pose.src.ar_v02_layout import JointChunkLayout
@@ -252,7 +252,7 @@ def test_double_pass_budget_matches_native_pack_and_bounds_any_c(frames, c):
     )
     clean = make_teacher_forcing_clean_pack(pack)
     assert module.ar_v02_token_count(nt, frames, chunk_size=c) == pack.sequence_length + clean.sequence_length
-    assert module.ar_v02_token_count(nt, frames) >= pack.sequence_length + clean.sequence_length
+    assert module.ar_v02_token_count(nt, frames) == module.ar_v02_token_count(nt, frames, chunk_size=4)
     assert module.ar_v02_token_count(nt, frames) == joint_training_token_budget(nt, frames, 368, 640)
 
 

@@ -94,13 +94,14 @@ def test_sample_ceiling_stops_real_reads_without_lookahead(ceiling, prewarm):
         verify_batch(batch, lengths)
 
 
-def test_two_t129_fit_but_no_third_and_mixed_four_fit():
-    lengths = [129, 129, 129, 65, 33, 33]
-    packed, _ = loader(lengths)
+def test_short_captions_allow_three_t129_at_60k_and_mixed_four_fit():
+    lengths = [129, 129, 129, 129, 65, 33, 33]
+    packed, _ = loader(lengths, max_sequence_length=60000)
     batches = list(packed)
-    assert [ids(batch) for batch in batches] == [[0, 1], [2, 3, 4, 5]]
+    # These fixtures have only 20 text tokens: three clips cost 59,828.
+    assert [ids(batch) for batch in batches] == [[0, 1, 2], [3, 4, 5, 6]]
     for batch in batches:
-        assert batch["_num_tokens"] < 70000
+        assert batch["_num_tokens"] + JOINT_PACK_PADDING_RESERVE < 60000
         verify_batch(batch, lengths)
 
 
@@ -113,7 +114,7 @@ def test_two_t129_fit_but_no_third_and_mixed_four_fit():
 )
 def test_lookahead_backfills_short_clips_and_preserves_skipped_order(lookahead, expected):
     lengths = [129, 129, 33, 33, 65]
-    packed, clips = loader(lengths, max_sequence_length=40000, lookahead_limit=lookahead)
+    packed, clips = loader(lengths, max_sequence_length=26000, lookahead_limit=lookahead)
     batches = list(packed)
     assert [ids(batch) for batch in batches] == expected
     assert sorted(i for batch in batches for i in ids(batch)) == list(range(len(lengths)))
@@ -136,11 +137,11 @@ def test_fit_is_pure_and_exact_cap_is_excluded():
 
 
 def test_oversized_sample_dropped_and_finite_stream_drains():
-    packed, _ = loader([129, 33, 65], max_sequence_length=20000)
+    packed, _ = loader([129, 33, 65], max_sequence_length=14000)
     batches = list(packed)
     assert [ids(b) for b in batches] == [[1], [2]]
     assert sum(b["_dropped_count"] for b in batches) == 1
-    packed, _ = loader([129], max_sequence_length=20000)
+    packed, _ = loader([129], max_sequence_length=14000)
     assert list(packed) == []
 
 
@@ -173,7 +174,8 @@ def test_time_ceiling_still_limits_real_mixed_packs():
 def test_budget_matches_dataset_and_counts_both_passes(frames):
     assert joint_training_token_budget(101, frames, 368, 640) == ar_v02_token_count(101, frames)
     n = (frames - 1) // 4
-    assert joint_training_token_budget(101, frames, 368, 640) == 2 * (103 + n * (480 + 9))
+    boundaries = (n + 3) // 4
+    assert joint_training_token_budget(101, frames, 368, 640) == 2 * (103 + 240 * (n + boundaries) + 8 * n + boundaries)
 
 
 @pytest.mark.parametrize(
@@ -232,9 +234,9 @@ def test_padding_reserve_is_once_per_pack_and_changes_only_admission():
     batches = list(packed)
     assert len(batches) == 1 and ids(batches[0]) == [0, 1]
     batch = batches[0]
-    assert batch["_num_tokens"] == batch["_ar_c1_raw_forward_tokens"] == raw_pair
-    assert batch["_ar_c1_reserved_budget_tokens"] == raw_pair + JOINT_PACK_PADDING_RESERVE
-    assert raw_pair < batch["_ar_c1_attention_padded_capacity"] <= batch["_ar_c1_reserved_budget_tokens"]
+    assert batch["_num_tokens"] == batch["_ar_c4_raw_forward_tokens"] == raw_pair
+    assert batch["_ar_c4_reserved_budget_tokens"] == raw_pair + JOINT_PACK_PADDING_RESERVE
+    assert raw_pair < batch["_ar_c4_attention_padded_capacity"] <= batch["_ar_c4_reserved_budget_tokens"]
     assert batch["_ar_pack_padding_reserve"] == 512
 
 
@@ -297,3 +299,92 @@ def test_audit_matches_runtime_storage_and_flex_wrapper_shapes_cpu(monkeypatch, 
         (audit["flex_gen_query_capacity_per_pass"], audit["flex_clean_kv_capacity"]),
         (audit["flex_gen_query_capacity_per_pass"], audit["flex_noisy_kv_capacity"]),
     ]
+
+
+@pytest.mark.parametrize("extra,accepted", [(0, False), (511, False), (512, False), (513, True)])
+def test_dataset_transform_and_packer_share_exclusive_padding_cap(extra, accepted):
+    from cosmos3_joint_video_hand_pose.src.ar_dataset import ARV02BudgetTransform, EgoVerseARSegmentDataset
+
+    raw = ar_v02_token_count(20, 33)
+    cap = raw + extra
+    packed, clips = loader([33], max_sequence_length=cap)
+    assert bool(list(packed)) == accepted
+    sample = dict(clips[0], clip_frames=33, action_source_frame_indices=torch.arange(65))
+    transform = ARV02BudgetTransform(lambda value, **kw: value, cap)
+    if accepted:
+        assert transform(sample)["ar_num_tokens"] == raw
+    else:
+        with pytest.raises(ValueError, match="padding-inclusive"):
+            transform(sample)
+    # Exercise the real planning method without opening media/codec artifacts.
+    dataset = object.__new__(EgoVerseARSegmentDataset)
+    dataset.frame_stride = 2
+    dataset.clip_frame_tiers = (33,)
+    dataset.speed_factor = 0.5
+    dataset.prompt_mode = "segment_only"
+    dataset.prompt_formatter = lambda *args: "caption"
+    dataset.token_counter = lambda _: 20
+    dataset.tokens_per_latent = 8
+    dataset.chunk_camera_mode = True
+    dataset.max_sequence_length = cap
+    dataset.tier_counts = {"dropped": 0}
+    dataset.dropped_segments = []
+    row = dict(episode_hash="ep", span_index=0, start_idx=0, end_idx=65, text_normalized="move")
+    plan = dataset._build_clip_plan(row, dict(fps=30, task_description="task"))
+    assert (plan is not None) == accepted
+    if plan:
+        assert plan["_ar_num_tokens"] == raw
+
+
+@pytest.mark.parametrize("groups", [1, 2, 3, 4, 5, 6, 7, 8, 32])
+def test_c4_budget_counts_partial_final_chunk(groups):
+    from cosmos3_joint_video_hand_pose.src.ar_v02_layout import JointChunkLayout
+
+    layout = JointChunkLayout(groups + 1, 240, 4)
+    expected = 2 * (102 + layout.num_tokens)
+    assert joint_training_token_budget(100, 1 + 4 * groups, 368, 640) == expected
+
+
+def test_documented_c4_pair_budget():
+    assert 2 * joint_training_token_budget(100, 129, 368, 640) + JOINT_PACK_PADDING_RESERVE == 40376
+
+
+@pytest.mark.parametrize("version", [None, "joint_chunk_cond_v1_two_pass_full_us_c1_v1"])
+def test_old_or_missing_budget_rejected_by_transform_packer_and_resume(version, monkeypatch):
+    from cosmos3_joint_video_hand_pose.src.ar_dataset import ARV02BudgetTransform
+    from cosmos3_joint_video_hand_pose.src.dataloader_state import RecoverablePackingDataLoader
+
+    packed, clips = loader([33])
+    sample = dict(clips[0], clip_frames=33, action_source_frame_indices=torch.arange(65))
+    if version is None:
+        sample.pop("ar_token_budget_version")
+    else:
+        sample["ar_token_budget_version"] = version
+    with pytest.raises(ValueError, match="budget version"):
+        packed._compute_token_split_per_sample(sample)
+    with pytest.raises(ValueError, match="budget version"):
+        ARV02BudgetTransform(lambda value, **kw: value, 60000)(sample)
+
+    def forbidden(*args):
+        pytest.fail("old resume mutated parent state")
+    monkeypatch.setattr(RecoverablePackingDataLoader, "load_state_dict", forbidden)
+    # Empty lookahead must not hide a changed packed-batch cursor.
+    with pytest.raises(ValueError, match="budget version"):
+        packed.load_state_dict(dict(ar_token_budget_version=version, buffer=[]))
+    # A new outer marker cannot legitimize a saved old lookahead sample.
+    with pytest.raises(ValueError, match="buffer token budget version"):
+        packed.load_state_dict(dict(ar_token_budget_version=AR_V02_TOKEN_BUDGET_VERSION, buffer=[sample]))
+
+
+def test_current_budget_checkpoint_delegates_to_existing_resume(monkeypatch):
+    from cosmos3_joint_video_hand_pose.src.dataloader_state import RecoverablePackingDataLoader
+
+    packed, clips = loader([33])
+    payload = dict(version=2, global_id=7, inner={}, buffer=[clips[0]])
+    monkeypatch.setattr(RecoverablePackingDataLoader, "state_dict", lambda self: dict(payload))
+    saved = packed.state_dict()
+    assert saved["ar_token_budget_version"] == AR_V02_TOKEN_BUDGET_VERSION
+    seen = []
+    monkeypatch.setattr(RecoverablePackingDataLoader, "load_state_dict", lambda self, value: seen.append(value))
+    packed.load_state_dict(saved)
+    assert seen == [saved]

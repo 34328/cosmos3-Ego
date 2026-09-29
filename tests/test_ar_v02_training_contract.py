@@ -45,7 +45,7 @@ def test_window_uses_update_counts_not_average_of_microbatch_means():
         loss, _ = window.reduce(v, torch.ones(len(v), dtype=torch.bool), a, torch.ones(len(a), dtype=torch.bool))
         losses.append(loss / 2)  # Cosmos trainer division
     grad = torch.autograd.grad(sum(losses), p)[0]
-    ref = (p * torch.tensor([1.0, 2.0, 3.0, 4.0])).square().mean() + 0.7 * (
+    ref = (p * torch.tensor([1.0, 2.0, 3.0, 4.0])).square().mean() + 1.0 * (
         p * torch.tensor([7.0, 8.0])
     ).square().mean()
     torch.testing.assert_close(sum(losses), ref)
@@ -109,7 +109,7 @@ def _distributed_worker(rank, init_file):
         all_v = torch.tensor([x for rank_batches in BATCHES for v, a in rank_batches for x in v])
         all_a = torch.tensor([x for rank_batches in BATCHES for v, a in rank_batches for x in a])
         rv, ra = ref(all_v, all_a)
-        (rv.mean() + 0.7 * ra.mean()).backward()
+        (rv.mean() + 1.0 * ra.mean()).backward()
         for actual, expected in zip(model.module.parameters(), ref.parameters(), strict=True):
             torch.testing.assert_close(actual.grad, expected.grad, atol=1e-6, rtol=1e-6)
         dist.all_reduce(report)
@@ -212,7 +212,7 @@ def test_mixin_bypasses_native_scaling_and_passes_coordinate_validity():
         vision_gen=True,
         action_gen=True,
         rectified_flow_training_config=SimpleNamespace(
-            sample_level_loss_averaging=True, loss_scale=1.0, action_loss_weight=0.7, image_loss_scale=None
+            sample_level_loss_averaging=True, loss_scale=1.0, action_loss_weight=1.0, image_loss_scale=None
         ),
     )
     model.rectified_flow_video = SimpleNamespace(
@@ -241,9 +241,35 @@ def test_mixin_bypasses_native_scaling_and_passes_coordinate_validity():
         is_image_batch=False,
     )
     output, loss = model.training_step(data, 0)
-    torch.testing.assert_close(loss, torch.tensor(3.8))
+    torch.testing.assert_close(loss, torch.tensor(5.0))
     torch.testing.assert_close(output["_backward_loss"], loss)
+    for key, expected in (("train_objective_numerator", loss.detach()),
+                          ("train_objective_denominator", torch.ones_like(loss))):
+        assert not output[key].requires_grad
+        assert output[key].grad_fn is None
+        assert output[key].shape == loss.shape
+        assert output[key].dtype == loss.dtype
+        assert output[key].device == loss.device
+        torch.testing.assert_close(output[key], expected)
+    # The logger's detached metadata must not change the training objective or
+    # its gradient; compare with the existing two-term objective independently.
+    from cosmos3_joint_video_hand_pose.src.loss import whole_action_flow_loss
+    reference_video, _ = whole_video_flow_loss(
+        pred=v, target=data["gen_data_noised"].vt_target_vision,
+        condition_mask=packed.vision.condition_mask,
+        time_weight=lambda *args: torch.ones(2),
+    )
+    reference_action, _ = whole_action_flow_loss(
+        pred=a, target=data["gen_data_noised"].vt_target_action,
+        condition_mask=packed.action.condition_mask,
+        visibility=model._current_hand_visibility, valid_mask=masks,
+    )
+    reference = reference_video + reference_action
+    torch.testing.assert_close(loss, reference)
+    expected_grads = torch.autograd.grad(reference, [v[0], *a])
     output["_backward_loss"].backward()
+    for tensor, expected in zip([v[0], *a], expected_grads, strict=True):
+        torch.testing.assert_close(tensor.grad, expected)
     assert torch.count_nonzero(a[1].grad) == 0
     assert output["egoverse_global_action_samples"] == 1
     model.configure_ar_loss_accumulation(2)
@@ -253,6 +279,10 @@ def test_mixin_bypasses_native_scaling_and_passes_coordinate_validity():
     for i in range(2):
         output, loss = model.training_step(data, i)
         torch.testing.assert_close(output["_backward_loss"] / 2, loss)
+        torch.testing.assert_close(output["train_objective_numerator"], loss.detach())
+        torch.testing.assert_close(output["train_objective_denominator"], torch.ones_like(loss))
+        assert not output["train_objective_numerator"].requires_grad
+        assert not output["train_objective_denominator"].requires_grad
     assert model._ar_loss_window.complete
 
 
@@ -336,7 +366,9 @@ class CallbackModel(torch.nn.Module):
 def bind_source(callback, path, *, official=False):
     import torch.distributed.checkpoint as dcp
 
-    source = SimpleNamespace(path=str(path), warm_start=official, uses_object_store=False)
+    # This fixture exercises explicit model-only warm start, including legacy v1.
+    # Full training resumes are covered separately below.
+    source = SimpleNamespace(path=str(path), warm_start=True, uses_object_store=False, backend_key=None)
     callback.trainer = SimpleNamespace(
         checkpointer=SimpleNamespace(
             keys_to_resume_during_load=lambda: ({"model"}, source),
@@ -378,8 +410,9 @@ def test_callback_official_init_save_preflight_resume_and_batch_binding(tmp_path
     with pytest.raises(ValueError, match="ar_layout_version"):
         callback2.on_training_step_batch_start(resumed, batch)
     callback2.config.trainer.grad_accum_iter = 3
-    callback2.on_train_start(resumed)
-    assert resumed.accumulation == 3  # formal trainer fail-fast configuration
+    with pytest.raises(ValueError, match="grad_accum_iter=1"):
+        callback2.on_train_start(resumed)
+    assert resumed.accumulation == 1
     resumed._ar_loss_window = SimpleNamespace(complete=False)
     with pytest.raises(RuntimeError, match="partially"):
         callback2.on_save_checkpoint_start(resumed)
@@ -783,3 +816,109 @@ def test_fixed_vae_replay_keeps_metadata_and_freezes_actual_denoiser_input(tmp_p
 
     records = json.loads((tmp_path / "rank00000.step00000.vae.replay.json").read_text())
     assert records[0]["max_abs"] > 0 and records[0]["equal"] is False
+
+
+@pytest.mark.parametrize("count", [0, 2, 3, True, 1.5])
+def test_callback_rejects_accumulation_before_checkpoint_access(tmp_path, count):
+    callback = make_callback(tmp_path)
+    callback.config.trainer.grad_accum_iter = count
+    with pytest.raises(ValueError, match="grad_accum_iter=1"):
+        callback.on_load_checkpoint_start(CallbackModel())
+
+
+def rank_state_checkpoint(tmp_path, *, omitted_rng=None, omitted_loader=None, world_size=8):
+    import pickle
+    import torch.distributed.checkpoint as dcp
+    from cosmos3_joint_video_hand_pose.src.ar_v02_contract import _RNG_STATE_FIELDS
+
+    state = {"iteration": 50}
+    for rank in range(world_size):
+        state[f"rng_state_{rank}"] = {
+            field: torch.ones(1, dtype=torch.uint8)
+            for field in _RNG_STATE_FIELDS if (rank, field) != omitted_rng
+        }
+    dcp.save(state, checkpoint_id=str(tmp_path / "trainer"), no_dist=True)
+    (tmp_path / "dataloader").mkdir(exist_ok=True)
+    for rank in range(world_size):
+        if rank != omitted_loader:
+            (tmp_path / "dataloader" / f"rank_{rank}.pkl").write_bytes(
+                pickle.dumps(dict(version=2, global_id=50, inner={}, buffer=[]))
+            )
+    source = SimpleNamespace(path=str(tmp_path), backend_key=None, warm_start=False)
+    checkpointer = SimpleNamespace(get_storage_reader=lambda path, source: dcp.FileSystemReader(path))
+    return checkpointer, source
+
+
+def test_eight_rank_resume_preflight(tmp_path):
+    from cosmos3_joint_video_hand_pose.src.ar_v02_contract import assert_resume_rank_state
+
+    checkpointer, source = rank_state_checkpoint(tmp_path)
+    assert_resume_rank_state(checkpointer, source, world_size=8)
+    with pytest.raises(ValueError, match="expected world_size=4"):
+        assert_resume_rank_state(checkpointer, source, world_size=4)
+
+
+@pytest.mark.parametrize("rank", range(8))
+def test_resume_rejects_each_missing_rank_loader(tmp_path, rank):
+    from cosmos3_joint_video_hand_pose.src.ar_v02_contract import assert_resume_rank_state
+
+    checkpointer, source = rank_state_checkpoint(tmp_path, omitted_loader=rank)
+    with pytest.raises(ValueError, match=f"missing dataloader ranks=\\[{rank}\\]"):
+        assert_resume_rank_state(checkpointer, source, world_size=8)
+
+
+@pytest.mark.parametrize("field", ["torch", "torch_cuda", "numpy_packed_len", "numpy_packed_bytes", "random_packed_len", "random_packed_bytes"])
+def test_resume_rejects_incomplete_rng(tmp_path, field):
+    from cosmos3_joint_video_hand_pose.src.ar_v02_contract import assert_resume_rank_state
+
+    checkpointer, source = rank_state_checkpoint(tmp_path, omitted_rng=(7, field))
+    with pytest.raises(ValueError, match=f"rng_state_7.{field}"):
+        assert_resume_rank_state(checkpointer, source, world_size=8)
+
+
+def test_callback_auto_resume_requires_full_training_state(tmp_path):
+    callback = make_callback(tmp_path)
+    bind_source(callback, tmp_path / "run")
+    keys, source = callback.trainer.checkpointer.keys_to_resume_during_load()
+    source.warm_start = False
+    with pytest.raises(ValueError, match="model/optim/scheduler/trainer/dataloader"):
+        callback.on_load_checkpoint_start(CallbackModel())
+
+
+def test_callback_runs_rank_preflight_before_binding_model(tmp_path, monkeypatch):
+    callback = make_callback(tmp_path)
+    bind_source(callback, tmp_path / "run")
+    keys, source = callback.trainer.checkpointer.keys_to_resume_during_load()
+    keys.update({"optim", "scheduler", "trainer", "dataloader"})
+    callback.trainer.checkpointer.keys_to_resume_during_load = lambda: (keys, source)
+    from cosmos3_joint_video_hand_pose.src import ar_v02_contract as module
+    monkeypatch.setattr(module.dist, "is_initialized", lambda: True)
+    monkeypatch.setattr(module.dist, "get_world_size", lambda: 8)
+    def reject(checkpointer, loaded_source, *, world_size):
+        assert world_size == 8 and loaded_source is source
+        raise ValueError("rank preflight reached")
+    monkeypatch.setattr(module, "assert_resume_rank_state", reject)
+    model = CallbackModel()
+    with pytest.raises(ValueError, match="rank preflight reached"):
+        callback.on_load_checkpoint_start(model)
+    assert not hasattr(model.net, "ar_training_contract")
+
+
+def test_callback_complete_training_resume_cpu(tmp_path):
+    import torch.distributed.checkpoint as dcp
+
+    callback = make_callback(tmp_path)
+    model = CallbackModel()
+    callback._attach(model)
+    run = tmp_path / "complete_resume"
+    checkpointer, source = rank_state_checkpoint(run, world_size=1)
+    dcp.save(model.state_dict(), checkpoint_id=str(run / "model"), no_dist=True)
+    checkpointer.keys_to_resume_during_load = lambda: (
+        {"model", "optim", "scheduler", "trainer", "dataloader"}, source
+    )
+    callback.trainer = SimpleNamespace(checkpointer=checkpointer)
+    restored = CallbackModel()
+    callback.on_load_checkpoint_start(restored)
+    callback.on_load_checkpoint_end(restored, iteration=50, checkpoint_path=str(run))
+    callback.on_train_start(restored, iteration=50)
+    assert callback._ready and restored.accumulation == 1

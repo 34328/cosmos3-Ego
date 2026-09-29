@@ -1,15 +1,27 @@
 """Joint chunk-conditioned training on native Cosmos packed samples."""
 
 import math
+import weakref
 import torch
-from .ar_model import EgoVerseARModel, OmniMoTCausalModel
+from .ar_model import ARStepContext, EgoVerseARModel, OmniMoTCausalModel
 from .ar_v02_attention import JointTeacherForcingAttention
 from .ar_v02_layout import STATE, CONDITION_VIDEO, LAYOUT_VERSION, JointChunkLayout
 from .ar_v02_packing import pack_joint_sequence
 
 
 class EgoVerseARV02Model(EgoVerseARModel):
-    def __init__(self, config, chunk_state_conditioning=True, seed=42):
+    _required_tf_frames_per_chunk = 4
+
+    def _is_chunkwise_tf(self):
+        # Cosmos' native [V0,V1..VC] grid differs from our repeated U/S layout.
+        # Keep native truncation/assertion off: JointChunkLayout owns C=4 and
+        # preserves the last partial chunk, including every future action row.
+        return False
+
+    def __init__(self, config, chunk_state_conditioning=True, seed=42, action_representation="legacy_local_delta_absolute_hand_v1"):
+        if action_representation not in ("legacy_local_delta_absolute_hand_v1", "fixed_camera_wrist_local_delta_latent_v1"):
+            raise ValueError("unsupported action representation")
+        self.action_representation = action_representation
         if (
             not config.diffusion_expert_config.enable_action_state_embedding
             or not config.diffusion_expert_config.enable_vision_condition_embedding
@@ -20,11 +32,15 @@ class EgoVerseARV02Model(EgoVerseARModel):
         if not chunk_state_conditioning:
             raise ValueError("state ablation is deferred; complete v0.2 includes every S_k")
         super().__init__(
-            config, train_chunk_sizes=(1, 2, 3, 4), train_window_range=(15, 15), seed=seed, whole_action_loss=True
+            config, train_chunk_sizes=(4,), train_window_range=(15, 15), seed=seed, whole_action_loss=True
         )
         self.chunk_state_conditioning = True
         self._joint_layout = None
         self._joint_layouts = []
+
+    def _sample_step_context(self, iteration: int) -> ARStepContext:
+        """V0.2 training uses a fixed four-latent chunk and 15-chunk history."""
+        return ARStepContext(chunk_size=4, window=15)
 
     def _encode_vision_x0_tokens(
         self,
@@ -76,6 +92,17 @@ class EgoVerseARV02Model(EgoVerseARModel):
             versions = versions[0]
         if versions != LAYOUT_VERSION or "ar_boundary_states" not in data_batch:
             raise ValueError("joint_chunk_cond_v1 dataset required; legacy state layout is not interchangeable")
+        representation = getattr(self, "action_representation", "legacy_local_delta_absolute_hand_v1")
+        observed = data_batch.get("ar_action_representation")
+        def flatten(value):
+            if isinstance(value, (list, tuple)):
+                return [item for child in value for item in flatten(child)]
+            return [value]
+        if representation == "fixed_camera_wrist_local_delta_latent_v1":
+            if self._ar_step.chunk_size != 4 or any(x != representation for x in flatten(observed)):
+                raise ValueError("fixed-camera actions require C=4 and explicit matching representation metadata")
+        elif observed is not None and any(x != representation for x in flatten(observed)):
+            raise ValueError("new action representation cannot be passed to a legacy model")
         result = super()._prepare_training_data(data_batch, iteration)
         _, plans, data, memory_info, _, _ = result
         if memory_info["skip_text"]:
@@ -248,33 +275,37 @@ class EgoVerseARV02Model(EgoVerseARModel):
         attention = JointTeacherForcingAttention(
             layouts, device=packed_sequence.vision.tokens[0].device, text_lengths=packed_sequence.joint_text_lengths
         )
-        init_base = memory.init
+        # Wrappers live on memory itself: strong bound methods/closures would
+        # retain all clean KV tensors until cyclic GC, across training updates.
+        memory_ref = weakref.ref(memory)
+        init_base = weakref.WeakMethod(memory.init)
         text_lengths = packed_sequence.joint_text_lengths
 
         def init(hidden_states, device):
-            init_base(hidden_states, device)
+            init_base()(hidden_states, device)
             # Stock replay treats all text as one caption. Keep each packed sample causal and isolated.
-            memory.und_kv_offsets = torch.tensor(
+            memory_ref().und_kv_offsets = torch.tensor(
                 [0] + list(__import__("itertools").accumulate(text_lengths)), device=device, dtype=torch.int32
             )
 
         memory.init = init
-        read_base = memory.read_for_layer
+        read_base = weakref.WeakMethod(memory.read_for_layer)
 
         def read_for_layer(i):
-            value = read_base(i)
+            value = read_base()(i)
             value.gen_attention_override = attention
             return value
 
         memory.read_for_layer = read_for_layer
         memory._joint_clean_text_kv = {}
-        write_base = memory.write_for_layer
+        write_base = weakref.WeakMethod(memory.write_for_layer)
 
         def write_for_layer(i, kv_to_store):
-            write_base(i, kv_to_store)
-            if memory.pass_number == 1:
+            write_base()(i, kv_to_store)
+            owner = memory_ref()
+            if owner.pass_number == 1:
                 # Preserve the clean text computation graph; inference UndKVCache detaches.
-                memory._joint_clean_text_kv[i] = tuple(x.clone() for x in kv_to_store[2:])
+                owner._joint_clean_text_kv[i] = tuple(x.clone() for x in kv_to_store[2:])
 
         memory.write_for_layer = write_for_layer
         return memory

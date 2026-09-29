@@ -132,26 +132,30 @@ def test_config_enables_cross_rank_sample_level_averaging():
 
     flow_config = _model_config()["rectified_flow_training_config"]
     assert flow_config["sample_level_loss_averaging"] is True
-    assert flow_config["independent_action_schedule"] is False
+    assert flow_config["independent_action_schedule"] is True
+    assert flow_config["normalize_loss_by_active"] is True
+    assert flow_config["shift_action"] == 5
 
 
-def test_overfit_v0_0_config_is_the_single_joint_baseline():
-    from cosmos3_joint_video_hand_pose.src.config import egoverse_joint_video_hand_pose_overfit_v0_0
+def test_v02_config_uses_current_joint_loss_contract():
+    from cosmos3_joint_video_hand_pose.src.config import _ar_v02_experiment
 
-    config = egoverse_joint_video_hand_pose_overfit_v0_0
-    assert config["job"]["name"] == "overfit_v0.0"
+    config = _ar_v02_experiment(True)
+    assert config["job"]["name"] == "multitask20h_joint_chunk_cond_v1"
     assert config["job"]["wandb_mode"] == "online"
     flow = config["model"]["config"]["rectified_flow_training_config"]
-    assert flow["loss_scale"] == 10.0
-    assert flow["action_loss_weight"] == 7.0
-    assert config["model"]["subblock_equal_weight"] is True
+    assert flow["loss_scale"] == 1.0
+    assert flow["action_loss_weight"] == 1.0
+    assert flow["sample_level_loss_averaging"] is True
+    assert flow["normalize_loss_by_active"] is True
+    assert flow["independent_action_schedule"] is True
+    assert config["model"]["chunk_state_conditioning"] is True
+    assert config["optimizer"]["lr_multipliers"] == {}
     assert config["trainer"]["logging_iter"] == 1
-    assert config["trainer"]["max_iter"] == 2000
-    assert config["checkpoint"]["save_iter"] == 300
-    assert config["model"]["config"]["parallelism"]["context_parallel_shard_degree"] == 2
-    assert config["model"]["config"]["parallelism"]["data_parallel_shard_degree"] == 4
-    callback_names = set(config["trainer"]["callbacks"])
-    assert callback_names.isdisjoint({"training_stats", "param_count", "dataloader_speed"})
+    assert config["trainer"]["max_iter"] == 1200
+    assert config["checkpoint"]["save_iter"] == 600
+    assert config["model"]["config"]["parallelism"]["context_parallel_shard_degree"] == 1
+    assert config["model"]["config"]["parallelism"]["data_parallel_shard_degree"] == 8
 
 
 def test_wandb_loss_metric_sources_are_complete():

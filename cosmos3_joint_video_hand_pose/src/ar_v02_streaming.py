@@ -8,7 +8,7 @@ Usage:
     stream.reset(seed=42)  # mandatory after an interrupted/failed call
 
 U is [1,D,1,H,W] latent (or one RGB frame with input_is_latent=False);
-state is a ChunkCameraState or normalized [57]/[64] tensor. Current GT V/A
+state is a representation-matched physical state or normalized [57]/[64] tensor. Current GT V/A
 are required only for gt/oracle. For generated, pass U/S only on the first call.
 C=4 is the deployment default; C=1..3 and partial final blocks support correctness
 tests. The caller owns model/VAE, frozen normalizers, tokenizer and output sinks.
@@ -24,12 +24,9 @@ from cosmos_framework.data.generator.sequence_packing.modality import ModalityDa
 from cosmos_framework.data.generator.sequence_packing.mrope import get_3d_mrope_ids_vae_tokens
 from cosmos_framework.data.generator.sequence_packing.sequence import PackedSequence, PackedSequenceBuilder
 
-from .ar_chunk_state import (
-    ChunkCameraState,
-    decode_chunk_camera_action,
-    decode_chunk_camera_state,
-    encode_chunk_camera_state,
-)
+from cosmos_framework.model.generator.vision_encoder import normalize_uint8_item
+
+from .action_representation import ActionRepresentationAdapter, FIXED_CAMERA
 from .ar_v02_cache import BoundedJointKVCache
 from .ar_v02_inference import HISTORY_MODES, JOINT_STEPS, _schedule
 from .ar_v02_layout import ACTION, CONDITION_VIDEO, LAYOUT_VERSION, STATE, VIDEO
@@ -204,6 +201,7 @@ class StreamingJointSampler:
         latent_shape,
         state_normalizer,
         future_normalizer,
+        hand_codecs=None,
         chunk_size=4,
         history="gt",
         seed=42,
@@ -224,6 +222,10 @@ class StreamingJointSampler:
             raise ValueError("source_fps and speed_factor must be finite and positive")
         self.model, self.history, self.chunk_size = model, history, chunk_size
         self.state_normalizer, self.future_normalizer = state_normalizer, future_normalizer
+        self.action_adapter = ActionRepresentationAdapter(state_normalizer, future_normalizer, hand_codecs)
+        self.action_adapter.validate_model(model)
+        if self.action_adapter.representation == FIXED_CAMERA and chunk_size != 4:
+            raise ValueError("fixed-camera statistics require C=4")
         self.source_fps = float(source_fps)
         self.device = torch.device(model.tensor_kwargs["device"])
         if self.device.type == "cuda" and self.device.index is None:
@@ -274,6 +276,7 @@ class StreamingJointSampler:
         self.generator = torch.Generator(device=self.device).manual_seed(seed)
         self.chunk = 0
         self.source_index = source_start
+        self._source_start = source_start
         self._terminal = None
         self._previous_frames = 0
         self._failed = self._closed = False
@@ -309,6 +312,8 @@ class StreamingJointSampler:
     ):
         """Return only this block. A partial block closes the episode until reset.
 
+        With input_is_latent=False, uint8 RGB is normalized to [-1, 1];
+        floating-point RGB must already be normalized to the VAE input range.
         Physical action integration and clean refresh finish before return.
         generated retains only one [U,V] block and its terminal state; next U is
         decoded/re-encoded at the next call, never from a future GT payload.
@@ -359,18 +364,24 @@ class StreamingJointSampler:
             if not input_is_latent:
                 if u.ndim != 5 or u.shape[0] != 1 or u.shape[2] != 1 or not torch.isfinite(u).all():
                     raise ValueError("condition RGB must be one finite [1,channels,1,H,W] frame")
-                u = self.model.encode(u.to(device=self.device, dtype=self.dtype)).float()
+                if not torch.is_floating_point(u):
+                    u = normalize_uint8_item(u, dict(device=self.device, dtype=torch.float32))
+                else:
+                    u = u.to(device=self.device)
+                u = self.model.encode(u).float()
         self._check(u, self._condition.shape, "condition latent")
         self._condition.copy_(u)
         if isinstance(state, torch.Tensor):
-            state = decode_chunk_camera_state(state, self.state_normalizer, source_index=self.source_index)
-        if not isinstance(state, ChunkCameraState) or state.source_index != self.source_index:
+            state = self.action_adapter.decode_state(state, source_index=self.source_index)
+        self.action_adapter.validate_state(state)
+        if state.source_index != self.source_index:
             raise ValueError("state must describe the current absolute source boundary")
-        encoded = encode_chunk_camera_state(state, self.state_normalizer)
+        encoded = self.action_adapter.encode_state(state)
         self._check(encoded, (57,), "encoded state")
         self._state.zero_()
         self._state[0, :57].copy_(encoded)
-        self.workspace.set_boundary(self.source_index, frames)
+        # RoPE starts at the current episode origin; physical metadata stays absolute.
+        self.workspace.set_boundary(self.source_index - self._source_start, frames)
         text_seconds = 0.0
         if not self.cache.text_ready:
             self._sync()
@@ -413,7 +424,7 @@ class StreamingJointSampler:
             raise ValueError("non-finite Euler result")
         # Independent return buffers: GT refresh and subsequent calls cannot overwrite them.
         predicted_v, predicted_a = video.clone(), action.clone()
-        decoded_action = decode_chunk_camera_action(state, action, self.future_normalizer)
+        decoded_action = self.action_adapter.decode_action(state, action)
         self.cache.begin_phase("refresh", chunk=chunk, frames=frames)
         refresh_v, refresh_a = (gt_video, gt_action) if self.history in ("gt", "oracle") else (video, action)
         self._forward(self.workspace.load("refresh", refresh_v, refresh_a))
@@ -424,7 +435,7 @@ class StreamingJointSampler:
             self._previous[:, :, 1 : frames + 1].copy_(video)
             # Own the tiny terminal state; user mutation of returned decoded output is harmless.
             end = decoded_action.end_state
-            self._terminal = ChunkCameraState(end.source_index, end.rigid_camera.clone(), end.hand_latents.clone())
+            self._terminal = type(end)(end.source_index, end.rigid_camera.clone(), end.hand_latents.clone())
             self._previous_frames = frames
         result_u, result_s = self._condition.clone(), self._state[0].clone()
         self.chunk, self.source_index = chunk, self.source_index + 8 * frames

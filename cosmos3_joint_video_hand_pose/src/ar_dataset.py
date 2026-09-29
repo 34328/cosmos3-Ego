@@ -3,9 +3,11 @@
 Each sample is one continuous window of a segment. Video keeps every
 ``frame_stride``-th source frame (``T = 4n + 1`` frames, ``n + 1`` VAE latents);
 actions keep every source frame and are grouped ``K = 4 * frame_stride`` per latent.
-Latent group 0 repeats the first-frame state ``K`` times (a clean condition); group
-``j >= 1`` holds the actions of source frames ``K(j-1)+1 .. Kj`` of the window, whose
-last frame is latent ``j``'s last video frame. Hand visibility follows the action rows.
+V0.2 emits future actions only and separate boundary states (one state per used
+chunk). Legacy V0.1 alone repeats the initial state K times. Latent group j>=1
+holds source actions K(j-1)+1..Kj; hand visibility follows these action rows.
+The fixed-camera representation uses C=4/K=8 with independently fitted 57D
+state/future normalizers and explicit validated hand codecs.
 
 FPS labels are the real rates times the source's speed factor (EgoVerse 0.5 slows
 human motion to half speed in model time); ``fps_action == fps_video * K / 4`` holds
@@ -41,7 +43,15 @@ VAE_TEMPORAL_COMPRESSION = 4
 DEFAULT_CLIP_FRAME_TIERS = (129, 65, 33)
 DEFAULT_SPEED_FACTORS = {"egoverse": 0.5}
 AR_MAX_SEQUENCE_LENGTH = 75_000
-AR_V02_TOKEN_BUDGET_VERSION = "joint_chunk_cond_v1_two_pass_full_us_c1_v1"
+# CP1 runtime/Flex padding: two streams, two passes, 128 rows each.
+JOINT_ATTENTION_ALIGNMENT = 128
+JOINT_PACK_PADDING_RESERVE = 4 * JOINT_ATTENTION_ALIGNMENT
+AR_V02_TOKEN_BUDGET_VERSION = "joint_chunk_cond_v1_two_pass_full_us_c4_v2"
+
+
+def joint_reserved_token_budget(raw_tokens):
+    """Add padding once per candidate pack; raw sample metadata stays unchanged."""
+    return raw_tokens + JOINT_PACK_PADDING_RESERVE
 
 
 def clip_span(clip_frames: int, frame_stride: int) -> int:
@@ -70,15 +80,21 @@ def ar_token_count(text_tokens: int, clip_frames: int, action_tokens_per_latent:
 
 
 def ar_v02_token_count(
-    text_tokens: int, clip_frames: int, action_tokens_per_latent: int = 8, *, chunk_size: int = 1
+    text_tokens: int,
+    clip_frames: int,
+    action_tokens_per_latent: int = 8,
+    *,
+    chunk_size: int = 4,
+    spatial_tokens_per_latent: int = SPATIAL_TOKENS_PER_LATENT_FRAME,
 ) -> int:
     """Conservative *sum of both passes*, including unsupervised noisy U/S rows.
 
-    C=1 is the worker-side upper bound; choosing C and encoding RGB belong to
-    the model. Each pass uses text + 2 (EOS and generation start, no BOS)
+    C=4 is the fixed training layout. Explicit other C values are only for
+    layout regression calculations, not checkpoint budget compatibility.
+    Each pass uses text + 2 (EOS and generation start, no BOS)
     and all U/S/V/A tokens. The cap is exclusive in PackingDataLoader, so a
-    pack must have sum(ar_num_tokens) < max_sequence_length. It is a compute
-    budget, not the length of either individual model forward.
+    pack must have joint_reserved_token_budget(sum(ar_num_tokens)) < the cap.
+    It is a compute budget, not the length of either individual model forward.
     """
     if type(text_tokens) is not int or text_tokens < 0:
         raise ValueError("text_tokens must be a non-negative integer")
@@ -90,7 +106,9 @@ def ar_v02_token_count(
         raise ValueError("chunk_size must be one of 1,2,3,4")
     n = (clip_frames - 1) // 4
     boundaries = (n + chunk_size - 1) // chunk_size
-    generation = SPATIAL_TOKENS_PER_LATENT_FRAME * (n + boundaries) + action_tokens_per_latent * n + boundaries
+    if type(spatial_tokens_per_latent) is not int or spatial_tokens_per_latent < 1:
+        raise ValueError("spatial_tokens_per_latent must be positive")
+    generation = spatial_tokens_per_latent * (n + boundaries) + action_tokens_per_latent * n + boundaries
     return 2 * (text_tokens + 2 + generation)
 
 
@@ -110,6 +128,8 @@ class ARV02BudgetTransform:
         sample = self.transform(sample, resolution=resolution)
         if sample.get("ar_layout_version") != "joint_chunk_cond_v1":
             return sample
+        if sample.get("ar_token_budget_version") != AR_V02_TOKEN_BUDGET_VERSION:
+            raise ValueError("dataset token budget version mismatch; old C1 metadata must not be reinterpreted")
         tokens = sample.get("text_token_ids")
         if (
             not isinstance(tokens, torch.Tensor)
@@ -122,8 +142,8 @@ class ARV02BudgetTransform:
         k = (span - 1) // ((frames - 1) // 4)
         sample["ar_num_tokens"] = ar_v02_token_count(tokens.numel(), frames, k)
         sample["ar_token_budget_version"] = AR_V02_TOKEN_BUDGET_VERSION
-        if sample["ar_num_tokens"] >= self.max_sequence_length:
-            raise ValueError("tokenized v0.2 sample exceeds the double-pass token budget")
+        if joint_reserved_token_budget(sample["ar_num_tokens"]) >= self.max_sequence_length:
+            raise ValueError("tokenized v0.2 sample exceeds the padding-inclusive double-pass token budget")
         return sample
 
 
@@ -178,6 +198,10 @@ class EgoVerseARSegmentDataset(Dataset):
         prompt_mode: str = PROMPT_MODE_SEGMENT_ONLY,
         chunk_state_normalizer: str | Path | None = None,
         valid_windows_manifest: str | Path | None = None,
+        action_representation: str | None = None,
+        future_normalizer: str | Path | None = None,
+        right_codec: str | Path | None = None,
+        left_codec: str | Path | None = None,
     ):
         if prompt_mode not in PROMPT_MODES:
             raise ValueError(f"unsupported prompt mode {prompt_mode!r}; expected one of {PROMPT_MODES}")
@@ -198,13 +222,33 @@ class EgoVerseARSegmentDataset(Dataset):
         self.random_window = bool(random_window)
         self.token_counter = token_counter or CosmosTextTokenCounter()
         self.prompt_formatter = prompt_formatter or CosmosActionPromptFormatter()
-        self.action_builder = action_builder or Action57Builder(rigid_pose_frame_delta=True)
+        from .action_fixed_normalization import REPRESENTATION, NORMALIZER_SCHEMA
+        fixed_profile = (json.loads(Path(chunk_state_normalizer).read_text())
+                         if chunk_state_normalizer is not None else {})
+        if fixed_profile.get("schema") == NORMALIZER_SCHEMA:
+            inferred = fixed_profile.get("representation")
+            if inferred != REPRESENTATION:
+                raise ValueError("retired or missing action representation in state statistics; refit required")
+        else:
+            inferred = "legacy_local_delta_absolute_hand_v1"
+        self.action_representation = action_representation or inferred
+        if self.action_representation != inferred:
+            raise ValueError("action representation and state statistics schema mismatch")
+        self.fixed_camera_mode = inferred == REPRESENTATION
+        self.fixed_hand_codecs = None
+        self.action_builder = (None if self.fixed_camera_mode else
+                               action_builder or Action57Builder(rigid_pose_frame_delta=True))
         self.chunk_state_normalizer = None
         self.chunk_camera_mode = False
         self.state_normalizer_sha256 = None
         self.valid_windows_sha256 = None
         self.valid_windows = None
-        if chunk_state_normalizer is not None:
+        if self.fixed_camera_mode:
+            if action_builder is not None:
+                raise ValueError("fixed-camera data cannot use a legacy Action57Builder")
+            self._init_fixed(chunk_state_normalizer, future_normalizer, valid_windows_manifest,
+                             (right_codec, left_codec), episodes_manifest, segments_manifest, split)
+        elif chunk_state_normalizer is not None:
             import hashlib
             from .normalization import PiecewiseAsinhNormalizer
 
@@ -287,6 +331,43 @@ class EgoVerseARSegmentDataset(Dataset):
         if not self.rows:
             raise ValueError(f"no {split!r} segment is long enough for the smallest clip tier")
 
+    def _init_fixed(self, state_path, future_path, manifest_path, codec_paths,
+                    episodes_path, segments_path, split):
+        import hashlib
+        from .action_fixed_normalization import (FixedCameraNormalizer, load_fixed_codecs,
+                                                REPRESENTATION, NORMALIZER_SCHEMA, VALID_WINDOWS_SCHEMA)
+        if self.frame_stride != 2 or future_path is None or manifest_path is None:
+            raise ValueError("fixed-camera dataset requires K=8, separate future statistics and manifest")
+        self.fixed_hand_codecs = load_fixed_codecs(codec_paths)
+        hashes = tuple(c.checkpoint_sha256 for c in self.fixed_hand_codecs)
+        self.chunk_state_normalizer = FixedCameraNormalizer(state_path, kind="state", codec_sha256=hashes)
+        self.future_normalizer = FixedCameraNormalizer(future_path, kind="future", codec_sha256=hashes)
+        data = Path(manifest_path).read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if any(n.profile["manifest_sha256"] != digest for n in
+               (self.chunk_state_normalizer, self.future_normalizer)):
+            raise ValueError("fixed-camera state/future manifest hash mismatch")
+        manifest = json.loads(data)
+        expected = dict(schema=VALID_WINDOWS_SCHEMA, state_schema=NORMALIZER_SCHEMA,
+                        representation=REPRESENTATION, layout_version="joint_chunk_cond_v1",
+                        chunk_size=4, tokens_per_latent=8, frame_stride=2, codec_sha256=list(hashes))
+        if any(manifest.get(k) != v for k, v in expected.items()):
+            raise ValueError("fixed-camera manifest representation/layout/codec mismatch")
+        if manifest.get("tracking_validation") != dict(
+            version="fixed_camera_float32_v1", quaternion_norm_atol=1e-4,
+            so3_atol=1e-5, so3_rtol=1e-5, missing_hand="exclude_entire_window",
+            finite_dtype="float32", scope="all_source_frames"):
+            raise ValueError("fixed-camera manifest lacks matching strict tracking audit")
+        prefix = "train" if split == "train" else "heldout"
+        for name, path in (("episodes", episodes_path), ("segments", segments_path)):
+            if hashlib.sha256(Path(path).read_bytes()).hexdigest() != manifest["source_hashes"][prefix+"_"+name]:
+                raise ValueError("dataset source differs from fixed-camera audit")
+        self.valid_windows = manifest["windows"]
+        self.valid_windows_sha256 = digest
+        self.state_normalizer_sha256 = hashlib.sha256(Path(state_path).read_bytes()).hexdigest()
+        self.future_normalizer_sha256 = hashlib.sha256(Path(future_path).read_bytes()).hexdigest()
+        self.chunk_camera_mode = True
+
     def _build_clip_plan(self, row: dict, episode: dict) -> dict | None:
         sample_id = f"{row['episode_hash']}:{row['span_index']}:{row['start_idx']}:{row['end_idx']}"
         source_frames = int(row["end_idx"]) - int(row["start_idx"])
@@ -301,7 +382,8 @@ class EgoVerseARSegmentDataset(Dataset):
         budget = ar_token_count(text_tokens, frames, self.tokens_per_latent)
         if self.chunk_camera_mode:
             budget = ar_v02_token_count(text_tokens, frames, self.tokens_per_latent)
-        if budget >= self.max_sequence_length:
+        admission_budget = joint_reserved_token_budget(budget) if self.chunk_camera_mode else budget
+        if admission_budget >= self.max_sequence_length:
             self._drop(sample_id, source_frames, "exceeds_packing_cap")
             return None
         return {
@@ -392,18 +474,23 @@ class EgoVerseARSegmentDataset(Dataset):
                     "left.obs_wrist_pose": left,
                     "right.obs_keypoints": right_points,
                     "left.obs_keypoints": left_points,
-                }
+                }, fixed_camera=self.fixed_camera_mode,
             )
             reasons = [name for name, flags in invalid.items() if flags.any()]
             if reasons:
                 raise ValueError(f"audited window tracking changed or is invalid: {reasons}")
-        per_frame_action = self.action_builder.build(
-            head_pose=head,
-            right_wrist_pose=right,
-            left_wrist_pose=left,
-            right_keypoints=right_points,
-            left_keypoints=left_points,
-        )  # [span,57]
+        if self.fixed_camera_mode:
+            from .action_fixed_normalization import encode_fixed_window
+            physical_states, physical_future = encode_fixed_window(
+                head, right, left, right_points, left_points, self.fixed_hand_codecs)
+            normalized_future = self.future_normalizer.normalize(physical_future)
+            # Internal compatibility row only; never emitted as a future action.
+            per_frame_action = torch.cat((normalized_future.new_zeros(1, 57), normalized_future))
+        else:
+            per_frame_action = self.action_builder.build(
+                head_pose=head, right_wrist_pose=right, left_wrist_pose=left,
+                right_keypoints=right_points, left_keypoints=left_points,
+            )  # [span,57]
 
         def visibility_of(side: str) -> np.ndarray:
             name = f"{side}.obs_palm_in_fov_front_1"
@@ -442,7 +529,35 @@ class EgoVerseARSegmentDataset(Dataset):
             "window_start": first,
             "source_frame_indices": torch.from_numpy(video_indexes.copy()),
             "action_source_frame_indices": torch.from_numpy(action_indexes.copy()),
+            # Raw metric target: metres, world frame, right then left, includes boundary.
+            "ar_source_keypoints_world": torch.from_numpy(np.stack(
+                (right_points.reshape(span, 21, 3), left_points.reshape(span, 21, 3)), axis=1).copy()),
         }
+        if self.fixed_camera_mode:
+            offsets = torch.arange(0, span - 1, 8, dtype=torch.long)
+            sample.update(
+                ar_boundary_states=torch.nn.functional.pad(
+                    self.chunk_state_normalizer.normalize(physical_states), (0, 7)),
+                ar_layout_version="joint_chunk_cond_v1",
+                ar_action_representation=self.action_representation,
+                ar_chunk_size=4,
+                ar_num_tokens=int(row["_ar_num_tokens"]),
+                ar_token_budget_version=AR_V02_TOKEN_BUDGET_VERSION,
+                ar_boundary_source_offsets=offsets,
+                ar_boundary_source_indices=offsets + first,
+                ar_boundary_times=(offsets + first).double() / float(episode["fps"]),
+                ar_condition_source="gt",
+                future_action_source_frame_indices=torch.from_numpy(action_indexes[1:].copy()),
+                ar_source_poses=torch.from_numpy(np.stack((head, right, left), axis=1).copy()),
+                ar_state_schema=self.chunk_state_normalizer.schema,
+                ar_state_normalizer_sha256=self.state_normalizer_sha256,
+                ar_future_normalizer_sha256=self.future_normalizer_sha256,
+                ar_codec_sha256=self.chunk_state_normalizer.codec_sha256,
+                ar_right_hand_codec_sha256=self.chunk_state_normalizer.codec_sha256[0],
+                ar_left_hand_codec_sha256=self.chunk_state_normalizer.codec_sha256[1],
+                ar_valid_windows_sha256=self.valid_windows_sha256,
+            )
+            return sample
         if self.chunk_state_normalizer is not None:
             from .ar_chunk_state import (
                 boundary_states_from_streams,
@@ -453,8 +568,8 @@ class EgoVerseARSegmentDataset(Dataset):
                 CHUNK_CAMERA_LAYOUT_VERSION,
             )
 
-            # C is chosen by the model at each step, not by dataloader workers.
-            # Supply all possible latent boundaries; the ablation uses the same sample.
+            # V0.2 training fixes C=4 in the model. Keep all candidate
+            # boundaries for layout compatibility; packing selects the C=4 states.
             boundaries = chunk_boundaries(ar_latent_frames(frames), 1, tokens_per_latent=self.tokens_per_latent)
             hands = torch.stack((per_frame_action[:, 18:33], per_frame_action[:, 42:57]), dim=1)
             state_builder = chunk_camera_states_from_streams if self.chunk_camera_mode else boundary_states_from_streams
@@ -510,6 +625,9 @@ def get_egoverse_ar_dataset(
     split: str = "train",
     chunk_state_normalizer: str | None = None,
     valid_windows_manifest: str | None = None,
+    action_representation: str | None = None,
+    right_codec: str | None = None,
+    left_codec: str | None = None,
 ):
     from cosmos_framework.data.generator.action.datasets.action_sft_dataset import ActionIterableShuffleDataset
     from cosmos_framework.data.generator.action.utils.transforms import ActionTransformPipeline
@@ -519,6 +637,10 @@ def get_egoverse_ar_dataset(
         builder_kwargs["state_normalizer"] = state_normalizer
     if future_normalizer is not None:
         builder_kwargs["future_normalizer"] = future_normalizer
+    from .action_fixed_normalization import NORMALIZER_SCHEMA, REPRESENTATION
+    fixed = (action_representation == REPRESENTATION or
+             (chunk_state_normalizer is not None and
+              json.loads(Path(chunk_state_normalizer).read_text()).get("schema") == NORMALIZER_SCHEMA))
     raw = EgoVerseARSegmentDataset(
         episodes_manifest,
         segments_manifest,
@@ -527,11 +649,15 @@ def get_egoverse_ar_dataset(
         clip_frame_tiers=tuple(clip_frame_tiers),
         speed_factors=None if speed_factors is None else dict(speed_factors),
         random_window=random_window,
-        action_builder=Action57Builder(**builder_kwargs),
+        action_builder=None if fixed else Action57Builder(**builder_kwargs),
         max_sequence_length=max_sequence_length,
         prompt_mode=prompt_mode,
         chunk_state_normalizer=chunk_state_normalizer,
         valid_windows_manifest=valid_windows_manifest,
+        action_representation=action_representation,
+        future_normalizer=future_normalizer,
+        right_codec=right_codec,
+        left_codec=left_codec,
     )
     transform = ActionTransformPipeline(
         pad_keys=[],

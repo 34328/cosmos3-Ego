@@ -24,11 +24,17 @@ def whole_action_flow_loss(
     condition_mask: list[torch.Tensor],
     visibility: list[torch.Tensor],
     valid_mask: list[torch.Tensor | None] | None = None,
+    mask_out_of_fov: bool = True,
+    collect_field_metrics: bool = False,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     """v0.2: one masked mean over all valid future (time, coordinate) pairs.
 
-    Conditions, unseen hands, structural padding and the last seven padded
-    coordinates contribute neither numerator nor denominator. Samples have
+    Conditions, structural padding and the last seven padded coordinates
+    contribute neither numerator nor denominator. The legacy default also
+    excludes unseen hands. Wrist-local delta actions disable that FOV mask:
+    tracking validity is enforced by rejecting corrupt windows upstream.
+    Visibility remains metadata, never a replacement for tracking validity.
+    Samples have
     equal weight; empty samples are reported separately for global reduction.
     Action timestep weighting is uniform. v0.1's block reduction is unchanged.
     """
@@ -38,6 +44,7 @@ def whole_action_flow_loss(
     if len(masks) != len(pred):
         raise ValueError("valid_mask must have one entry per sample")
     losses, counts = [], []
+    field_losses = {name: [] for name in ACTION_SUBBLOCKS} if collect_field_metrics else {}
     for prediction, label, condition, visible, valid in zip(
         pred, target, condition_mask, visibility, masks, strict=True
     ):
@@ -55,8 +62,9 @@ def whole_action_flow_loss(
         if not ((visible == 0) | (visible == 1)).all():
             raise ValueError("visibility mask must be binary")
         keep = (~condition.bool())[:, None].expand(rows, 57).clone()
-        keep[:, 9:33] &= visible[:, 0:1].bool()
-        keep[:, 33:57] &= visible[:, 1:2].bool()
+        if mask_out_of_fov:
+            keep[:, 9:33] &= visible[:, 0:1].bool()
+            keep[:, 33:57] &= visible[:, 1:2].bool()
         if valid is not None:
             # Native Cosmos masks may be channel-only; v0.2 also needs
             # coordinate-level masks for adjacent-label validity and padding.
@@ -77,6 +85,13 @@ def whole_action_flow_loss(
         numerator = error.sum()
         losses.append(numerator / count.clamp_min(1))
         counts.append(count)
+        # Diagnostics only: reuse the exact objective mask, detach before any
+        # extra reduction. These means never participate in backward.
+        for name in field_losses:
+            columns, _ = ACTION_SUBBLOCKS[name]
+            field_losses[name].append(
+                error.detach()[:, columns].sum() / keep[:, columns].sum().clamp_min(1)
+            )
     per_sample = torch.stack(losses)
     valid_coordinates = torch.stack(counts)
     active = valid_coordinates > 0
@@ -85,6 +100,8 @@ def whole_action_flow_loss(
         "per_sample_losses": per_sample,
         "active_samples": active,
         "valid_coordinates": valid_coordinates,
+        **({"field_per_sample_losses": {name: torch.stack(values) for name, values in field_losses.items()}}
+           if collect_field_metrics else {}),
     }
 
 

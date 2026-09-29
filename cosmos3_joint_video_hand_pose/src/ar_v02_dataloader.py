@@ -5,12 +5,13 @@ import operator
 import torch
 from .dataloader_state import RecoverablePackingDataLoader
 from .ar_v02_layout import LAYOUT_VERSION
-from .ar_dataset import AR_V02_TOKEN_BUDGET_VERSION
-
-JOINT_ATTENTION_ALIGNMENT = 128
-# CP1, CUDA-graph padding disabled: runtime adds a non-empty trailing pad
-# segment to each stream before attention. Two streams * two passes * 128.
-JOINT_PACK_PADDING_RESERVE = 4 * JOINT_ATTENTION_ALIGNMENT
+from .ar_dataset import (
+    AR_V02_TOKEN_BUDGET_VERSION,
+    JOINT_ATTENTION_ALIGNMENT,
+    JOINT_PACK_PADDING_RESERVE,
+    ar_v02_token_count,
+    joint_reserved_token_budget,
+)
 
 
 def _integer(value, name, minimum=1):
@@ -24,7 +25,7 @@ def _integer(value, name, minimum=1):
 
 
 def joint_training_token_budget(text_tokens, frames, height, width, patch_pixels=32):
-    """C=1 raw forward-token bound, excluding per-pack padding (unchanged)."""
+    """Fixed C=4 forward-token count, excluding unchanged per-pack padding."""
     text_tokens = _integer(text_tokens, "text_tokens", 0)
     frames = _integer(frames, "frames")
     height = _integer(height, "height")
@@ -32,12 +33,11 @@ def joint_training_token_budget(text_tokens, frames, height, width, patch_pixels
     patch_pixels = _integer(patch_pixels, "patch_pixels")
     if frames < 5 or (frames - 1) % 4:
         raise ValueError("expected 1+4N RGB frames")
-    n = (frames - 1) // 4
     patches = math.ceil(height / patch_pixels) * math.ceil(width / patch_pixels)
-    # Worst C=1: each group contributes one U, one S, one V and eight A.
+    # C=4: one U/S per four future groups, including a short final chunk.
     # Current replay retains zero-loss condition query rows in pass 2 as well.
     # Count them honestly; no assumption that masking removes their compute.
-    return 2 * (int(text_tokens) + 2 + n * (2 * patches + 9))
+    return ar_v02_token_count(text_tokens, frames, chunk_size=4, spatial_tokens_per_latent=patches)
 
 
 def joint_pack_padding_audit(text_tokens_per_pass, gen_tokens_per_pass):
@@ -64,7 +64,7 @@ def joint_pack_padding_audit(text_tokens_per_pass, gen_tokens_per_pass):
         flex_gen_query_capacity_per_pass=gen_pad,
         flex_clean_kv_capacity=text_pad + gen_pad,
         flex_noisy_kv_capacity=text_pad + 2 * gen_pad,
-        reserved_budget_tokens=raw + JOINT_PACK_PADDING_RESERVE,
+        reserved_budget_tokens=joint_reserved_token_budget(raw),
     )
 
 
@@ -102,10 +102,26 @@ class JointChunkPackingDataLoader(RecoverablePackingDataLoader):
             ),
         )
 
+    def state_dict(self):
+        state = super().state_dict()
+        state["ar_token_budget_version"] = AR_V02_TOKEN_BUDGET_VERSION
+        return state
+
+    def load_state_dict(self, state_dict):
+        # Changed pack boundaries change the batch cursor even with no buffered
+        # samples. Old checkpoints require their original loader for exact replay;
+        # loading model weights alone is not an exact training resume.
+        if state_dict.get("ar_token_budget_version") != AR_V02_TOKEN_BUDGET_VERSION:
+            raise ValueError("dataloader token budget version mismatch; cannot resume an old C1 packing checkpoint as C4")
+        for sample in state_dict.get("buffer", []):
+            if _unwrap(sample.get("ar_token_budget_version")) != AR_V02_TOKEN_BUDGET_VERSION:
+                raise ValueError("buffer token budget version mismatch")
+        return super().load_state_dict(state_dict)
+
     def _sample_fits(self, **kwargs):
         # Reserve once for the entire candidate pack, not for each sample.
-        # Keep max_sequence_length=70000 and all raw per-sample counts intact.
-        kwargs["packed_tokens"] += JOINT_PACK_PADDING_RESERVE
+        # Keep all raw per-sample counts intact; the configured cap controls admission.
+        kwargs["packed_tokens"] = joint_reserved_token_budget(kwargs["packed_tokens"])
         return super()._sample_fits(**kwargs)
 
     def __iter__(self):
@@ -119,13 +135,15 @@ class JointChunkPackingDataLoader(RecoverablePackingDataLoader):
                 raise ValueError("attention padding exceeds the reserved pack budget")
             if self.max_sequence_length is not None and audit["reserved_budget_tokens"] >= self.max_sequence_length:
                 raise ValueError("pack exceeds the padding-inclusive token cap")
-            batch.update({"_ar_c1_" + key: value for key, value in audit.items()})
+            batch.update({"_ar_c4_" + key: value for key, value in audit.items()})
             batch["_ar_pack_padding_reserve"] = JOINT_PACK_PADDING_RESERVE
             yield batch
 
     def _compute_token_split_per_sample(self, data_batch):
         if _unwrap(data_batch.get("ar_layout_version")) != LAYOUT_VERSION:
             raise ValueError("joint packer requires versioned chunk-conditioned samples")
+        if _unwrap(data_batch.get("ar_token_budget_version")) != AR_V02_TOKEN_BUDGET_VERSION:
+            raise ValueError("dataset token budget version mismatch; explicit C4 metadata required")
         rgb = _unwrap(data_batch["video"])
         if not isinstance(rgb, torch.Tensor) or rgb.ndim not in (4, 5) or (rgb.ndim == 5 and rgb.shape[0] != 1):
             raise ValueError("joint packer expects one RGB clip per sample")

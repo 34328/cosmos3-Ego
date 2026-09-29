@@ -47,6 +47,8 @@ class ARStepContext:
 class EgoVerseARModel(EgoVerseLossMixin, OmniMoTCausalModel):
     """Lingbot-va style joint video-action AR training with the EgoVerse 57D action loss."""
 
+    _required_tf_frames_per_chunk = 1
+
     def __init__(
         self,
         config,
@@ -84,7 +86,9 @@ class EgoVerseARModel(EgoVerseLossMixin, OmniMoTCausalModel):
                 self._get_teacher_forcing_kv_implementation() == "singleview_threeway_kv"
             ),
             # Chunking is owned by the lingbot mask; Cosmos' fixed-C truncation must stay off.
-            "teacher_forcing_frames_per_chunk=1": int(config.teacher_forcing_frames_per_chunk) == 1,
+            f"teacher_forcing_frames_per_chunk={self._required_tf_frames_per_chunk}": (
+                int(config.teacher_forcing_frames_per_chunk) == self._required_tf_frames_per_chunk
+            ),
             "supervise_temporal_causal_actions=True": bool(config.supervise_temporal_causal_actions),
             "action_tokens_per_latent set": config.action_tokens_per_latent is not None,
             "enable_moba=False": not bool(config.enable_moba),

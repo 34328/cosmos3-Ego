@@ -3,7 +3,8 @@
 import numpy as np
 import torch
 
-from .ar_v02_evaluation import decode_joint_actions, hand_keypoints
+from .action_representation import FIXED_CAMERA
+from .ar_v02_evaluation import decode_joint_actions, hand_keypoints, record_hand_keypoints, raw_gt_in_chunk
 from .ar_v02_layout import LAYOUT_VERSION
 
 
@@ -133,6 +134,7 @@ def render_joint_overlay(
     speed_factor=0.5,
     mode="real_time",
     source_offset=0,
+    raw_gt=None,
 ):
     """Return RGB dual panels and an auditable 30Hz source/frame mapping.
 
@@ -164,12 +166,17 @@ def render_joint_overlay(
         state_normalizer=state_normalizer,
         future_normalizer=future_normalizer,
         history=history,
+        hand_codecs=hand_codecs,
     )
+    raw_chunks = raw_gt_in_chunk(layout, raw_gt, source_offset=source_offset, reference=predicted_payload)
+    if raw_chunks is None and decoded[0]["representation"] == FIXED_CAMERA:
+        raise ValueError("raw GT keypoints required for wrist-local GT overlay")
     projections = {}
     for item in decoded:
         b = item["boundary"]
-        pred_points = hand_keypoints(item["predicted_rigid"], item["predicted"].hand_latents, hand_codecs).cpu().numpy()
-        gt_points = hand_keypoints(item["gt_rigid"], item["gt"].hand_latents, hand_codecs).cpu().numpy()
+        pred_points = record_hand_keypoints(item, "predicted", hand_codecs).cpu().numpy()
+        gt_points = (raw_chunks[b.chunk_id][1:] if raw_chunks is not None
+                     else record_hand_keypoints(item, "gt", hand_codecs)).cpu().numpy()
         gt_camera = item["gt_rigid"][:, 0].cpu().numpy()
         pred_camera = item["predicted_rigid"][:, 0].cpu().numpy()
         projections[b.chunk_id] = dict(
@@ -182,9 +189,12 @@ def render_joint_overlay(
     for role in ("gt", "predicted"):
         anchor = first[f"{role}_anchor"]
         initial_points[role] = (
-            hand_keypoints(anchor.rigid_camera[None], anchor.hand_latents[None], hand_codecs).cpu().numpy()
+            hand_keypoints(anchor.rigid_camera[None], anchor.hand_latents[None], hand_codecs,
+                           representation=first["representation"]).cpu().numpy()
         )
     gt_camera = first["gt_anchor"].rigid_camera[None, 0].cpu().numpy()
+    if raw_chunks is not None:
+        initial_points["gt"] = raw_chunks[1][:1].cpu().numpy()
     pred_camera = first["predicted_anchor"].rigid_camera[None, 0].cpu().numpy()
     initial = dict(
         left_gt=project_chunk_hands(initial_points["gt"], gt_camera, kg),
@@ -225,6 +235,7 @@ def render_joint_overlay(
             )
         frames.append(np.concatenate(panels, axis=1))
     timeline["history"] = history
+    timeline["gt_hand_source"] = "raw_gt_keypoints" if raw_chunks is not None else "decoded_gt_action_latents"
     timeline["left_overlay"] = "gt_green_and_prediction_red_with_gt_camera"
     timeline["right_overlay"] = "prediction_red_only_with_predicted_camera"
     timeline["projection_nonfinite_policy"] = "raise_data_error"

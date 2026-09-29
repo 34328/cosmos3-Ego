@@ -139,4 +139,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit("Pre-V0.2 experiment CLI retired. Use ar_v02_eval / ar_v02_overlay; shared helpers remain for V0.2.")

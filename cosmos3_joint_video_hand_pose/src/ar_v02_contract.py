@@ -16,6 +16,17 @@ import torch
 import torch.distributed as dist
 
 
+LEGACY_ACTION_REPRESENTATION = "legacy_local_delta_absolute_hand_v1"
+FIXED_CAMERA_ACTION_REPRESENTATION = "fixed_camera_wrist_local_delta_latent_v1"
+
+
+def _file_sha256(path):
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"required v0.2 artifact is missing: {path}")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 class GlobalSampleMeanWindow:
     """Independent video/action means over DP ranks AND accumulation microsteps.
 
@@ -49,7 +60,7 @@ class GlobalSampleMeanWindow:
     def complete(self):
         return self.position == self.microsteps
 
-    def reduce(self, video_losses, video_active, action_losses, action_active, *, action_weight=0.7):
+    def reduce(self, video_losses, video_active, action_losses, action_active, *, action_weight=1.0):
         if self.complete:
             raise RuntimeError("loss window already consumed")
         terms, actual = [], []
@@ -116,17 +127,29 @@ class ARTrainingContract(torch.nn.Module):
     Opt-in until the main model supplies the new frozen chunk-camera artifacts.
     """
 
-    def __init__(self, *, state_normalizer, action_normalizer, manifest_sha256, layout="joint_chunk_cond_v1"):
+    def __init__(
+        self,
+        *,
+        state_normalizer,
+        action_normalizer,
+        manifest_sha256,
+        layout="joint_chunk_cond_v1",
+        representation=LEGACY_ACTION_REPRESENTATION,
+        right_hand_codec=None,
+        left_hand_codec=None,
+    ):
         super().__init__()
         if layout != "joint_chunk_cond_v1":
             raise ValueError("v0.2 training requires layout joint_chunk_cond_v1")
         if len(manifest_sha256) != 64 or any(c not in "0123456789abcdef" for c in manifest_sha256):
             raise ValueError("manifest_sha256 must be a SHA256 digest")
+        if representation not in (LEGACY_ACTION_REPRESENTATION, FIXED_CAMERA_ACTION_REPRESENTATION):
+            raise ValueError(f"unsupported action representation: {representation}")
         artifacts = {}
         for name, path in (("state_normalizer", state_normalizer), ("action_normalizer", action_normalizer)):
             raw = Path(path).read_bytes()
             payload = json.loads(raw)
-            if name == "state_normalizer":
+            if representation == LEGACY_ACTION_REPRESENTATION and name == "state_normalizer":
                 if payload.get("frozen") is not True or payload.get("split") != "train":
                     raise ValueError("state normalizer must be frozen and train-only")
                 if "f0" in str(payload.get("schema", "")).lower():
@@ -134,9 +157,56 @@ class ARTrainingContract(torch.nn.Module):
                 if payload.get("manifest_sha256") != manifest_sha256:
                     raise ValueError("state normalizer/manifest binding mismatch")
             artifacts[name] = {"sha256": hashlib.sha256(raw).hexdigest(), "payload": payload}
-        self._expected = dict(
-            schema="ar_v02_training_contract_v1", layout=layout, manifest_sha256=manifest_sha256, artifacts=artifacts
-        )
+        if representation == FIXED_CAMERA_ACTION_REPRESENTATION:
+            from .action_fixed_normalization import FixedCameraNormalizer
+            from .codec_fixed_camera import FrozenFixedCameraHandCodec
+
+            state = FixedCameraNormalizer(state_normalizer, kind="state")
+            future = FixedCameraNormalizer(
+                action_normalizer, kind="future", codec_sha256=state.codec_sha256
+            )
+            if state.profile["manifest_sha256"] != manifest_sha256:
+                raise ValueError("state normalizer/manifest binding mismatch")
+            if future.profile["manifest_sha256"] != manifest_sha256:
+                raise ValueError("future normalizer/manifest binding mismatch")
+            codec_paths = (right_hand_codec, left_hand_codec)
+            if any(path is None for path in codec_paths):
+                raise ValueError("fixed-camera contract requires explicit right/left hand codecs")
+            codec_hashes = tuple(_file_sha256(path) for path in codec_paths)
+            if codec_hashes != state.codec_sha256:
+                raise ValueError("normalizers and right/left hand codec SHA256 identities differ")
+            for side, path, digest in zip(("right", "left"), codec_paths, codec_hashes, strict=True):
+                codec = FrozenFixedCameraHandCodec(path, expected_sha256=digest)
+                if codec.representation != FIXED_CAMERA_ACTION_REPRESENTATION:
+                    raise ValueError("legacy hand codec cannot initialize fixed-camera training")
+                if codec.checkpoint_sha256 != digest or codec.metadata.get("side") != side:
+                    raise ValueError(f"fixed-camera {side} hand codec identity/side mismatch")
+                artifacts[f"{side}_hand_codec"] = {
+                    "sha256": digest,
+                    "representation": codec.representation,
+                    "input_frame": codec.input_frame,
+                }
+            self._expected = dict(
+                schema="ar_v02_training_contract_v2",
+                representation=representation,
+                layout=layout,
+                manifest_sha256=manifest_sha256,
+                codec_sha256=list(codec_hashes),
+                normalizer_profile_sha256={
+                    "state": state.profile["profile_sha256"],
+                    "future": future.profile["profile_sha256"],
+                },
+                artifacts=artifacts,
+            )
+        else:
+            # Preserve the v1 payload byte-for-byte so historical legacy v0.2
+            # checkpoints can still be inspected/resumed explicitly.
+            self._expected = dict(
+                schema="ar_v02_training_contract_v1",
+                layout=layout,
+                manifest_sha256=manifest_sha256,
+                artifacts=artifacts,
+            )
 
     def get_extra_state(self):
         return copy.deepcopy(self._expected)
@@ -178,6 +248,49 @@ def assert_finite_gradients(parameters, *, group=None):
     return int(flags[1].item())
 
 
+# Cosmos' get_rand_state_dict format; inspect metadata without touching CUDA/RNG.
+_RNG_STATE_FIELDS = (
+    "torch", "torch_cuda", "numpy_packed_len", "numpy_packed_bytes",
+    "random_packed_len", "random_packed_bytes",
+)
+
+
+def assert_resume_rank_state(checkpointer, source, *, world_size):
+    """Fail before model loading if any current rank cannot resume exactly.
+
+    Use Cosmos storage readers/backends; do not change its DCP loader. Check all
+    ranks on every process so rank-local missing files cannot silently restart
+    a stream. Actual payload deserialization remains with the official loader.
+    """
+    from cosmos_framework.utils.easy_io import easy_io
+
+    root = str(source.path).rstrip("/")
+    reader = checkpointer.get_storage_reader(root + "/trainer", source)
+    metadata = reader.read_metadata().state_dict_metadata
+    required = ["iteration"] + [
+        f"rng_state_{rank}.{field}"
+        for rank in range(world_size) for field in _RNG_STATE_FIELDS
+    ]
+    missing_rng = [key for key in required if key not in metadata]
+    expected_ranks = {f"rng_state_{rank}" for rank in range(world_size)}
+    saved_ranks = {key.split(".", 1)[0] for key in metadata if key.startswith("rng_state_")}
+    missing_loaders = [
+        rank for rank in range(world_size)
+        if not easy_io.exists(root + f"/dataloader/rank_{rank}.pkl", backend_key=source.backend_key)
+    ]
+    if missing_rng or missing_loaders or saved_ranks != expected_ranks:
+        raise ValueError(
+            f"strict resume rank state incomplete: missing RNG={missing_rng}, "
+            f"missing dataloader ranks={missing_loaders}, "
+            f"saved RNG ranks={sorted(saved_ranks)}, expected world_size={world_size}"
+        )
+
+
+def _require_single_microstep(value):
+    if type(value) is not int or value != 1:
+        raise ValueError("v0.2 trainer requires grad_accum_iter=1; accumulation >1 is not supported")
+
+
 # Kept here so the training config has one explicit contract integration hook.
 from cosmos_framework.utils.callback import Callback
 
@@ -200,6 +313,9 @@ class ARTrainingContractCallback(Callback):
         action_normalizer,
         valid_windows_manifest,
         official_checkpoint,
+        representation=LEGACY_ACTION_REPRESENTATION,
+        right_hand_codec=None,
+        left_hand_codec=None,
         check_raw_gradients=True,
     ):
         super().__init__()
@@ -207,6 +323,9 @@ class ARTrainingContractCallback(Callback):
         self.action_normalizer = str(action_normalizer)
         self.valid_windows_manifest = str(valid_windows_manifest)
         self.official_checkpoint = Path(official_checkpoint).resolve()
+        self.representation = representation
+        self.right_hand_codec = None if right_hand_codec is None else str(right_hand_codec)
+        self.left_hand_codec = None if left_hand_codec is None else str(left_hand_codec)
         self.check_raw_gradients = check_raw_gradients
         self.contract = self._make_contract()
         self._ready = False
@@ -214,13 +333,19 @@ class ARTrainingContractCallback(Callback):
         self._official_init = False
 
     def _make_contract(self):
-        from .ar_chunk_state import ChunkCameraStateNormalizer
-
         digest = hashlib.sha256(Path(self.valid_windows_manifest).read_bytes()).hexdigest()
-        # Use the data owner's strict schema/profile/18D validation as well.
-        ChunkCameraStateNormalizer(self.state_normalizer, expected_manifest_sha256=digest)
+        if self.representation == LEGACY_ACTION_REPRESENTATION:
+            from .ar_chunk_state import ChunkCameraStateNormalizer
+
+            # Use the legacy data owner's strict schema/profile/18D validation.
+            ChunkCameraStateNormalizer(self.state_normalizer, expected_manifest_sha256=digest)
         return ARTrainingContract(
-            state_normalizer=self.state_normalizer, action_normalizer=self.action_normalizer, manifest_sha256=digest
+            state_normalizer=self.state_normalizer,
+            action_normalizer=self.action_normalizer,
+            manifest_sha256=digest,
+            representation=self.representation,
+            right_hand_codec=self.right_hand_codec,
+            left_hand_codec=self.left_hand_codec,
         )
 
     def _attach(self, model):
@@ -242,6 +367,10 @@ class ARTrainingContractCallback(Callback):
         self._ready = False
         if not getattr(model, "whole_action_loss", False):
             raise ValueError("ARTrainingContractCallback requires the v0.2 whole-loss model")
+        model_representation = getattr(model, "action_representation", LEGACY_ACTION_REPRESENTATION)
+        if model_representation != self.representation:
+            raise ValueError("model and checkpoint contract action representations differ")
+        _require_single_microstep(self.config.trainer.grad_accum_iter)
         model.configure_ar_loss_accumulation(self.config.trainer.grad_accum_iter)
         keys, source = self.trainer.checkpointer.keys_to_resume_during_load()
         if source is None or "model" not in keys:
@@ -261,6 +390,14 @@ class ARTrainingContractCallback(Callback):
 
         if not self.config.checkpoint.strict_resume:
             raise ValueError("v0.2 resume requires checkpoint.strict_resume=True")
+        if not source.warm_start or set(keys) != {"model"}:
+            required_components = {"model", "optim", "scheduler", "trainer", "dataloader"}
+            if not required_components.issubset(keys):
+                raise ValueError("strict resume requires model/optim/scheduler/trainer/dataloader")
+            assert_resume_rank_state(
+                self.trainer.checkpointer, source,
+                world_size=dist.get_world_size() if dist.is_initialized() else 1,
+            )
         self._attach(model)
         reader = self.trainer.checkpointer.get_storage_reader(str(Path(source.path) / "model"), source)
         metadata = reader.read_metadata().state_dict_metadata
@@ -294,6 +431,7 @@ class ARTrainingContractCallback(Callback):
     def on_train_start(self, model, iteration=0):
         if not self._ready:
             raise RuntimeError("checkpoint contract was not validated before training")
+        _require_single_microstep(self.config.trainer.grad_accum_iter)
         model.configure_ar_loss_accumulation(self.config.trainer.grad_accum_iter)
 
     def on_training_step_batch_start(self, model, data_batch, iteration=0):
@@ -305,6 +443,13 @@ class ARTrainingContractCallback(Callback):
             "ar_state_normalizer_sha256": expected["artifacts"]["state_normalizer"]["sha256"],
             "ar_valid_windows_sha256": expected["manifest_sha256"],
         }
+        if self.representation == FIXED_CAMERA_ACTION_REPRESENTATION:
+            fields.update(
+                ar_action_representation=self.representation,
+                ar_future_normalizer_sha256=expected["artifacts"]["action_normalizer"]["sha256"],
+                ar_right_hand_codec_sha256=expected["artifacts"]["right_hand_codec"]["sha256"],
+                ar_left_hand_codec_sha256=expected["artifacts"]["left_hand_codec"]["sha256"],
+            )
 
         def flatten(value):
             if isinstance(value, (list, tuple)):

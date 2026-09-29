@@ -42,7 +42,6 @@ import numpy as np
 import torch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TOML = PROJECT_ROOT / "configs/ar_v0_1.toml"
 
 
 def flow_sigmas(steps: int, shift: float) -> torch.Tensor:
@@ -314,7 +313,7 @@ def _write_side_by_side(path: Path, gt: np.ndarray, pred: np.ndarray, fps: float
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--ckpt", required=True, help="DCP model directory (contains .metadata)")
-    parser.add_argument("--toml", type=Path, default=DEFAULT_TOML, help="AR experiment TOML (default: %(default)s)")
+    parser.add_argument("--toml", type=Path, required=True, help="Historical AR V0.1 snapshot TOML; current inference uses ar_v02_eval")
     parser.add_argument("--output", type=Path, required=True, help="output directory")
     parser.add_argument("--indices", default=None, help="comma-separated dataset indices (overrides --num-samples)")
     parser.add_argument("--num-samples", type=int, default=4, help="first N clips with --clip-frames frames")
@@ -440,4 +439,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit("Pre-V0.2 experiment CLI retired. Use ar_v02_eval / ar_v02_overlay; shared helpers remain for V0.2.")

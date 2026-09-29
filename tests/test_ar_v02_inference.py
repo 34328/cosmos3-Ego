@@ -46,6 +46,8 @@ def fixture(c=2, future_frames=5):
     sampler.gt_video = torch.arange(layout.num_video_frames).float()[None, None, :, None, None] + 2
     sampler.gt_action, sampler.gt_states = payload, states
     sampler.state_normalizer, sampler.future_normalizer = normalizer, future_normalizer
+    from cosmos3_joint_video_hand_pose.src.action_representation import ActionRepresentationAdapter
+    sampler.action_adapter = ActionRepresentationAdapter(normalizer, future_normalizer)
     sampler.roles, sampler.chunks, sampler.sources = layout.action_metadata()
     decoded_blocks = []
 

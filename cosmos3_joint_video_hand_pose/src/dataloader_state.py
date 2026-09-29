@@ -196,15 +196,26 @@ class RecoverablePackingDataLoader(PackingDataLoader):
             torch.set_rng_state(torch_state)
 
     def _initialize_child_iterators_once(self) -> None:
-        super()._initialize_child_iterators_once()
-        if self._restored_buffer_metadata is None:
-            return
-        pending = self._rebuild_buffer(self._restored_buffer_metadata)
-        # super() may have prewarmed one post-checkpoint sample. Pending samples
-        # from the saved packer must be consumed before that newer sample.
-        self.buffers[0] = deque(pending + list(self.buffers[0]))
-        log.info(f"Rebuilt {len(pending)} pending packed sample(s).", rank0_only=False)
-        self._restored_buffer_metadata = None
+        # Recreating a StatefulDataLoader iterator draws a temporary CPU worker
+        # base seed before restoring its saved seed. Do not consume the trainer's
+        # already-restored RNG: Cosmos samples video/action sigmas on the CPU.
+        preserve_rng = self._state_was_restored and not self._child_iterators_initialized
+        if preserve_rng:
+            python_state, numpy_state, torch_state = random.getstate(), np.random.get_state(), torch.get_rng_state()
+        try:
+            super()._initialize_child_iterators_once()
+            if self._restored_buffer_metadata is None:
+                return
+            pending = self._rebuild_buffer(self._restored_buffer_metadata)
+            # Keep saved pending samples ahead of the newly prewarmed sample.
+            self.buffers[0] = deque(pending + list(self.buffers[0]))
+            log.info(f"Rebuilt {len(pending)} pending packed sample(s).", rank0_only=False)
+            self._restored_buffer_metadata = None
+        finally:
+            if preserve_rng:
+                random.setstate(python_state)
+                np.random.set_state(numpy_state)
+                torch.set_rng_state(torch_state)
 
 
 class EgoVerseDataLoaderStateCallback(Callback):

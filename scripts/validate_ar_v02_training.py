@@ -12,7 +12,8 @@ import time
 
 REPO = Path(__file__).resolve().parents[1]
 PYTHON = sys.executable
-TOML = REPO / "cosmos3_joint_video_hand_pose/configs/ar_v0_2_c.toml"
+# Historical lifecycle regression; does not validate the new fixed-camera assets.
+TOML = REPO / "cosmos3_joint_video_hand_pose/configs/ar_v0_2.toml"
 
 
 def gpucheck(run, phase):
@@ -42,11 +43,12 @@ def gpucheck(run, phase):
     assert not processes.strip(), "GPU compute processes are present"
 
 
-def source_manifest():
-    paths = list((REPO / "cosmos3_joint_video_hand_pose/src").glob("*.py"))
-    paths += list((REPO / "packages/cosmos3/cosmos_framework/model/generator/mot").glob("*.py"))
-    paths += list((REPO / "packages/cosmos3/cosmos_framework/data/generator/sequence_packing").glob("*.py"))
-    paths += [TOML, REPO / "packages/cosmos3/cosmos_framework/trainer/__init__.py"]
+def source_manifest(toml=TOML):
+    # Include the native implementation and verification entrypoints, not just MoT.
+    roots = ("cosmos3_joint_video_hand_pose/src", "packages/cosmos3/cosmos_framework", "scripts")
+    paths = {p for root in roots for p in (REPO / root).rglob("*.py")}
+    paths.update((REPO / "cosmos3_joint_video_hand_pose/configs").glob("*.toml"))
+    paths.add(toml.resolve())
     return {str(p.relative_to(REPO)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
 
@@ -130,10 +132,11 @@ def main():
     parser.add_argument(
         "--compact-ready", action="store_true", help="Set only after main controller confirms compact pass wiring ready"
     )
+    parser.add_argument("--toml", type=Path, default=TOML)
     args = parser.parse_args()
+    args.toml = args.toml.resolve()
     if args.mode == "resume50" and not args.compact_ready:
         parser.error("50 updates require the main controller's compact-ready confirmation")
-    assert os.uname().nodename == "nb-1678910729611554048-cr786mpgj9xc", "Tdebug5 only"
     run = args.run_dir.resolve()
     run.mkdir(parents=False, exist_ok=False)
     env = dict(
@@ -146,14 +149,14 @@ def main():
         OMP_NUM_THREADS="1",
         PYTHONUNBUFFERED="1",
     )
-    (run / "recipe_snapshot.toml").write_bytes(TOML.read_bytes())
-    baseline = source_manifest()
+    (run / "recipe_snapshot.toml").write_bytes(args.toml.read_bytes())
+    baseline = source_manifest(args.toml)
     (run / "source_manifest.json").write_text(json.dumps(baseline, indent=2))
     subprocess.run(["git", "diff", "--binary"], cwd=REPO, stdout=(run / "workspace.diff").open("w"), check=True)
     subprocess.run(["git", "status", "--short"], cwd=REPO, stdout=(run / "workspace.status").open("w"), check=True)
 
     def stage(label, job, steps, loaded, *extra):
-        assert source_manifest() == baseline, "implementation changed between stages; use a fresh run"
+        assert source_manifest(args.toml) == baseline, "implementation changed between stages; use a fresh run"
         gpucheck(run, "before_" + label)
         (run / "status").write_text(label + "\n")
         output = run / (label + ".json")
@@ -168,7 +171,7 @@ def main():
             "-m",
             "cosmos3_joint_video_hand_pose.src.smoke_train",
             "--toml",
-            str(TOML),
+            str(args.toml),
             "--wandb-mode",
             "disabled",
             "--job-name",
@@ -186,7 +189,7 @@ def main():
         with (run / (label + ".log")).open("x") as log:
             subprocess.run(command, cwd=REPO, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
         (run / (label + ".elapsed_seconds")).write_text(str(time.time() - started))
-        assert source_manifest() == baseline, "implementation changed during stage; cannot compare"
+        assert source_manifest(args.toml) == baseline, "implementation changed during stage; cannot compare"
         return verify_result(output, loaded, steps)
 
     try:

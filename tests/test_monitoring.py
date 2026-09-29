@@ -51,3 +51,24 @@ def test_wrap_prompt_respects_pixel_width_without_spaces():
     assert len(lines) > 1
     assert "".join(lines) == prompt
     assert all(font.getlength(line) <= 180 for line in lines)
+
+
+def test_render_rejects_replaced_normalizer_before_decoding(tmp_path):
+    import hashlib
+    import json
+    from types import SimpleNamespace
+    import pytest
+    from cosmos3_joint_video_hand_pose.src.monitoring import render
+
+    state = tmp_path / "state.json"
+    future = tmp_path / "future.json"
+    state.write_text("original")
+    future.write_text("unchanged")
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text(json.dumps({"action_normalizers": {
+        "state": {"path": str(state), "sha256": hashlib.sha256(state.read_bytes()).hexdigest()},
+        "future": {"path": str(future), "sha256": hashlib.sha256(future.read_bytes()).hexdigest()},
+    }}))
+    state.write_text("replaced")
+    with pytest.raises(ValueError, match="state normalizer content differs"):
+        render(SimpleNamespace(metadata=metadata, state_normalizer=None, future_normalizer=None))

@@ -13,7 +13,7 @@ from .temporal import cosmos_wam_token_count
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TOML = PROJECT_ROOT / "configs/overfit_v0_5_frame_delta_b3.toml"
+DEFAULT_TOML = PROJECT_ROOT / "configs/ar_v0_2_fixed_camera.toml"
 
 
 def parse_args() -> argparse.Namespace:
@@ -111,7 +111,7 @@ def audit_batch(batch: dict, cap: int, action_tokens_per_latent: int | None = No
             num_tokens += cosmos_wam_token_count(int(text_ids.numel()), frames)
         else:
             count = ar_token_count(int(text_ids.numel()), frames, action_tokens_per_latent)
-            # Upper bound before the model chooses C: one state per future latent.
+            # Conservative admission budget; the current model fixes C=4.
             if is_v02:
                 from .ar_v02_dataloader import joint_training_token_budget
 
@@ -154,7 +154,13 @@ def main() -> None:
         dataloader = instantiate(config.dataloader_train)
 
     iterator = iter(dataloader)
-    local = [audit_batch(next(iterator), int(config.dataloader_train.max_sequence_length)) for _ in range(args.batches)]
+    local = [
+        audit_batch(
+            next(iterator), int(config.dataloader_train.max_sequence_length),
+            action_tokens_per_latent=int(config.model.config.action_tokens_per_latent),
+        )
+        for _ in range(args.batches)
+    ]
     gathered = [None] * dist.get_world_size()
     dist.all_gather_object(gathered, {"rank": dist.get_rank(), "batches": local})
     if dist.get_rank() == 0:

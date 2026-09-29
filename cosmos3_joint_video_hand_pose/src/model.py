@@ -8,6 +8,7 @@ import torch
 
 from .loss import visibility_weighted_action_flow_loss, whole_action_flow_loss, whole_video_flow_loss
 from .ar_v02_contract import GlobalSampleMeanWindow, assert_optimizer_covers_trainable
+from .action_representation import FIXED_CAMERA, LEGACY
 
 
 try:
@@ -22,7 +23,7 @@ except ImportError as error:  # pragma: no cover - exercised only outside the Co
 def _visibility_from_batch(data_batch: dict[str, Any]) -> list[torch.Tensor]:
     raw = data_batch.get("hand_visibility")
     if raw is None:
-        raise KeyError("hand_visibility is required for EgoVerse action loss")
+        raise KeyError("hand_visibility is required in EgoVerse batch metadata")
     items = raw if isinstance(raw, list) else [raw]
     result = []
     for item in items:
@@ -39,7 +40,7 @@ def _visibility_from_batch(data_batch: dict[str, Any]) -> list[torch.Tensor]:
 
 
 class EgoVerseLossMixin:
-    """57D visibility-weighted action loss and loss logging shared by EgoVerse models.
+    """57D representation-specific action loss and logging for EgoVerse models.
 
     Mix in before a Cosmos ``OmniMoTModel`` subclass; the generator architecture is unchanged.
     """
@@ -136,8 +137,8 @@ class EgoVerseLossMixin:
             or getattr(cfg, "lidar_gen", False)
         ):
             raise ValueError("v0.2 whole loss requires paired video/action only")
-        if rf.loss_scale != 1.0 or rf.action_loss_weight != 0.7:
-            raise ValueError("v0.2 objective is L_video + 0.7 * L_action")
+        if rf.loss_scale != 1.0 or rf.action_loss_weight != 1.0:
+            raise ValueError("v0.2 objective is L_video + L_action")
         for kind in ("und", "gen"):
             if out_net.get(f"lbl_metadata_{kind}") is not None and getattr(
                 getattr(cfg, "lbl", None), f"coeff_{kind}", 0
@@ -170,6 +171,8 @@ class EgoVerseLossMixin:
             condition_mask=packed.action.condition_mask,
             visibility=self._current_hand_visibility,
             valid_mask=packed.action.action_valid_mask,
+            mask_out_of_fov=getattr(self, "action_representation", LEGACY) != FIXED_CAMERA,
+            collect_field_metrics=getattr(self, "action_representation", LEGACY) == FIXED_CAMERA,
         )
         window = getattr(self, "_ar_loss_window", None)
         if window is None or window.complete:
@@ -179,14 +182,24 @@ class EgoVerseLossMixin:
             self.begin_ar_loss_window(counts, device=counts.device)
             window = self._ar_loss_window
         backward, stats = window.reduce(
-            video["per_sample_losses"], video["active_samples"], action["per_sample_losses"], action["active_samples"]
+            video["per_sample_losses"], video["active_samples"], action["per_sample_losses"], action["active_samples"],
+            action_weight=rf.action_loss_weight,
         )
         self._ar_backward_loss = backward
+        self._last_visibility_loss_metrics = {
+            name + "_loss": values.sum() * window.world_size * window.microsteps
+            / window.global_counts[1].clamp_min(1)
+            for name, values in action.get("field_per_sample_losses", {}).items()
+        }
         # Rank-mean of these metrics, SUMMED over microsteps, is the update mean.
         v = stats["video_contribution"] * window.world_size
         a = stats["action_contribution"] * window.world_size
         logged_loss = backward / window.microsteps
         return logged_loss, {
+            # Native WandBCallback must average these already globally scaled
+            # rank contributions, not weight them by the local pack size again.
+            "train_objective_numerator": logged_loss.detach(),
+            "train_objective_denominator": torch.ones_like(logged_loss.detach()),
             "flow_matching_loss_vision": v,
             "flow_matching_loss_action": a,
             "flow_matching_loss_vision_per_instance": video["unweighted_per_sample_losses"].detach(),
@@ -278,6 +291,7 @@ class EgoVerseLossMixin:
                 condition_mask=condition_mask,
                 visibility=self._current_hand_visibility,
                 valid_mask=action_valid_mask,
+                mask_out_of_fov=getattr(self, "action_representation", LEGACY) != FIXED_CAMERA,
             )
         else:
             loss, metrics = visibility_weighted_action_flow_loss(
@@ -326,6 +340,12 @@ class EgoVerseLossMixin:
                 timesteps_lidar=timesteps_lidar,
             )
         rf_cfg = self.config.rectified_flow_training_config
+        if getattr(self, "_record_pretrain_probe", False):
+            # Capture the actual schedules without drawing RNG or retaining a graph.
+            self._pretrain_noise_trace = {
+                "video_timesteps": timesteps.detach().float().cpu().tolist(),
+                "action_timesteps": None if timesteps_action is None else timesteps_action.detach().float().cpu().tolist(),
+            }
         sample_scale = torch.ones((), device=total_loss.device, dtype=total_loss.dtype)
         if (
             not getattr(self, "whole_action_loss", False)

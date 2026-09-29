@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Run only after the user releases all eight Tdebug5 GPUs for this check.
+# Run only after the user releases eight GPUs on an authorized node for this check.
 # Two separate torchrun processes: 2 updates/save/exit, then restore + 1 update.
 set -Eeuo pipefail
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON="${AR_V02_PYTHON:-/home/lzh/miniconda3/envs/cosmos3/bin/python}"
-TOML="$REPO/cosmos3_joint_video_hand_pose/configs/ar_v0_2_c.toml"
+# Historical lifecycle regression; not a new fixed-camera training recipe.
+TOML="$REPO/cosmos3_joint_video_hand_pose/configs/ar_v0_2.toml"
 BASE="$REPO/outputs/joint_video_hand_pose/ar_v0_2"
 JOB=resume_contract_2plus1
 
@@ -16,9 +17,6 @@ if [[ "${1:-}" != --run-authorized ]]; then
 fi
 RUN_ID="${2:-resume_$(date -u +%Y%m%dT%H%M%SZ)}"
 [[ "$RUN_ID" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo "Invalid run id" >&2; exit 2; }
-[[ "$(hostname)" == nb-1678910729611554048-cr786mpgj9xc ]] || {
-    echo "This script is pinned to the verified Tdebug5 host" >&2; exit 2;
-}
 cd "$REPO"
 [[ -x "$PYTHON" && -f "$TOML" ]] || exit 2
 RUN_DIR="$BASE/$RUN_ID"

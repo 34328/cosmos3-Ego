@@ -94,6 +94,8 @@ def save_rollout(
     intrinsics=None,
     gt_pixel_transform=None,
     generated_pixel_transform=None,
+    raw_gt=None,
+    raw_gt_disabled_diagnostic=False,
 ):
     """Producer shared by sample CLI and callers using JointARSampler directly."""
     if not layout.chunk_state_conditioning:
@@ -108,10 +110,15 @@ def save_rollout(
         bounded_control_api=False,
         execution_scope="fixed_length_offline",
         steps=JOINT_STEPS,
+        raw_gt_disabled_diagnostic=raw_gt_disabled_diagnostic,
     )
     arrays = dict(
         predicted_action=_array(predicted_action), gt_future=_array(gt_future), boundary_states=_array(boundary_states)
     )
+    if raw_gt is not None:
+        meta["raw_gt"] = {key: raw_gt[key] for key in ("coordinate_frame", "units", "hand_order")}
+        arrays.update({f"raw_gt_{key}": _array(raw_gt[key])
+                       for key in ("keypoints", "camera_poses", "source_indexes")})
     if gt_rgb is not None:
         if generated_rgb_chunks is None or len(generated_rgb_chunks) != len(layout.boundaries):
             raise ValueError("RGB export requires one complete [U,V] decoded block per chunk")
@@ -140,6 +147,18 @@ def _validate(meta, arrays):
             raise ValueError(f"metadata {key} must be an integer")
     if meta["source_offset"] < 0 or meta["chunk_size"] not in (1, 2, 3, 4):
         raise ValueError("invalid source offset or chunk size")
+    from .action_representation import FIXED_CAMERA, LEGACY
+    representation = meta.get("action_representation", LEGACY)
+    if representation not in (FIXED_CAMERA, LEGACY):
+        raise ValueError("unknown archive action representation")
+    if representation == FIXED_CAMERA:
+        if meta["chunk_size"] != 4:
+            raise ValueError("fixed-camera archive requires C=4")
+        for side in ("right", "left"):
+            artifact = meta.get("hand_codecs", {}).get(side, {})
+            digest = artifact.get("sha256", "")
+            if not artifact.get("path") or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+                raise ValueError("fixed-camera archive requires exact right/left codec identities")
     if not meta.get("sample_id") or not meta.get("episode_id"):
         raise ValueError("sample_id and episode_id are required")
     for key in ("source_fps", "speed_factor"):
@@ -147,6 +166,15 @@ def _validate(meta, arrays):
             raise ValueError(f"invalid {key}")
     layout = JointChunkLayout(meta["num_frames"], meta["vision_tokens"], meta["chunk_size"])
     n = (layout.num_frames - 1) * 8
+    raw_gt = _raw_gt_payload(meta, arrays)
+    diagnostic = meta.get("raw_gt_disabled_diagnostic", False)
+    if type(diagnostic) is not bool or (diagnostic and raw_gt is not None):
+        raise ValueError("raw_gt_disabled_diagnostic must be boolean and cannot accompany raw GT")
+    if representation == FIXED_CAMERA and raw_gt is None and not diagnostic:
+        raise ValueError("raw GT required; explicit raw_gt_disabled_diagnostic=True allows rigid-only diagnostics")
+    if raw_gt is not None:
+        from .ar_v02_evaluation import raw_gt_in_chunk
+        raw_gt_in_chunk(layout, raw_gt, source_offset=meta["source_offset"], reference=torch.empty(0))
     for name, shape in (
         ("predicted_action", (layout.num_action_rows, 64)),
         ("gt_future", (n, 64)),
@@ -201,6 +229,16 @@ def load_rollout(path):
     return _validate(meta, arrays), meta, arrays
 
 
+def _raw_gt_payload(meta, arrays):
+    names = ("keypoints", "camera_poses", "source_indexes")
+    present = any(f"raw_gt_{key}" in arrays for key in names)
+    if not present and "raw_gt" not in meta:
+        return None  # Historical archives remain readable as explicit diagnostics.
+    if "raw_gt" not in meta or not all(f"raw_gt_{key}" in arrays for key in names):
+        raise ValueError("incomplete raw GT archive payload")
+    return dict(meta["raw_gt"], **{key: arrays[f"raw_gt_{key}"] for key in names})
+
+
 def _normalizers(meta, args):
     paths = {}
     for name in ("state_normalizer", "future_normalizer"):
@@ -208,13 +246,32 @@ def _normalizers(meta, args):
         paths[name] = Path(override or meta[name]["path"])
         if _hash(paths[name]) != meta[name]["sha256"]:
             raise ValueError(f"{name} SHA256 differs from the rollout")
+    from .action_representation import FIXED_CAMERA, LEGACY
+    from .action_fixed_normalization import FixedCameraNormalizer
+    representation = meta.get("action_representation", LEGACY)
+    if representation == FIXED_CAMERA:
+        hashes = [meta["hand_codecs"][side]["sha256"] for side in ("right", "left")]
+        return tuple(FixedCameraNormalizer(paths[name], kind=kind, codec_sha256=hashes)
+                     for name, kind in (("state_normalizer", "state"), ("future_normalizer", "future")))
+    if representation != LEGACY:
+        raise ValueError("unknown archive action representation")
     return ChunkCameraStateNormalizer(paths["state_normalizer"]), PiecewiseAsinhNormalizer(paths["future_normalizer"])
 
 
-def _codecs(args):
+def _codecs(args, meta=None):
     from .codec import FrozenHandMLPAE15
-
-    return tuple(FrozenHandMLPAE15(getattr(args, f"{side}_codec")).eval() for side in ("right", "left"))
+    from .action_representation import FIXED_CAMERA, LEGACY
+    from .codec_fixed_camera import FrozenFixedCameraHandCodec
+    if (meta or {}).get("action_representation", LEGACY) == FIXED_CAMERA:
+        codecs = tuple(FrozenFixedCameraHandCodec(
+            getattr(args, f"{side}_codec", None) or meta["hand_codecs"][side]["path"],
+            expected_sha256=meta["hand_codecs"][side]["sha256"],
+        ).eval() for side in ("right", "left"))
+        if any(codec.metadata.get("side") != side for side, codec in zip(("right", "left"), codecs)):
+            raise ValueError("archive hand codec side/order mismatch")
+        return codecs
+    return tuple(FrozenHandMLPAE15(getattr(args, f"{side}_codec", None) or CODECS / f"{side}_mlp15_primary.pt").eval()
+                 for side in ("right", "left"))
 
 
 def _tensors(arrays):
@@ -229,7 +286,8 @@ def _rgb_chunks(arrays):
 def evaluate_archive(path, args):
     layout, meta, arrays = load_rollout(path)
     state, future = _normalizers(meta, args)
-    codecs = None if args.rigid_only else _codecs(args)
+    from .action_representation import FIXED_CAMERA
+    codecs = _codecs(args, meta) if not args.rigid_only or meta.get("action_representation") == FIXED_CAMERA else None
     metrics = evaluate_joint_actions(
         layout,
         *_tensors(arrays),
@@ -237,6 +295,9 @@ def evaluate_archive(path, args):
         future_normalizer=future,
         history=meta["history"],
         hand_codecs=codecs,
+        compute_hand_metrics=not args.rigid_only,
+        raw_gt=_raw_gt_payload(meta, arrays),
+        source_offset=meta["source_offset"],
     )
     if "gt_rgb" in arrays:
         rect = meta.get("valid_image_rect", [0, 0, arrays["gt_rgb"].shape[2], arrays["gt_rgb"].shape[1]])
@@ -263,7 +324,9 @@ def evaluate_archive(path, args):
         input=str(Path(path).resolve()),
         metadata=meta,
         metrics=metrics,
-        hand_metric_scope="all_finite_tracked_coordinates",
+        hand_metric_scope=("all_finite_raw_coordinates_no_visibility_mask"
+                           if _raw_gt_payload(meta, arrays) is not None
+                           else "all_finite_decoded_coordinates_no_visibility_mask"),
         image_skeleton_detector_metrics_available=False,
     )
 
@@ -286,12 +349,13 @@ def overlay_archive(path, output, args):
         generated_pixel_transform=arrays["generated_pixel_transform"],
         state_normalizer=state,
         future_normalizer=future,
-        hand_codecs=_codecs(args),
+        hand_codecs=_codecs(args, meta),
         history=meta["history"],
         source_fps=meta["source_fps"],
         speed_factor=meta["speed_factor"],
         mode=args.mode,
         source_offset=meta["source_offset"],
+        raw_gt=_raw_gt_payload(meta, arrays),
     )
     timeline.update(sample_id=meta["sample_id"], episode_id=meta["episode_id"], bounded_control_api=False)
     save_joint_overlay(output, frames, timeline)
@@ -309,9 +373,18 @@ def _load_bound_model(config, checkpoint, dataset_cfg):
 
     state_path = Path(dataset_cfg.chunk_state_normalizer)
     digest = _hash(dataset_cfg.valid_windows_manifest)
-    ChunkCameraStateNormalizer(state_path, expected_manifest_sha256=digest)
+    from .action_fixed_normalization import FixedCameraNormalizer, NORMALIZER_SCHEMA
+    profile = json.loads(state_path.read_text())
+    if profile.get("schema") == NORMALIZER_SCHEMA:
+        FixedCameraNormalizer(profile, kind="state")
+        if profile.get("manifest_sha256") != digest:
+            raise ValueError("fixed-camera state manifest mismatch")
+    else:
+        ChunkCameraStateNormalizer(state_path, expected_manifest_sha256=digest)
     contract = ARTrainingContract(
-        state_normalizer=state_path, action_normalizer=dataset_cfg.future_normalizer, manifest_sha256=digest
+        state_normalizer=state_path, action_normalizer=dataset_cfg.future_normalizer, manifest_sha256=digest,
+        representation=dataset_cfg.get("action_representation", "legacy_local_delta_absolute_hand_v1"),
+        right_hand_codec=dataset_cfg.get("right_codec"), left_hand_codec=dataset_cfg.get("left_codec"),
     )
     reader = dcp.FileSystemReader(str(checkpoint))
     metadata = reader.read_metadata().state_dict_metadata
@@ -409,12 +482,22 @@ def sample(args):
                 model,
                 batch,
                 state_normalizer=raw.chunk_state_normalizer,
-                future_normalizer=raw.action_builder.future_normalizer,
+                future_normalizer=(raw.future_normalizer if getattr(raw, "fixed_camera_mode", False)
+                                   else raw.action_builder.future_normalizer),
+                hand_codecs=getattr(raw, "fixed_hand_codecs", None),
                 chunk_size=args.chunk_size,
                 source_fps=fps,
             )
             group = zarr.open_group(episode["abs_zarr_path"], mode="r")
             dense_indexes = raw_item["action_source_frame_indices"].numpy()
+            from .action import pose_matrices
+            # Preserve original annotations; never reconstruct GT from AE latents.
+            raw_gt = dict(
+                keypoints=_array(raw_item["ar_source_keypoints_world"]),
+                camera_poses=pose_matrices(_array(raw_item["ar_source_poses"])[:, 0]),
+                source_indexes=dense_indexes,
+                coordinate_frame="world", units="metres", hand_order=["right", "left"],
+            )
             gt_rgb = decode_rgb_video(group["images.front_1"][dense_indexes]).permute(1, 2, 3, 0).numpy()
             for history in args.history:
                 video, action = sampler.sample(
@@ -423,6 +506,7 @@ def sample(args):
                 rgb = decode_video_chunks(model, sampler.layout, video)
                 _, gt_future, _ = sampler.layout.unpack_action(sampler.gt_action)
                 meta = dict(
+                    action_representation=sampler.action_adapter.representation,
                     sample_id=item["sample_id"],
                     episode_id=episode_id,
                     history=history,
@@ -454,6 +538,11 @@ def sample(args):
                     text_prefill_seconds=sampler.cache_prefill_seconds,
                     timing_scope="sampler_only_excludes_initial_GT_VAE_and_offline_RGB_export",
                 )
+                if getattr(raw, "fixed_hand_codecs", None) is not None:
+                    meta["hand_codecs"] = {
+                        side: dict(path=str(codec.checkpoint_path), sha256=codec.checkpoint_sha256)
+                        for side, codec in zip(("right", "left"), raw.fixed_hand_codecs)
+                    }
                 # Native 640x360 images receive bottom-only reflection padding to 368;
                 # image origin and focal lengths do not change, so both transforms are identity.
                 archive = save_rollout(
@@ -463,6 +552,7 @@ def sample(args):
                     gt_future=gt_future,
                     boundary_states=sampler.gt_states,
                     metadata=meta,
+                    raw_gt=raw_gt,
                     gt_rgb=gt_rgb,
                     generated_rgb_chunks=rgb,
                     intrinsics=np.asarray(group.attrs["intrinsics"]["front_1"]),
@@ -507,7 +597,7 @@ def parser():
         sub.add_argument("--state-normalizer", type=Path, help="relocated file; hash must match archive")
         sub.add_argument("--future-normalizer", type=Path, help="relocated file; hash must match archive")
         for side in ("right", "left"):
-            sub.add_argument(f"--{side}-codec", type=Path, default=CODECS / f"{side}_mlp15_primary.pt")
+            sub.add_argument(f"--{side}-codec", type=Path, help="relocated codec; fixed-camera archives enforce exact SHA256")
     return root
 
 

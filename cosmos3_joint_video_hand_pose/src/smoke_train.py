@@ -30,7 +30,8 @@ from .audit_dataloader import audit_batch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TOML = PROJECT_ROOT / "configs/overfit_v0_5_frame_delta_b3.toml"
+# Preserve the legacy lifecycle fixture; fixed-camera runs must select their recipe.
+DEFAULT_TOML = PROJECT_ROOT / "configs/ar_v0_2.toml"
 
 
 def input_digest(value) -> str:
@@ -540,7 +541,7 @@ def main() -> None:
             if getattr(model, "whole_action_loss", False):
                 break
             if source not in output:
-                raise KeyError(f"overfit_v0.0 smoke output missing action sub-block metric: {source}")
+                raise KeyError(f"legacy block-loss smoke output missing action sub-block metric: {source}")
             value = output[source].detach().float()
             if not torch.isfinite(value).all():
                 raise FloatingPointError(f"non-finite action sub-block metric at smoke step {step}: {source}")
@@ -548,8 +549,34 @@ def main() -> None:
         if not record["finite"]:
             raise FloatingPointError(f"non-finite loss at smoke step {step}")
         records.append(record)
+        audit_file.write(
+            json.dumps(
+                {
+                    "rank": dist.get_rank(),
+                    "event": "step_complete",
+                    **record,
+                    "allocated_memory_gib": torch.cuda.memory_allocated() / 2**30,
+                    "reserved_memory_gib": torch.cuda.memory_reserved() / 2**30,
+                }
+            )
+            + "\n"
+        )
+        audit_file.flush()
         step += 1
         del output, loss, batch
+        audit_file.write(
+            json.dumps(
+                {
+                    "rank": dist.get_rank(),
+                    "event": "step_released",
+                    "step": step - 1,
+                    "allocated_memory_gib": torch.cuda.memory_allocated() / 2**30,
+                    "reserved_memory_gib": torch.cuda.memory_reserved() / 2**30,
+                }
+            )
+            + "\n"
+        )
+        audit_file.flush()
 
     if grad_accum_iter != 0:
         raise RuntimeError("smoke ended inside a gradient accumulation window")
