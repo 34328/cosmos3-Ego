@@ -73,6 +73,22 @@ def test_nonfinite_loss_fails_before_backward():
         monitor.on_before_backward(None, torch.tensor(float("nan")))
 
 
+def test_capturable_fp32_lr_is_compared_exactly_in_its_own_dtype():
+    net = torch.nn.ModuleDict({"action2llm": torch.nn.Linear(2, 2), "other": torch.nn.Linear(2, 2)})
+    opt = torch.optim.SGD([{"params": net["action2llm"].parameters(), "lr": torch.tensor(1e-4)},
+                           {"params": net["other"].parameters(), "lr": torch.tensor(2e-5)}])
+    torch.optim.lr_scheduler.LambdaLR(opt, lambda step: step/100)
+    cfg = dict(lr=2e-5, lr_multipliers={"action2llm": 5})
+    rows = optimizer_lr_receipt(net, opt, cfg)
+    assert [x["initial_lr"] for x in rows] == [float(torch.tensor(1e-4)), float(torch.tensor(2e-5))]
+    assert all(x["actual_lr"] == 0 for x in rows)
+    # Even a one-ULP mutation must fail; this is not a tolerance relaxation.
+    base = opt.param_groups[0]["initial_lr"]
+    opt.param_groups[0]["initial_lr"] = torch.nextafter(base, torch.tensor(float("inf")))
+    with pytest.raises(ValueError, match="LR mismatch"):
+        optimizer_lr_receipt(net, opt, cfg)
+
+
 def test_formal_recipe_composes_without_cli_overrides():
     from cosmos3_joint_video_hand_pose.src import config as project
     from cosmos_framework.configs.toml_config.sft_config import load_experiment_from_toml

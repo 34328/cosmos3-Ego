@@ -28,6 +28,8 @@
 
 ### 当前：训练前第5步，双节点16卡短测通过（2026-09-29，待Claude复审）
 
+正式启动补充：`c28e579`首次启动在optimizer初始化核验阶段退出，**0个训练步、无参数更新**。原生FusedAdam把LR存为FP32 tensor，新增核验器却与Python FP64值按1e-8相对阈值比较，2e-5的正常FP32舍入差被误判。原生打印组为2e-5（405 tensors）及1e-4（7 tensors），配方没有配置错误。修复仅使核验在实际LR dtype下精确比较，并增加FP32 tensor回归及一ULP错误必须拒绝的测试；不改变LR、优化器或warmup规则。失败目录`formal_fixed_camera_t273_20260930T011300`保留，修复测试、提交后从独立新目录启动。
+
 仅短测，未启动正式训练。Tdebug2（10.3.12.18，MASTER）和Tdebug6（10.3.12.24）各8×H800；每轮启动前两台均8卡空闲，结束后也已释放。官方HSDP shard=8、replicate=2；实际trace核实节点内分片组[0…7]/[8…15]、跨节点复制组[0,8]。两端分别经MCP调用 `launch_ar_v0_2.sh`，NNODES=2、NODE_RANK=0/1、MASTER_ADDR=10.3.12.18。只设置NCCL_SOCKET_IFNAME=eth0与NCCL_IB_DISABLE=1，无其他NCCL调优。
 
 配方为fixed-camera，cuDNN benchmark=false、deterministic=true；273混合档 `[273,257,129,65,33]`，C=4、60K token、最多4clip/卡、grad_accum=1。复用第3步已校验且hash匹配的prepared273统计／清单，没有重新拟合。独立证据目录：`outputs/validation/ar_v02_pretrain_step5_20260929T233700/`。`launch_nodes.py`只是本次参数与进程启动记录，底层复用官方CLI／Trainer／checkpoint／W&B，没有新增训练循环或修改模型源码。

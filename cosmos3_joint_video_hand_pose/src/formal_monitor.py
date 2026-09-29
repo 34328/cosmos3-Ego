@@ -31,8 +31,13 @@ def optimizer_lr_receipt(net, optimizer, config):
                 name = names[id(p)]
                 tag = next((key for key in multipliers if key in name), "default")
                 expected = float(config["lr"]) * multipliers.get(tag, 1)
-                if not math.isclose(float(group.get("initial_lr", group["lr"])), expected, rel_tol=1e-8):
-                    raise ValueError(f"native optimizer LR mismatch for {name}")
+                actual = group.get("initial_lr", group["lr"])
+                # Native capturable FusedAdam stores LR as FP32 tensors. Compare
+                # exactly in that representation, not to a Python FP64 literal.
+                matches = (torch.equal(actual, actual.new_tensor(expected)) if isinstance(actual, torch.Tensor)
+                           else math.isclose(float(actual), expected, rel_tol=1e-12))
+                if not matches:
+                    raise ValueError(f"native optimizer LR mismatch for {name}: {float(actual)} != {expected}")
                 tags.add(tag)
                 seen.add(tag)
             rows.append(dict(tags=sorted(tags), parameters=len(group["params"]),
