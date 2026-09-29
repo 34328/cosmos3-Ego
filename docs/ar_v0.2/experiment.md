@@ -14,7 +14,7 @@
 
 ### 2026-09-30 正式训练准备：273混合档、双节点1000步
 
-用户已授权启动，当前处于提交前CPU回归阶段。数据准备输出为 `outputs/data_expansion_20260928/prepared_fixed_camera_wrist_local_delta_latent_v1_t273/`，保留129版本；复用冻结PCA，未重训codec。按原seed=42、每段8个窗口、C=4、tiers=(273,257,129,65,33)重新生成。
+用户已授权，正式训练已从已push的 `b3585fb2e3db92d0f13184856435090d827576c3` 启动。数据准备输出为 `outputs/data_expansion_20260928/prepared_fixed_camera_wrist_local_delta_latent_v1_t273/`，保留129版本；复用冻结PCA，未重训codec。按原seed=42、每段8个窗口、C=4、tiers=(273,257,129,65,33)重新生成。
 
 - 资源：Tdebug6 CPU配额120核，空闲内存约1.4TiB。64窗口串行/8进程逐数组精确相等；全量使用32进程，35,272窗口编码72.37s、487.39窗口/s，全流程222.67s。4409训练段、642验证段；state 286,432行，future 9,165,824行。
 - **11/11文件SHA256与删除前prepared273完全一致**。清单 `e70d2d14…`、state统计 `43910942…`、future统计 `e76997fb…`；完整比较、命令、资源和吞吐证据在 `outputs/maintenance/formal_t273_20260930/`。新正式目录不再依赖validation测试目录。
@@ -26,9 +26,17 @@
 
 准备阶段22项针对性CPU回归通过；31文件分3组并行整合回归236+96+211=543项通过。补充监控回调链路后7项通过；用户追加warmup裁剪豁免后，监控、配方、官方启动、训练合同相关CPU回归 **73 passed**（58.16s），含前100步全部裁剪不停止、warmup不污染后续窗口、step110触发9/10、其他停机条件仍生效。官方TOML无CLI覆盖加载通过，参数快照为`final_recipe.json`，f_min=0.1。129版两套统计/清单hash不变。Tdebug2/6预检共16×H800均4MiB、0%、无GPU进程；W&B API认证及项目访问成功。运行链接、commit及实际LR于启动后补充。此段不是已完成训练的声明。
 
-### 当前：训练前第5步，双节点16卡短测通过（2026-09-29，待Claude复审）
+**正式运行：** `outputs/joint_video_hand_pose/ar_v0_2/formal_fixed_camera_t273_20260930T011945/`，Tdebug2+Tdebug6，01:19启动；官方Trainer于01:23完成首步。无CLI超参数覆盖；原生optimizer检查为405张量基础2e-5、指定五模块7张量1e-4，warmup首步实际LR均0。W&B [bytyfmqa](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/bytyfmqa) 已经API验证为running，第1、2步三项主loss及8字段loss与本地JSONL逐项一致；证据为运行根目录`wandb_verified.json`。第2步video=0.292466、action=0.328146、total=0.620612，global batch=51，整步30.00s、同步训练段29.39s，峰值allocated55.62/reserved67.00GiB；前2步裁剪率100%，warmup正常记录不触发停机。尚未达到500/1000 checkpoint，不声称效果评测完成。
+
+自动跟进`ar-v0-2`已配置：每分钟检查，按10/100步里程碑主动汇报，异常及时报告，不自动调参或重启；到500/1000步分别执行冻结273窗口的两模式评测。两个节点的外围进程监督仅调用原版入口、记录进程组，任一端失败时停止本运行另一端，未替换训练循环。启动清单与监督脚本保存在运行目录和`outputs/maintenance/formal_t273_20260930/`。
+
+### 首次启动核验器修复（2026-09-30）
 
 正式启动补充：`c28e579`首次启动在optimizer初始化核验阶段退出，**0个训练步、无参数更新**。原生FusedAdam把LR存为FP32 tensor，新增核验器却与Python FP64值按1e-8相对阈值比较，2e-5的正常FP32舍入差被误判。原生打印组为2e-5（405 tensors）及1e-4（7 tensors），配方没有配置错误。修复仅使核验在实际LR dtype下精确比较，并增加FP32 tensor回归及一ULP错误必须拒绝的测试；不改变LR、优化器或warmup规则。失败目录`formal_fixed_camera_t273_20260930T011300`保留，修复测试、提交后从独立新目录启动。
+
+修复后相关CPU回归26项通过；包含此次新增float32核验测试。修复已随`b3585fb`提交并push，正式运行已越过核验并实际完成训练步。
+
+### 训练前第5步：双节点16卡短测通过（2026-09-29历史记录）
 
 仅短测，未启动正式训练。Tdebug2（10.3.12.18，MASTER）和Tdebug6（10.3.12.24）各8×H800；每轮启动前两台均8卡空闲，结束后也已释放。官方HSDP shard=8、replicate=2；实际trace核实节点内分片组[0…7]/[8…15]、跨节点复制组[0,8]。两端分别经MCP调用 `launch_ar_v0_2.sh`，NNODES=2、NODE_RANK=0/1、MASTER_ADDR=10.3.12.18。只设置NCCL_SOCKET_IFNAME=eth0与NCCL_IB_DISABLE=1，无其他NCCL调优。
 

@@ -2,7 +2,7 @@
 
 当前方案：`fixed_camera_wrist_local_delta_latent_v1`，57D action，固定 C=4、K=8（每块32条未来action），15个历史chunk，联合去噪30步，`L_video + L_action`。
 
-2026-09-30：用户已授权双节点1000步正式训练，正在完成启动准备。prepared273已在独立正式`t273/`目录重建，11个文件hash与删除前完全一致；固定配方改为273混合档、HSDP8×2、500步保存及指定五模块5倍LR。实时状态、监控停止条件与500/1000步评测口径统一见[experiment当前节](experiment.md#0-当前新表示wrist-local-pca15δz)，下文短测记录属于此前状态。
+2026-09-30：双节点1000步正式训练已从`b3585fb`启动，[本次W&B](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/bytyfmqa)的首两步11项loss已通过API核实。prepared273在独立正式`t273/`目录重建，11个文件hash与删除前完全一致；273混合档、HSDP8×2、500步保存、指定五模块5倍LR。前100步裁剪只记录，最早110步才按warmup之后的9/10规则停止。实时状态与500/1000步评测口径统一见[experiment当前节](experiment.md#0-当前新表示wrist-local-pca15δz)，下文短测记录属于此前状态。
 
 | 文档 | 用途 |
 |---|---|
