@@ -9,6 +9,12 @@
 
 ## 本地补丁
 
+### AR V0.2 薄启动入口（2026-09-29）
+
+- `examples/_sft_launcher_common.sh` 增加可选 `WORKDIR`、`TRAINING_MODULE`、`TRAINING_PYTHONPATH`，使仓外项目配置能复用官方检查、torchrun 参数、日志和退出码处理；未指定时保留官方 examples 默认行为。
+- 可选 `TEXT_TOKENIZER_PATH` 相对路径以工作目录解析并导出。项目 wrapper 保留独立 tokenizer 默认目录，不根据目录名猜测与 DCP 是否匹配。
+- 不增加训练循环，不改 Trainer／优化器／调度器。CPU 配置与启动测试不代替真实 GPU 保存恢复验收；实际证据见 `docs/ar_v0.2/experiment.md`。
+
 ### AR v0.2 逐块图像／state 条件与多样本（2026-09-28，验收中）
 
 - 新布局为 `joint_chunk_cond_v1`：每块独立编码 `U/S/V/A`，替代下节旧单首帧布局。项目层改动位于 `cosmos3_joint_video_hand_pose/src/ar_v02_*`，旧布局的测试结果不能作为新布局验收依据。

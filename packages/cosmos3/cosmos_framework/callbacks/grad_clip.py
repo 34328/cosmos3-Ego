@@ -453,7 +453,7 @@ class GradClip(Callback):
                 applied_scale = min(1.0, self.clip_norm / (norm_value + 1.0e-6)) if math.isfinite(norm_value) else 0.0
             log_dict[f"{prefix}/triggered"] = last_triggered
             log_dict[f"{prefix}/trigger_count_window"] = window_count
-            log_dict[f"{prefix}/trigger_count_cumulative"] = self._clip_trigger_total[modality]
+            log_dict[f"{prefix}/trigger_count_since_process_start"] = self._clip_trigger_total[modality]
             log_dict[f"{prefix}/applied_scale"] = applied_scale
         if wandb.run:
             wandb.log(log_dict, step=iteration)

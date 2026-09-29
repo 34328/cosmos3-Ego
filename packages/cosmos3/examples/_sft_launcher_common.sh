@@ -9,6 +9,11 @@
 #                        Absolute or repo-root-relative.
 #
 # Caller MAY set before sourcing (presence drives which existence checks fire):
+#   WORKDIR             repository root. Defaults to the parent of the caller's
+#                       directory, preserving the examples/ launcher behavior.
+#   TRAINING_MODULE     Python module passed to torchrun -m; default
+#                       cosmos_framework.scripts.train.
+#   TRAINING_PYTHONPATH PYTHONPATH for torchrun; default ".".
 #   DATASET_PATH         recipe-local dataset dir, e.g. "examples/data/<name>".
 #                        If unset, no dataset existence check fires
 #                        (reasoner / HF-streaming case).
@@ -36,8 +41,12 @@ set -uo pipefail
 
 : "${TOML_FILE:?TOML_FILE must be set before sourcing _sft_launcher_common.sh}"
 
-# Repo root = parent of the wrapper's directory (examples/).
-WORKDIR="$(cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd)"
+# Repo root = parent of the wrapper's directory (examples/) unless an external
+# project explicitly supplies its own repository root and registered CLI.
+WORKDIR="${WORKDIR:-$(cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd)}"
+WORKDIR="$(cd "$WORKDIR" && pwd)"
+TRAINING_MODULE="${TRAINING_MODULE:-cosmos_framework.scripts.train}"
+TRAINING_PYTHONPATH="${TRAINING_PYTHONPATH:-.}"
 
 # Anchor relative paths to $WORKDIR.
 [[ "$TOML_FILE" = /* ]] || TOML_FILE="$WORKDIR/$TOML_FILE"
@@ -52,6 +61,11 @@ if [[ -n "${BASE_CHECKPOINT_PATH:-}" ]]; then
     WAN_VAE_PATH="${WAN_VAE_PATH:-examples/checkpoints/wan22_vae/Wan2.2_VAE.pth}"
     [[ "$WAN_VAE_PATH" = /* ]] || WAN_VAE_PATH="$WORKDIR/$WAN_VAE_PATH"
     export BASE_CHECKPOINT_PATH WAN_VAE_PATH
+fi
+
+if [[ -n "${TEXT_TOKENIZER_PATH:-}" ]]; then
+    [[ "$TEXT_TOKENIZER_PATH" = /* ]] || TEXT_TOKENIZER_PATH="$WORKDIR/$TEXT_TOKENIZER_PATH"
+    export TEXT_TOKENIZER_PATH
 fi
 
 OUTPUT_ROOT="${OUTPUT_ROOT:-$WORKDIR/outputs/train}"
@@ -95,8 +109,8 @@ TORCHRUN_ARGS=(--nproc_per_node="${NPROC_PER_NODE:-8}" --master_port="${MASTER_P
 [[ -n "${NODE_RANK:-}" ]]   && TORCHRUN_ARGS+=(--node_rank="$NODE_RANK")
 [[ -n "${MASTER_ADDR:-}" ]] && TORCHRUN_ARGS+=(--master_addr="$MASTER_ADDR")
 
-IMAGINAIRE_OUTPUT_ROOT="$IMAGINAIRE_OUTPUT_ROOT" PYTHONPATH=. \
-    torchrun "${TORCHRUN_ARGS[@]}" -m cosmos_framework.scripts.train \
+IMAGINAIRE_OUTPUT_ROOT="$IMAGINAIRE_OUTPUT_ROOT" PYTHONPATH="$TRAINING_PYTHONPATH" \
+    torchrun "${TORCHRUN_ARGS[@]}" -m "$TRAINING_MODULE" \
     --sft-toml="$TOML_FILE" \
     "${TRAILING_ARGS[@]}" \
     2>&1 | tee "$LOG_FILE"

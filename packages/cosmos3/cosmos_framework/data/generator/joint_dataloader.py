@@ -1483,9 +1483,9 @@ class RankPartitionedDataLoader:
         return iter(self.dataloader)
 
     def __len__(self) -> int:
-        if isinstance(self.dataset, torch.utils.data.IterableDataset):
-            # This wrapper's action streams are infinite. Calling len() on the
-            # inner DataLoader makes PyTorch warn after one nominal epoch.
+        if isinstance(self.dataset, torch.utils.data.IterableDataset) and not hasattr(type(self.dataset), "__len__"):
+            # Unsized streams have no epoch length; sized iterables retain native
+            # DataLoader batching and drop_last semantics.
             return 0
         return len(self.dataloader)
 

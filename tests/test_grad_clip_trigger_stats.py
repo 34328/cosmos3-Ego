@@ -24,7 +24,7 @@ def _reference_logs(norms, clip_norm, logging_iter):
                 {
                     "grad_clip/triggered": last_triggered,
                     "grad_clip/trigger_count_window": window,
-                    "grad_clip/trigger_count_cumulative": total,
+                    "grad_clip/trigger_count_since_process_start": total,
                     "grad_clip/applied_scale": last_scale,
                 }
             )
