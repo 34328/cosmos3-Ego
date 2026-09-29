@@ -1,5 +1,7 @@
 # V0.2 代码导航
 
+> 历史快照，仅保留记录。当前导航见 [design.md 第7节](../design.md#7-代码导航)，验收记录见 [experiment.md](../experiment.md)。
+
 当前生产代码保留在 `cosmos3_joint_video_hand_pose/src/`，以 `ar_v02_` 区分 V0.1。整理不改变导入路径、模型布局、30 步采样及 checkpoint 合同。
 
 ## 按数据流阅读
@@ -22,8 +24,8 @@
 - `configs/ar_v0_2_c.toml`：既有运行记录的兼容别名，不是独立实验。
 - `configs/ar_v0_2_c_no_chunk_state.toml`：暂停、不可运行，仅留作历史引用。
 - `tests/test_ar_v02_*.py`：按模块组织的回归；`*_gpu.py` 需要 GPU。状态和整体损失另见 `test_ar_chunk_state.py`、`test_whole_action_loss.py`。
-- [scripts/README.md](../../scripts/README.md)：Nano 对照、流式 smoke、梯度和恢复验证的入口及使用边界。
-- [packages/cosmos3/UPSTREAM.md](../../packages/cosmos3/UPSTREAM.md)：框架补丁清单；不把项目逻辑继续堆入上游目录。
+- [scripts/README.md](../../../scripts/README.md)：Nano 对照、流式 smoke、梯度和恢复验证的入口及使用边界。
+- [packages/cosmos3/UPSTREAM.md](../../../packages/cosmos3/UPSTREAM.md)：框架补丁清单；不把项目逻辑继续堆入上游目录。
 - `outputs/`：结果、日志及诊断快照，不进入 Git；数据和模型权重不随代码整理移动或删除。
 
 ## 本次整理验证

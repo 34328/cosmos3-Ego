@@ -1,5 +1,7 @@
 # V0.2 新方案实现与训练检查
 
+> 历史 review，保留当时结论。当前方案见 [design.md](../design.md)，后续修复与验收见 [experiment.md](../experiment.md)，最新交接见 [9月29日 review](../review_codex_2026-09-29.md)。
+
 日期：2026-09-28。远端：`/mnt/lzh/cosmos-EgoWAM`，分支 `ar-video-action`。本轮保留原工作区改动，未提交。四个子 agent 分别检查数据／动态打包、损失／恢复、推理／投影、注意力／网络测试，主控整合并执行完整 Nano 短检查。
 
 ## 结论
