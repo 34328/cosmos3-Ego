@@ -21,10 +21,10 @@
 - 配方：官方 `launch_ar_v0_2.sh`；fixed-camera TOML及注册配置均为max_iter=1000、save_iter=500、warmup=100、cosine cycle=1000，HSDP shard8×replicate2。60K预算、最多4clip/卡、C4/K8/H15、联合30步、video/action=1:1、确定性cuDNN保持已验收设置。指定五项 `action2llm/llm2action/action_modality_embed/action_state_embed/vision_condition_embed` 倍率5，其余1；峰值分别1e-4/2e-5。warmup起点实际LR=0，不能把峰值写成首步LR。
 - 启动前原生optimizer创建后按参数身份逐组核对 `initial_lr`、实际 `lr`，写 `optimizer_lr_groups.json` 并打印。正式入口无CLI超参数覆盖；启动记录绑定已push的commit。
 - 原生Trainer回调扩展 `FormalTrainingMonitor` 只读记录，不更改loss、梯度或更新规则。每步 `formal_monitor.jsonl` 记录16rank实际clip数、global batch、显存峰值、同步训练段时间、实际原生GradClip事件、三个主loss及8个字段；原有 `loss_metrics.jsonl` 和在线W&B仍保留。前100步每10步汇报，之后每100步汇报。
-- 停止条件：非有限loss在反向前检查，原合同在梯度裁剪前检查非有限梯度；OOM由原生任务失败退出。最近10步至少9步裁剪（包括warmup）；任一主loss最近10步均值超过前10步均值3倍；步开始驻留allocated显存连续10步逐步增长且累计超过2GiB，均停止并报告，不自动调参/重启。显存缓存reserved的高水位本身不作为泄漏。普通单步loss波动不称为发散。
+- 停止条件：非有限loss在反向前检查，原合同在梯度裁剪前检查非有限梯度；OOM由原生任务失败退出。按用户追加决定，step≤100仅记录裁剪率，step101起累计新的10步判断窗口，最早step110启用最近10步至少9步裁剪的停止条件；warmup事件不计入停机窗口。任一主loss最近10步均值超过前10步均值3倍；步开始驻留allocated显存连续10步逐步增长且累计超过2GiB，均停止并报告，不自动调参/重启。这两条及非有限检查不豁免warmup。显存缓存reserved的高水位本身不作为泄漏。普通单步loss波动不称为发散。
 - 500/1000 checkpoint评测固定使用新清单内全部1557个273帧heldout窗口（98个有合格长窗口的episode），每窗按清单seed，分别gt/generated、联合30步。主指标用原始GT关键点；按 `chunk>=17` 单列首次淘汰及后续误差，不能把第16块误当已淘汰。可拆分清单分配空闲节点并行，不能减少窗口或用decoded-GT替代主目标。模型训练不为评测重启。
 
-准备阶段22项针对性CPU回归通过，完整回归、启动空闲检查、实际LR与W&B API核实结果将在此补充。此段不是已启动或已完成训练的声明。
+准备阶段22项针对性CPU回归通过；31文件分3组并行整合回归236+96+211=543项通过。补充监控回调链路后7项通过；用户追加warmup裁剪豁免后，监控、配方、官方启动、训练合同相关CPU回归 **73 passed**（58.16s），含前100步全部裁剪不停止、warmup不污染后续窗口、step110触发9/10、其他停机条件仍生效。官方TOML无CLI覆盖加载通过，参数快照为`final_recipe.json`，f_min=0.1。129版两套统计/清单hash不变。Tdebug2/6预检共16×H800均4MiB、0%、无GPU进程；W&B API认证及项目访问成功。运行链接、commit及实际LR于启动后补充。此段不是已完成训练的声明。
 
 ### 当前：训练前第5步，双节点16卡短测通过（2026-09-29，待Claude复审）
 

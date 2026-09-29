@@ -44,20 +44,23 @@ def optimizer_lr_receipt(net, optimizer, config):
 
 
 class StopPolicy:
-    """No tuning: 9/10 clips; 3x initial loss mean; sustained resident growth."""
+    """After warmup: 9/10 clips; always check loss and resident growth."""
     def __init__(self):
         self.clips = deque(maxlen=10)
         self.losses = deque(maxlen=10)
         self.memory = deque(maxlen=10)
         self.baseline = None
+        self.step = 0
 
-    def update(self, clipped, losses, resident_gib):
+    def update(self, clipped, losses, resident_gib, *, step=None):
+        self.step = self.step + 1 if step is None else step
         if not all(math.isfinite(x) for x in (*losses, resident_gib)):
             return "nonfinite loss or memory metric"
         self.clips.append(bool(clipped))
         self.losses.append(tuple(losses))
         self.memory.append(resident_gib)
-        if len(self.clips) == 10 and sum(self.clips) >= 9:
+        # All ten contributing steps must be after the 100-step warmup.
+        if self.step >= 110 and len(self.clips) == 10 and sum(self.clips) >= 9:
             return "grad_clip triggered in at least 9 of the last 10 steps"
         if len(self.losses) == 10:
             means = [sum(x[i] for x in self.losses)/10 for i in range(len(losses))]
@@ -83,7 +86,7 @@ class FormalTrainingMonitor(Callback):
                 if row["step"] <= iteration:
                     self.policy.update(row["grad_clip_triggered"],
                                        [row[k] for k in ("loss/video_raw", "loss/action_raw", "loss/total")],
-                                       row["resident_allocated_gib"])
+                                       row["resident_allocated_gib"], step=row["step"])
         if not dist.is_initialized() or dist.get_rank() == 0:
             self.root.mkdir(parents=True, exist_ok=True)
             receipt = model._optimizer_lr_receipt
@@ -126,7 +129,7 @@ class FormalTrainingMonitor(Callback):
         metrics = dict(zip(self.names, rows[:, 7:].mean(0).tolist()))
         reason = self.policy.update(bool(rows[:, 6].max()),
                                     [metrics[k] for k in ("loss/video_raw", "loss/action_raw", "loss/total")],
-                                    float(rows[:, 4].max()))
+                                    float(rows[:, 4].max()), step=iteration)
         row = dict(step=iteration, global_batch=int(rows[:, 0].sum()),
                    clips_per_rank=rows[:, 0].int().tolist(),
                    peak_allocated_gib=float(rows[:, 1].max()), peak_reserved_gib=float(rows[:, 2].max()),

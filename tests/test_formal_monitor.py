@@ -5,14 +5,33 @@ import torch
 from cosmos3_joint_video_hand_pose.src.formal_monitor import StopPolicy, optimizer_lr_receipt, FormalTrainingMonitor
 
 
-def test_clipping_stop_includes_warmup_and_exact_boundary():
+def test_clipping_stop_after_warmup_and_exact_boundary():
     p = StopPolicy()
     for i in range(9):
-        assert p.update(i != 0, [1., 2., 3.], 30.) is None
-    assert "9 of" in p.update(True, [1., 2., 3.], 30.)
+        assert p.update(i != 0, [1., 2., 3.], 30., step=101+i) is None
+    assert "9 of" in p.update(True, [1., 2., 3.], 30., step=110)
     p = StopPolicy()
     for i in range(10):
-        assert p.update(i >= 2, [1., 2., 3.], 30.) is None
+        assert p.update(i >= 2, [1., 2., 3.], 30., step=101+i) is None
+
+
+def test_first_100_steps_all_clipped_do_not_stop():
+    p = StopPolicy()
+    for step in range(1, 101):
+        assert p.update(True, [1., 2., 3.], 30., step=step) is None
+    assert list(p.clips) == [True]*10
+    # Warmup events remain visible in logs but cannot fill the stop window.
+    for step in range(101, 110):
+        assert p.update(True, [1., 2., 3.], 30., step=step) is None
+    assert "9 of" in p.update(True, [1., 2., 3.], 30., step=110)
+
+
+def test_warmup_clips_do_not_poison_healthy_post_warmup_window():
+    p = StopPolicy()
+    for step in range(1, 101):
+        assert p.update(True, [1.], 30., step=step) is None
+    for step in range(101, 121):
+        assert p.update(False, [1.], 30., step=step) is None
 
 
 def test_divergence_and_nonfinite_stop():
@@ -87,17 +106,17 @@ def test_callback_records_fields_then_stops_without_changing_loss(monkeypatch, t
     m.on_train_start(model)
     output = {k: torch.tensor(1.) for k in module.LOSS_METRIC_SOURCES.values()}
     loss = torch.tensor(2., requires_grad=True)
-    for i in range(10):
+    for i in range(110):
         m.on_training_step_start(model, {"video": [None]*3}, iteration=i)
         m.on_before_backward(model, loss, iteration=i)
         m.on_training_step_batch_end(model, {}, output, loss, iteration=i)
-        if i < 9:
+        if i < 109:
             m.on_training_step_end(model, {}, output, loss, iteration=i+1)
         else:
             with pytest.raises(RuntimeError, match="9 of"):
                 m.on_training_step_end(model, {}, output, loss, iteration=i+1)
     row = json.loads((tmp_path / "STOPPED.json").read_text())
-    assert row["step"] == 10 and row["global_batch"] == 3 and row["clips_per_rank"] == [3]
+    assert row["step"] == 110 and row["global_batch"] == 3 and row["clips_per_rank"] == [3]
     assert set(module.LOSS_METRIC_SOURCES) <= row.keys()
     assert loss.item() == 2. and loss.grad is None
     resumed = FormalTrainingMonitor()
