@@ -1,7 +1,7 @@
 # AR v0.2：联合去噪、多样本 packing 与统一动作损失
 
 - 日期：2026-09-27（2026-09-28 改为“逐块条件”方案）
-- 状态：当前动作表示升级为 `fixed_camera_wrist_local_delta_latent_v1`，布局仍为每块 U_k＋S_k 条件和 V_k＋A_k 联合目标。代码与CPU回归已完成；PCA15已通过119个heldout episode的重建验收；两套57D统计已拟合，并通过119个heldout episode代表窗口的往返验证。真实GPU／WAM质量验收尚未完成。实现与实验状态见 [experiment.md](experiment.md)，本文定义当前方案与验收要求。
+- 状态：当前表示 `fixed_camera_wrist_local_delta_latent_v1`，已完成 1000 步正式训练。训练、评测结果和已知问题见 [experiment.md](experiment.md)；本文只定义方案与验收要求。
 - 目标：**优先提高 action 质量；视频作为联合学习与推理的辅助模态，同时用于检查视频—动作一致性。** 不以视频观感改善代替动作指标。
 - 依据：AR V0.1 实验的失配与漂移观察（AR V0.1／V0.2 历史文档保留）。本文已合入审阅建议及本轮修正；远端源码初查 `cebaf8a`，采样与 padding 复核 `9c28a2e`，仓库 `/mnt/lzh/cosmos-EgoWAM`，分支 `ar-video-action`。
 
@@ -238,7 +238,7 @@ T 指抽帧后送入 VAE 的 RGB 帧数。正式 C=4 时，T=33／65／129 分�
 
 正式推理固定 C=4：从第 9 块起，目标绝对时间超出当前训练片段的范围；第 17 块首次淘汰，C=4 训练未覆盖该边界。本版主要质量指标限于 chunk 1–8；至少 48 块的长 rollout 仅作缓存正确性／性能验收，不以其速度或数值一致性证明长时动作质量。更长训练 clip（例如 T=257）需先核对 episode 长度分布，留作后续数据方案，H 保持 15。
 
-首次淘汰必须按正式 C=4 构造超出训练 clip 长度的同输入 cache／重算测试。该测试只证明实现等价和缓存有界，不能证明模型学会了该长时分布。历史 C=1…4 矩阵只保留在 experiment.md 的旧实现记录中，不作为新表示的训练或验收配置。
+首次淘汰必须按正式 C=4 构造超出训练 clip 长度的同输入 cache／重算测试。该测试只证明实现等价和缓存有界，不能证明模型学会了该长时分布。历史 C=1…4 矩阵只保留在 [归档实验日志](archive/experiment_log_2026-09-28_to_09-30.md) 的旧实现记录中，不作为新表示的训练或验收配置。
 
 ### 3.1 抽帧与速度分别计算
 
@@ -347,7 +347,6 @@ loss 单测固定 `v_pred` 和 M，只扰动 M=0 位置的有限目标值，断�
 
 所有代码实现和测试在远端进行；下表是完整交付计划，不代表已经完成。源码路径相对 `cosmos3_joint_video_hand_pose/`，框架补丁另记入 `packages/cosmos3/UPSTREAM.md`，默认不改变原有非 AR 路径。
 
-**当前实施状态（2026-09-29）**：wrist-local＋Δz代码已落地，表示版本为 `fixed_camera_wrist_local_delta_latent_v1`，此前综合CPU回归441项通过；官方启动器复用及路径覆盖已接通。FOV策略已按用户决定落实方案 A：跟踪有效的全部 future action 行参与监督，legacy 不变，本次回归见 [experiment.md](experiment.md)。冻结PCA15已通过验收；两套57D统计已拟合并完成往返验证，129帧8卡显存及官方保存恢复已短测：新配方固定cuDNN benchmark=false、deterministic=true，恢复数值精确一致；分项action日志已在线核实。257/273档8卡容量短测均通过、无OOM；Tdebug2＋Tdebug6官方HSDP（shard8×replicate2、eth0 TCP）的273混合档6步及16rank保存恢复已通过，data trace／sigma／loss最大差0，原阈值不变。两轮online W&B经API核实；性能与通信口径、完整证据见experiment。正式训练仍由用户另行指定。
 
 新表示只按固定 C=4 重新做 token 计数和 GPU 容量 smoke，再决定是否继续使用历史 60,000 token、每卡最多 4 个 clip 和 512 padding 余量。紧凑 noisy 流仍只保留未来 V/A query，clean K/V 保留梯度；完整 GC 规则保持 `every_n=1, warm_up=0, gc_level=2`。旧 C=1 容量上界不再是新配方依据。
 
@@ -422,7 +421,7 @@ loss 单测固定 `v_pred` 和 M，只扰动 M=0 位置的有限目标值，断�
 | 项目 | 安排 |
 |---|---|
 | 完整 V0.2 训练＋第 6.4 节评测 | 必做，确认实际效果 |
-| cache／重算（第 6.1 节）、多样本／逐样本（第 4 节）的数值对照 | 必做，检查实现是否正确；实测覆盖与未完成矩阵见 experiment.md |
+| cache／重算（第 6.1 节）、多样本／逐样本（第 4 节）的数值对照 | 必做，检查实现是否正确；实测覆盖见 [归档实验日志](archive/experiment_log_2026-09-28_to_09-30.md) |
 | 延迟（第 6.2 节） | 用户已要求暂缓；不额外训练，不作为当前启动门槛 |
 | 有／无 state、video-first／joint、尺度校准、packing 训练对照、历史加噪等独立训练对照 | 暂缓，出现具体问题再做 |
 
@@ -477,13 +476,13 @@ loss 单测固定 `v_pred` 和 M，只扰动 M=0 位置的有限目标值，断�
 - [packages/cosmos3/UPSTREAM.md](../../packages/cosmos3/UPSTREAM.md)：框架补丁清单；不把项目逻辑继续堆入上游目录。
 - `outputs/`：结果、日志及诊断快照，不进入 Git；数据和模型权重不随代码整理移动或删除。
 
-训练配方更新（2026-09-29）：固定 C=4、K=8，即每个完整块预测 32 条源帧 action；15 个历史 chunk 不变。新动作表示及新 codec、state/future 57D Piecewise-Asinh 统计只按正式 C=4 准备。experiment.md 中 C=1…4 的数值矩阵属于旧实现历史，不能作为 `fixed_camera_wrist_local_delta_latent_v1` 的通过证据；既有实验和统计快照不覆写。
+训练配方更新（2026-09-29）：固定 C=4、K=8，即每个完整块预测 32 条源帧 action；15 个历史 chunk 不变。新动作表示及新 codec、state/future 57D Piecewise-Asinh 统计只按正式 C=4 准备。归档实验日志中 C=1…4 的数值矩阵属于旧实现历史，不能作为 `fixed_camera_wrist_local_delta_latent_v1` 的通过证据；既有实验和统计快照不覆写。
 
 ### 7.3 本轮实施边界（2026-09-29）
 
 - 在 Cosmos3 官方 `_sft_launcher_common.sh` 上增加必要的项目入口扩展，版本化薄启动脚本；Trainer、优化器、调度器、checkpoint、W&B 仍走官方实现。保存／恢复验收必须经过官方 Trainer；数值夹具仅证明相应算子。
 - base checkpoint、VAE、text tokenizer 可从配置／环境变量覆盖，默认路径保留；tokenizer 分目录不是错误，但来源与词表必须核验。
-- 配方保持 video/action=1:1、Nano action head 初始化、LambdaCosine、基础LR=2e-5、逐步GC、文本dropout=0.1。2026-09-30用户授权正式配方：action2llm、llm2action、action_modality_embed、action_state_embed、vision_condition_embed均5倍，其余1倍；warmup100/cycle1000/max_iter1000/save_iter500，HSDP8×2，273/257/129/65/33混合档。具体数据hash、停机口径和运行状态见experiment当前节；旧配方/运行快照不改写。
+- 配方保持 video/action=1:1、Nano action head 初始化、LambdaCosine、基础LR=2e-5、逐步GC、文本dropout=0.1。2026-09-30用户授权正式配方：action2llm、llm2action、action_modality_embed、action_state_embed、vision_condition_embed均5倍，其余1倍；warmup100/cycle1000/max_iter1000/save_iter500，HSDP8×2，273/257/129/65/33混合档。运行结果见 [experiment.md](experiment.md)；旧配方/运行快照不改写。
 - hand MPJPE 主指标对原始 GT 关键点；decoded-GT 仅辅助。统一源帧、左右手、米与毫米、块首／整体坐标转换，并分别报告腕位姿和 wrist-local 手形误差。
-- H=15 不改；现有 T=129 只能覆盖最多7块历史。T=257覆盖15块历史，T=273覆盖首次淘汰，均为模型视频帧数；先审计有效窗口和显存，未验收不切换训练档位。
+- H=15 不改；现有 T=129 只能覆盖最多7块历史。T=257覆盖15块历史，T=273覆盖首次淘汰，均为模型视频帧数；两档已通过显存短测，并用于 1000 步正式训练。
 - palm-in-FOV 不是跟踪有效性。用户已选择方案 A：仅新 wrist-local 路径取消 FOV loss 屏蔽，跟踪有效的 future 行全部监督；`invalid_frames` 继续拒绝跟踪无效的整窗。保留不可见连续段／恢复边界审计与 `hand_visibility` 元数据，可另按 FOV 分组评测，不把缺失标签当有效，也不声称已解决模型预测的积分漂移。
