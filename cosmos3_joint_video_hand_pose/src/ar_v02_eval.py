@@ -403,6 +403,14 @@ def _load_bound_model(config, checkpoint, dataset_cfg):
     return model
 
 
+def _inference_hand_codecs(raw_dataset):
+    """Keep CPU data encoding separate from decoder device/dtype mutations."""
+    import copy
+
+    codecs = getattr(raw_dataset, "fixed_hand_codecs", None)
+    return None if codecs is None else tuple(copy.deepcopy(codec) for codec in codecs)
+
+
 def sample(args):
     import os
 
@@ -484,7 +492,7 @@ def sample(args):
                 state_normalizer=raw.chunk_state_normalizer,
                 future_normalizer=(raw.future_normalizer if getattr(raw, "fixed_camera_mode", False)
                                    else raw.action_builder.future_normalizer),
-                hand_codecs=getattr(raw, "fixed_hand_codecs", None),
+                hand_codecs=_inference_hand_codecs(raw),
                 chunk_size=args.chunk_size,
                 source_fps=fps,
             )
