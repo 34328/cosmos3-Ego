@@ -477,6 +477,16 @@ def sample(args):
             if any(type(item[k]) is not int for k in ("start", "frames", "seed")):
                 raise ValueError("frozen window indexes and seed must be integers")
         model = _load_bound_model(config, args.ckpt, ds_cfg)
+        video_shift = getattr(args, "video_shift", 5.0)
+        video_guidance = getattr(args, "video_guidance", 1.0)
+        from .ar_inference import flow_sigmas
+        sampler_type, guidance_kwargs = JointARSampler, {}
+        if video_guidance != 1:
+            from .ar_v02_guidance import VideoGuidedJointARSampler
+            processor = instantiate(ds_cfg.tokenizer_config)
+            sampler_type = VideoGuidedJointARSampler
+            guidance_kwargs = dict(video_guidance=video_guidance,
+                negative_text_ids=processor.tokenize_text("", is_video=False, use_system_prompt=False)[:4096])
         saved = []
         for number, item in enumerate(selected):
             index = by_id[item["sample_id"]]
@@ -486,7 +496,7 @@ def sample(args):
             episode_id = raw.rows[index]["episode_hash"]
             episode = raw.episodes[episode_id]
             fps = float(episode["fps"])
-            sampler = JointARSampler(
+            sampler = sampler_type(
                 model,
                 batch,
                 state_normalizer=raw.chunk_state_normalizer,
@@ -495,6 +505,7 @@ def sample(args):
                 hand_codecs=_inference_hand_codecs(raw),
                 chunk_size=args.chunk_size,
                 source_fps=fps,
+                **guidance_kwargs,
             )
             group = zarr.open_group(episode["abs_zarr_path"], mode="r")
             dense_indexes = raw_item["action_source_frame_indices"].numpy()
@@ -509,7 +520,8 @@ def sample(args):
             gt_rgb = decode_rgb_video(group["images.front_1"][dense_indexes]).permute(1, 2, 3, 0).numpy()
             for history in args.history:
                 video, action = sampler.sample(
-                    history=history, seed=item["seed"], use_cache=not args.no_cache, verify_cache=args.verify_cache
+                    history=history, seed=item["seed"], use_cache=not args.no_cache, verify_cache=args.verify_cache,
+                    video_schedule=flow_sigmas(JOINT_STEPS, video_shift),
                 )
                 rgb = decode_video_chunks(model, sampler.layout, video)
                 _, gt_future, _ = sampler.layout.unpack_action(sampler.gt_action)
@@ -519,6 +531,8 @@ def sample(args):
                     episode_id=episode_id,
                     history=history,
                     seed=item["seed"],
+                    video_shift=video_shift, action_shift=5.0,
+                    video_guidance=video_guidance, action_guidance=1.0,
                     source_offset=item["start"],
                     source_fps=fps,
                     speed_factor=raw.speed_factor,
@@ -589,6 +603,9 @@ def parser():
     run.add_argument("--history", nargs="+", choices=HISTORY_MODES, default=["gt"])
     run.add_argument("--limit", type=int, help="explicit subset of the frozen list, recorded in metadata")
     run.add_argument("--no-cache", action="store_true")
+    run.add_argument("--video-shift", type=float, default=5.0)
+    run.add_argument("--video-guidance", type=float, default=1.0,
+                     help="text CFG on video only; action retains conditional velocity")
     run.add_argument(
         "--verify-cache",
         action="store_true",
@@ -614,6 +631,12 @@ def main(argv=None):
     try:
         torch.set_num_threads(1)
         if args.command == "sample":
+            if not np.isfinite(args.video_shift) or args.video_shift <= 0:
+                raise ValueError("video shift must be positive and finite")
+            if not np.isfinite(args.video_guidance) or args.video_guidance < 1:
+                raise ValueError("video guidance must be finite and >= 1")
+            if args.video_guidance != 1 and (args.no_cache or args.verify_cache):
+                raise ValueError("video CFG requires cache without reference verification")
             if args.limit is not None and args.limit < 1:
                 raise ValueError("--limit must be positive")
             if args.no_cache and args.verify_cache:
