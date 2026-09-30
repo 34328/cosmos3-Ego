@@ -116,10 +116,78 @@ video loss 在约 100 步后基本不再下降；action loss 持续缓慢下降�
 | 视频生成运动不足、质量差 | 当前主要瓶颈，待诊断 |
 | 推理未用 CFG，shift=5 | 官方 image2video 默认 guidance 6.0、shift 10、35 步，与我们不同，待验证 |
 | `speed_factor=0.5` 使时间标签为 7.5fps，实际视频 15fps | 待单独对照 |
-| 全量评测因 codec 设备 bug 中断 | 已在对照分支修复（已删），需移植到主线后重跑 |
+| 全量评测因 codec 设备 bug 中断 | 主线修复 `b513d67`：每窗口推理独立 codec 副本；43 项 CPU 回归通过，四进程各连续两窗口 GPU 验证通过。尚未重跑全量评测 |
 | 满窗口（H=15）与淘汰旧块 | 训练已通过 273 档覆盖；长 rollout 时间 RoPE 外推尚未单独评估 |
 | 推理延迟 | 按用户决定暂缓 |
 
 ## 8. 历史训练（旧表示，仅作参考）
 
 2026-09-28 用旧动作表示（块首 state、旧 wrist-local AE、C=1…4、`L_video + 0.7 L_action`）跑过 1200 步，单节点 FSDP8，W&B 误设 disabled，分项 loss 历史丢失。与当前方案不可比。详见归档。
+
+## 9. 2026-09-30 视频效果排查（推理部分已完成，未训练）
+
+- 独立输出：`outputs/maintenance/codex_ablation_20260930T191612/`。
+- 固定正式 `formal_fixed_camera_t273_20260930T011945` 的 iter1000、`claude_diag_20260930` 实际完成的同 8 个 heldout 窗口，seed 42、C4、AR 联合 30 步；冻结清单及 hash 在新目录 `manifest.json`。
+- 顺序：时间位置／缓存重算／VAE／边界数值核对 → 视频 shift 5/10 → 固定较好 shift 后视频 CFG 1/3/6 → 官方 Nano image2video（guidance 6、shift 10、35 步）。训练对照等待用户另行确认。
+- 只改视频 schedule／guidance，action shift 固定 5、guidance 固定 1。CFG 的空文本使用官方训练 tokenizer，同步维护独立无文本历史 KV。
+- shift 选择标准预先固定：8 窗口 gt 模式左右腕块末误差均值较小者；相同则按视频 PSNR。所有相机／手形／视频得失一起报告。
+- 每组报告 8 窗口、136 个 chunk，单列 chunk>=17；可视化固定窗口 0/1/2（穿吊牌、搅拌蜡液、扣衬衫纽扣），不按效果挑选。原生 image2video 没有项目 57D 动作输出，动作指标标为不适用。
+- 新报告视频 PSNR 先汇总有效 RGB（去掉底部 padding）的像素 MSE 再转 dB，不能与旧报告的逐块 dB 算术均值直接比较。边界 MAE 比较同一源时刻的预测末帧与下一块 U，不将像素变化量解释为运动速度。
+- 初始检查：六节点 GPU 空闲；Tdebug4 CPU 负载较高。Tdebug1 四卡各连续核对两窗口，Tdebug2 八卡完成 shift10，Tdebug3/5 各八卡完成 CFG3/6；释放后的 Tdebug1 完成官方 Nano。CPU 像素汇总先验证一个窗口，再八进程、每进程两线程并行，复用首窗口结果，汇总耗时78.15秒。
+
+### 9.1 数值核对
+
+| 项目 | 实测 |
+|---|---|
+| 8 窗口时间位置 | 首块视频 latent 源帧 8/16/24/32，与各组 action 末行 RoPE 差均为 0；U/S 均在源帧 0，future action 为 1…32 |
+| 缓存与完整前缀重算 | 8 窗口×17块×30步×video/action=8,160 项，max_abs=0、relative_L2=0，含 k17 首次淘汰；逐步使用相同输入比较 |
+| 8 窗口 VAE PSNR（逐窗口平均） | 整段 33.653 dB；分块 33.971 dB；差值 +0.318 dB，范围 +0.213…+0.470 dB |
+| 同时刻块边界 MAE（0…255） | gt 预测 25.099；oracle 真实视频经分块 VAE 重建 2.594；generated 1.915，但其首条件对 GT 的 MAE 已达 42.462，平滑不等于准确 |
+| 修复后复现 | 首批 4 窗口的 predicted_action 和 generated_rgb 与原诊断逐元素完全一致；四个进程均成功编码并推理第二窗口，codec 设备错误未复现 |
+
+结论：当前证据未指向时间错位、缓存数值错误或 VAE 分块重建明显劣化；较大的边界偏差来自生成结果与真实条件的差距。详见 `step2_initial_report.json`、`step2_cache_final.json` 及逐项 JSONL。对照代码 `8ba69fc`，85 项 CPU 回归通过；补充独立缓存验证后 guidance 测试 7/7 通过。
+
+### 9.2 shift 与视频 CFG（已完成）
+
+每行同 8 窗口、136 块。单位：位置/手形 mm；PSNR dB；边界 MAE 为 0…255。手形误差在当前腕局部坐标、对原始 GT 关键点计算。generated 位置已包含累积漂移。
+
+| 历史 / video shift / CFG | 相机块末 | 右/左腕块末 | 右/左手形 | 视频 PSNR | 边界 MAE |
+|---|---:|---:|---:|---:|---:|
+| gt / 5 / 1 | 31.15 | 57.33 / 65.03 | 8.42 / 8.36 | 16.93 | 25.10 |
+| gt / 10 / 1 | 30.99 | 58.00 / 64.40 | 8.31 / 8.30 | 16.88 | 25.49 |
+| gt / 5 / 3 | 31.50 | 57.30 / 65.71 | 8.29 / 8.15 | 17.03 | 24.93 |
+| gt / 5 / 6 | 31.81 | 61.11 / 68.38 | 8.16 / 8.11 | 17.02 | 25.06 |
+| generated / 5 / 1 | 219.97 | 243.13 / 281.79 | 18.93 / 18.08 | 12.22 | 1.91 |
+| generated / 10 / 1 | 156.78 | 196.18 / 254.25 | 18.81 / 18.89 | 12.14 | 1.96 |
+| generated / 5 / 3 | 125.55 | 172.97 / 220.94 | 18.11 / 17.70 | 12.17 | 1.88 |
+| generated / 5 / 6 | 93.93 | 151.20 / 189.81 | 20.28 / 18.28 | 11.95 | 2.00 |
+
+- 不动基线每块从真实起点出发，相机/右腕/左腕块末误差 25.77/44.71/59.67 mm；不等同于自由自回归的无重置基线。
+- 预设 shift 选择指标（gt 双腕块末平均）为 61.1776 vs 61.2039 mm，近乎持平；后续固定 5。shift10 在本批自回归漂移上较好，但像素 PSNR 无改善，不宣称显著优劣。
+- CFG 在本批样本减轻累积漂移，但 GT 单块腕误差没有改善；CFG6 的自回归 PSNR、右手形更差。单靠调 shift/CFG 未解决问题。
+- 每组 `summary.json` 保存逐窗口、逐块和 `chunk17plus` 指标。第17块自回归右/左腕：基线341.19/436.31；shift10为251.11/378.04；CFG3为255.27/340.95；CFG6为205.38/286.03 mm。仅8个第17块，不作大样本结论。
+- 实验目录组名：`baseline_{gt,generated,oracle}`、`shift10_cfg1_{gt,generated}`、`cfg{3,6}_{gt,generated}`。各组固定前三窗口有 `window00…02.mp4`。
+- 官方 Nano 对照见下一节。
+
+### 9.3 官方 Nano 原生 image2video（已完成）
+
+使用未修改的 `cosmos_framework.scripts.inference` 和注册 `Cosmos3-Nano.yaml`，官方预训练权重 `/mnt/checkpoints/Cosmos3-Nano`，同样8个首帧/文本/seed42，273帧、15fps、guidance6、shift10、35步、默认 UniPC 与 diffusion cache；不改写生成循环。关闭一次性冷启动的 torch compile、关闭 guardrail/人脸模糊后处理以记录原始生成像素；没有触发安全拒绝。asset-only overrides 将 VAE 后端、权重和 VLM JSON 指向本地，保留两次资产配置失败日志（云存储凭据路径、官方 loader 改 cwd 后相对 JSON 路径失效）。成功目录 `native_nano_absolute_assets/`，8项官方 `sample_outputs.json` 均为 success。
+
+统一按官方等比例缩放与中心裁切到832×480；GT使用同一源帧，去掉初始条件，合计8×272个future采样帧，先汇总MSE再转dB。读取官方 `output.safetensors`，不从有损MP4反算指标。表中的边界指标为源帧32k到32k+2的相邻帧MAE，与9.1/9.2同一时刻条件重置MAE不同，不能混用。
+
+| 方法 | PSNR | 边界相邻帧MAE | 第17块PSNR |
+|---|---:|---:|---:|
+| AR gt shift5 CFG1 | 17.13 | 24.68 | 17.67 |
+| AR generated shift5 CFG1 | 12.27 | 8.16 | 12.10 |
+| AR generated shift10 CFG1 | 12.20 | 7.89 | 11.86 |
+| AR generated shift5 CFG3 | 12.22 | 8.02 | 11.49 |
+| AR generated shift5 CFG6 | 12.01 | 6.11 | 11.27 |
+| 官方 Nano image2video | 11.84 | 5.76 | 11.28 |
+| 全程保持首帧不动 | 12.71 | 0 | 12.29 |
+| GT | — | 6.50 | — |
+
+原生 Nano 不输出项目57D动作，相机/双腕/手形误差均不适用；它没有AR条件重置，因此同一时刻重置误差也不适用，不填伪造的0。每组每窗口/块的共同像素网格指标和完整表存于 `native_comparison/{metrics00…07,common_grid}.json`；固定前三窗口对比视频为 `window00…02.mp4`，左GT连续30fps、右预测15fps按真实时间显示，无伪造手形投影。
+
+结论：官方原生也不逐帧复现唯一GT未来，静止首帧的PSNR反而更高，不能用PSNR单独判断视觉质量或任务动作正确性。原生与AR同时存在权重、分辨率、时间标签（15 vs 7.5fps）、整段/分块生成、采样器与步数等差异，这是原生能力参照，不能据此单独归因于某项改动。已测证据排除了这8窗口的时间对齐/缓存错误及明显VAE分块劣化；shift/CFG不能解决GT单块腕误差。第5步训练对照等待用户确认，未启动。
+
+本地回放：`http://127.0.0.1:54712/ablation_20260930/`（需本地媒体服务运行）；本地文件 `eval_videos/ar_v0.2/ablation_20260930/`。所有对照保留相同8窗口和固定3个展示样本，不替换失败或不好看的样本。
