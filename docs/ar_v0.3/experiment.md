@@ -390,3 +390,33 @@ W&B API在step495–504有界查询中核实第500步8个原始字段及base/act
 阶段观察：heldout/gt的三档整体光流余弦约.041–.046；sigma=.1的左右腕72.30/58.15mm，比本次.02的76.61/60.99mm低，但仍高于旧lr1e-4/1000的68.09/55.89mm。train16/gt的PSNR17.61–17.67dB和腕误差也尚未达到旧step1000参照。
 
 generated的运动幅值比为.875–.914，较旧两组1.644–1.738更接近GT，但整体方向余弦-.076至-.060，不能将幅值接近1视作运动正确。sigma=.1相比本次.02的全程腕/手形误差更低、PSNR更高（12.535对12.196dB），第17块仍为489.95/352.56mm累计漂移；局部手形27.16/19.43mm仍高于旧lr1e-4的18.35/18.39mm。三档没有消除长历史误差，本次只有500步，不改变训练/默认sigma/停止规则，继续在1000/2000/3000评测同一冻结计划。
+
+## 9. 正式 step1000 checkpoint 与评测
+
+### 9.1 保存与训练统计（2026-10-02）
+
+官方于北京时间07:11:51完成iter_000001000保存，耗时19.18秒；model/trainer/optim/scheduler四类metadata及全部引用storage范围完整。model为886键/8份shard，metadata SHA256 `dbfd98706b8e4a50ac4fd103f534a13b37c9512fa7bd204f5b05e2cae1b45282`。配置SHA沿用第7节。扫描根为 `outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step001000/`；plan SHA `4b8d2ac010026ab075d9bc44d0f50378d00e4e22d1dbb2546784bb00612cf886`，binding SHA `9da5881109b85927a09fd6223437f447719e130e42581beac3c355288c764c40`。绑定时HEAD03a55ca，训练核心仍9eac185，source文件hash逐一匹配。
+
+以下为真实step501–1000逐步等权均值，前500见第8.1节。action为腕权3目标，8个字段仍未加权。
+
+| step段 | video均值 | action均值（腕权3） | total均值 | clip次数 |
+|---|---:|---:|---:|---:|
+| 501–600 | 0.414783 | 0.178155 | 0.592938 | 2 |
+| 601–700 | 0.412998 | 0.177752 | 0.590750 | 0 |
+| 701–800 | 0.410348 | 0.174187 | 0.584535 | 0 |
+| 801–900 | 0.414227 | 0.171667 | 0.585893 | 0 |
+| 901–1000 | 0.408547 | 0.168083 | 0.576630 | 0 |
+
+前/后500步video均值.422053→.412180、action .206227→.173969，8个原始字段均值均下降。501–1000仅step514/515触clip（norm约1.319/1.062），2/500=.4%；preclip norm均值.19193、p95 .32045、最大1.319，无非有限loss/梯度或停止原因，停止规则保持原值。后500步峰值allocated36.232GiB/reserved45.490GiB、驻留15.170–15.202GiB，稳定。
+
+FormalMonitor计算段均值前/后500步14.787→14.740秒；官方wall计时61–500/501–1000为15.388→15.715秒（后段51,968tokens/s、2.558clips/s），wall约增加2.1%。计算段与wall口径分开保留，该差异未归因于评测或其他因素；同节点DF/TF速度对照仍为第6.2节。
+
+W&B API以995≤step<1005、use_cache=false有界查询确认1000步8字段及base/action两路LR与本地exact一致。step1000更新用schedule999的8.4672916273e-5；真实checkpoint scheduler last_epoch1000、_step_count1001、下一更新LR8.4641542344e-5，与官方推进顺序一致。理论回执保持第7节定义。
+
+完整恰好1–1000监控原行SHA `aa80bf9eed08c2e7511ffe8b3774ad9af63786d33ec1754dea1755c5b5302095`，前500原字节与第8节快照一致。来源、官方计时、保存回执、全部raw8/梯度/显存/LR/API证据见 [formal_step1000_training.json](formal_step1000_training.json)（SHA256 `c56d08971c8c0db43d8da098816af8d027768f32d32efd8a315be50517b6a6a9`）。训练loss不能替代heldout质量评测。
+
+![真实前1000步训练统计](figures/formal_step1000_training.png)
+
+### 9.2 三档评测执行与验收
+
+UTC23:16:05，经MCP在Tdebug1 GPU0/1/2启动三档heldout首窗pilot（共3jobs/6NPZ），先验收后推进其余69jobs。实际启动前quota120核/affinity200核、低负载、约1.72TiB cgroup可用内存；目标H800均4MiB/0%且无compute进程。launch请求、wrapper/supervisor PID和各任务日志记录在本步扫描根 `launches/Tdebug1_pilot/`。目前完整96份/9组评测尚未完成，最终结果将在验收及CPU汇总后补入第9.3节。
