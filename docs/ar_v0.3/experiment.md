@@ -105,7 +105,7 @@
 
 用户确认短测后，重新检查实时资源，选两台空闲节点 HSDP 8×2，跨节点 NCCL 内网 TCP；在线 W&B 启动前核验最终配置/环境，启动后通过 API 核实 step/loss 已上传并记录当前 run 链接。沿用 `FormalTrainingMonitor` 与 `StopPolicy`，不改变 OOM 停止规则/预算，不擅自重启。
 
-step 500/1000/2000/3000 每次 heldout8 gt/generated（sigma_small=.02）+固定训练16 gt。全部32窗口、冻结清单hash、320×180整体光流余弦，以及 V0.2 step1000 / lr1e-4 同表方案见 `evaluation_plan.md`。未运行的训练/评测不填虚构结果。
+2026-10-02用户追加推理扫描：step 500/1000/2000/3000 每次 heldout8 gt/generated +固定训练16 gt，各扫 sigma_small={.02,.05,.1}，每checkpoint共96份。冻结清单hash、320×180整体光流余弦，以及 V0.2 step1000 / lr1e-4 同表方案见 `evaluation_plan.md`。未运行的训练/评测不填虚构结果。
 
 以下旧值直接读取 `outputs/maintenance/video_lr_eval_extended_20261001T2229/metrics/` 的 `baseline_{gt,generated}.json`、`lr1000_{gt,generated}.json`、`lr1000_train16_gt.json`，均为17块整体累加的320×180光流口径。V0.3未来每个checkpoint按同一split/mode追加行；旧sigma=0与V0.3主sigma=.02明确区分。未混用旧逐像素余弦数字。
 
@@ -119,3 +119,111 @@ step 500/1000/2000/3000 每次 heldout8 gt/generated（sigma_small=.02）+固定
 | V0.3 / 500、1000、2000、3000 | heldout / 8 | gt | .02 | 待评测 | 待评测 |
 | V0.3 / 500、1000、2000、3000 | heldout / 8 | generated | .02 | 待评测 | 待评测 |
 | V0.3 / 500、1000、2000、3000 | train / 16 | gt | .02 | 待评测 | 待评测 |
+
+## 6. Review 后修订：前缀低噪声 DF
+
+用户review已核对基础三项实现（单遍/梯度/mask/加权/refresh/LR回执），但原waver+shift5历史常为重度加噪，与推理小sigma历史覆盖不足。因此正式训练前必须使用随机低噪声前缀；以最新用户指令及 design §2.5 为准。
+
+最终公式：每sample的真实n_chunks上抽L均匀1..n；块<L的V/A共享每块Uniform[0,sigma_hist_max)低σ，默认histmax=.1；块≥L保持原视频waver/actionlogitnormal +shift5抽样，独立generator不改变原随机顺序，U/S0、全部未来块loss保留。默认开，关闭逐位复现此前V0.3。此前建议.5·u²已被用户更正，不做实现配方。
+
+本节新结果对应新采样，不能把第4节原采样20步视为最终默认配方短测。原结果完整保留作历史记录。
+
+- 实现 commit：`31206d7`，已 push。新增独立 CPU generator，以 seed/optimizer iteration/DP rank/sample ordinal 的稳定哈希派生；相同拓扑、packing 与 iteration 可复现，未宣称弹性 world-size 重排等价。
+- 新CPU/GPU/10k统计回执：`outputs/maintenance/ar_v03_prefix_implementation_20261002/`。CPU regression 43 passed/1 CUDA skipped，sigma 专项12 passed，config/monitor 专项25 passed；原生 CLI dryrun exit=0，最终配置默认 prefix=True/histmax=.1，并支持 CLI 关闭/覆盖。
+- 前缀开/关均覆盖官方小网络真实 GPU training_step 与 noisy flow target 自身/后续/合并梯度，共4 passed（35.04秒）。GPU 前核查 Tdebug6，无其他 compute 进程；使用空闲GPU2。关闭前缀时原有 sigma、timestep 和后续随机数逐位一致；启用时后缀抽样不变，U/S=0，物理sigma直接路由到flow timestep，未重复shift。
+- 新20步目录：`outputs/maintenance/ar_v03_prefix_short_20261001T172706/`。实时确认空闲的 Tdebug4（8×H800、CPU quota120、MemAvailable约1.37TiB）上已完成20/20、exit=0；官方step20 DCP保存25.25秒。
+- 性能参考直接复用第4节已完成的同机V0.2真实20步，路径在新目录 `v02_reference.json` 明确记录，不复制冒充新训练。两组最终输入身份仍须逐rank/step重新相等后才比较；不相等则不报公平速度结论。
+- 新20步checkpoint会先做heldout8 gt/generated三σ扫描，24任务/48NPZ。按固定清单拆成单窗，先一个固定窗口三σpilot（6NPZ）验证完整17块及吞吐，再用空闲GPU并行其余21任务；不减少8窗口。用户已确认短测和正式checkpoint均扫三档；正式每checkpoint96份。
+- 10k直方图及短测实际σ都分三口径：前缀内、逐块、所有后继块的紧前历史位置（排除各样本末块）。前缀内100%<.1，历史汇总约50%加原分布低σ；逐块比例不应固定50%。
+- 正式训练尚未启动。修订后的短测/σ扫描结果须给用户确认，再进入正式HSDP/W&B online阶段。
+
+### 6.1 10,000样本 sigma 直方图
+
+使用真实官方视频 waver/action logitnormal +shift5 后缀，seed42、iteration12、rank0，每sample17块。完整回执为 [prefix_sigma_10000.json](prefix_sigma_10000.json)，SHA256 `3ff2b6db40cfeefcd9117849c50bc67947f95b69d4edb91bf09b6a8dd2191ff8`。L各档548–622个样本，前缀占紧前历史位置49.861875%。每个query块2..17只计其紧前一块一次，排除各sample末块；不按H15的所有可见pair重复计权。
+
+| 统计口径 | 模态 | P(sigma<.02) | P(sigma<.05) | P(sigma<.1) |
+|---|---|---:|---:|---:|
+| 前缀内 | video/action（共享抽样） | 20.158% | 50.258% | 100% |
+| 全体紧前历史位置 | video | 10.134% | 25.293% | 50.348% |
+| 全体紧前历史位置 | action | 10.051% | 25.059% | 49.867% |
+
+逐块P(sigma<.1)如下；前面的块更可能处于随机前缀，末块不可能在前缀内，因此不能要求每个块各自约50%。
+
+| 块 | video % | action % |
+|---:|---:|---:|
+| 1 | 93.85 | 93.79 |
+| 2 | 88.15 | 88.06 |
+| 3 | 82.17 | 82.01 |
+| 4 | 76.63 | 76.30 |
+| 5 | 70.82 | 70.56 |
+| 6 | 65.00 | 64.75 |
+| 7 | 59.10 | 58.70 |
+| 8 | 53.13 | 52.69 |
+| 9 | 47.18 | 46.61 |
+| 10 | 41.55 | 40.92 |
+| 11 | 35.94 | 35.45 |
+| 12 | 30.26 | 29.45 |
+| 13 | 24.26 | 23.46 |
+| 14 | 18.54 | 17.82 |
+| 15 | 12.38 | 11.61 |
+| 16 | 6.60 | 5.69 |
+| 17 | 1.10 | .01 |
+
+![前缀、逐块和全体紧前历史位置的sigma统计](figures/prefix_sigma_10000.png)
+
+附录口径：按H15全部可见历史pair重复计权时，video/action低噪声比例为64.665%/64.322%；它不是用户指定的紧前一块约50%验收口径。
+
+### 6.2 新配方真实 Nano 20步
+
+新run UTC 17:39:56–17:48:12（服务器日志为Shanghai 01:39–01:48）。新目录下 `analyze_compare.py` 读取已完成的新20步及第4节原V0.2真实20步；两个run均exit0，重新核对全部160组rank/step窗口身份和packing metadata相同，412 clips、五档clip均覆盖。160次记录均为单遍1次net前向（V0.2为2次）；7组 raw 梯度全部finite/nonzero，全部stop_reason=null。不是重新运行V0.2，也未复制旧log伪装新run。
+
+| 指标 | 原V0.2两遍 | 新前缀V0.3单遍 | 相对变化 |
+|---|---:|---:|---:|
+| 首步秒/步 | 34.130 | 23.779 | -30.33% |
+| 全20步均值秒/步 | 25.248 | 15.026 | -40.49%（1.68×） |
+| steps6–20均值秒/步 | 24.350 | 14.142 | -41.92%（1.72×） |
+| steps6–20中位数秒/步 | 24.478 | 14.155 | -42.17% |
+| 全程峰值 allocated GiB/卡 | 56.442 | 36.180 | -35.90% |
+| 全程峰值 reserved GiB/卡 | 66.576 | 43.750 | -34.29% |
+
+计时沿用第4节的模型准备、forward/backward、optimizer/scheduler/zero_grad口径，包含只读诊断，不含dataloader/H2D/checkpoint。第20步官方iter_speed包含25.25秒保存，表内用FormalTrainingMonitor排除保存的14.155秒；不混用两种计时。
+
+| 新前缀V0.3 loss | 首5步均值 | 末5步均值 | 降幅 |
+|---|---:|---:|---:|
+| video | .525698 | .456431 | 13.18% |
+| action（腕权3目标） | .554329 | .330059 | 40.46% |
+| total | 1.080027 | .786490 | 27.18% |
+
+低σ会改变训练目标难度，不能拿第4节原高σ的loss绝对值直接作质量比较。8字段仍为未加权原值，完整值见回执。16/20步触发clip，处于100步warmup内，按既定规则不触发正式post-warmup 9/10停止判定；该现象已记录，正式训练不放宽阈值。
+
+实际加噪回执：412 samples、3252真实future blocks；前缀1451块，共享V/A σ中位数.052998、最大.09999790、100%<.1。全部3252个U和3252个S的sigma均为0。2840个紧前历史位置中，前缀替换占51.0915%（理论50%，有限样本z=.543）；video实际sigma≤.1为51.6197%，action为51.0915%，差异来自原后缀偶然低σ。
+
+| 实际短测逐块口径 | 样本数 | video sigma≤.1 % | action sigma≤.1 % |
+|---:|---:|---:|---:|
+| 1 | 412 | 76.21 | 75.97 |
+| 2 | 412 | 55.10 | 54.61 |
+| 3 | 319 | 52.98 | 52.98 |
+| 4 | 319 | 42.95 | 42.32 |
+| 5 | 204 | 57.35 | 57.35 |
+| 6 | 204 | 53.92 | 51.47 |
+| 7 | 204 | 41.67 | 40.20 |
+| 8 | 204 | 30.88 | 30.39 |
+| 9 | 109 | 52.29 | 51.38 |
+| 10 | 109 | 46.79 | 46.79 |
+| 11 | 109 | 35.78 | 35.78 |
+| 12 | 109 | 31.19 | 31.19 |
+| 13 | 109 | 26.61 | 25.69 |
+| 14 | 109 | 15.60 | 14.68 |
+| 15 | 109 | 11.93 | 11.01 |
+| 16 | 109 | 6.42 | 6.42 |
+| 17 | 102 | 0 | 0 |
+
+实际短测混合2/4/8/16/17块样本，逐块表随短clip退出改变分母，所以不像6.1固定17块统计严格递减。直方图按真实加噪sigma生成，排除slot0/pad和重复H15pair；不是按理论抽样替代监控。
+
+完整回执：[prefix_short_receipt.json](prefix_short_receipt.json)。
+
+![新前缀配方20步与原V0.2两遍实测](figures/prefix_short_compare.png)
+
+![实际短测前缀内和紧前历史sigma直方图](figures/prefix_short_sigma_histograms.png)
+
+![实际短测逐块sigma](figures/prefix_short_sigma_perchunk.png)
