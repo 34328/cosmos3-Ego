@@ -329,7 +329,7 @@ W&B API在step495–504有界查询中核实第500步8个原始字段及base/act
 
 ![正式前500步训练曲线及实际资源](figures/formal_step500_training.png)
 
-### 8.2 三档评测进度
+### 8.2 三档评测执行与验收
 
 已按冻结计划绑定实际step500，并在Tdebug1 GPU0/1/2启动三σ首窗pilot（gt/generated共6份）。启动前检查quota120核、约1.74TiB可用内存、低负载及GPU空闲；实际全模型DCP加载成功，单任务DCP加载约141.6–141.8秒。评测包括初始化、采样和导出，因此加载时间单独记录。此阶段训练继续在Tdebug4/2推进，W&B持续online。
 
@@ -337,4 +337,56 @@ W&B API在step495–504有界查询中核实第500步8个原始字段及base/act
 
 通过后，于UTC21:22:35–21:22:55分别经MCP启动Tdebug1/3/5/6的remaining supervisor，每节点8张空闲H800，共32个worker，推进其余69jobs。启动时各节点quota120核、1.36–1.74TiB空闲内存、低负载及所有目标GPU无compute进程；同时核对cgroup实际memory.max/current。每进程BLAS/OpenMP线程1，共享atomic job claim分配窗口，输出和日志独立，未占训练节点或重复派发。四端启动/PID/资源/退出回执在评测根 `launches/`，逐任务状态在 `states/`，worker进度与真实吞吐在 `workers/`。
 
-UTC21:25检查为3/72 jobs成功（pilot共6/96 NPZ）、32 running、37 pending、0失败；训练持续到step592且stop_reason=null。完整96份/9组指标尚未汇总，后续完成后补入本节的整体光流/腕/手形/PSNR及V0.2参照表，不以pilot或训练loss代替完整评测。
+完整GPU阶段已完成72/72 jobs、96/96 NPZ、0失败；全部存档包含17块并通过原生参数/身份/hash验收。CPU汇总在空闲Tdebug3完成，quota120核、affinity200核、约1.37TiB空闲内存、低负载，GPU无compute进程；每worker的BLAS/OpenMP/OpenCV线程1且CUDA为空。三个代表存档serial1与parallel3逐位一致，耗时47.762/18.815秒；复用这3份，再由24workers计算其余93份，计算段69.313秒（1.342份/秒），含来源核查与写出的完整aggregate阶段75.289秒。两阶段均exit0。总共96份、9组、1,632个完整块光流对、52,224个action样本和26,112个future RGB帧，CPU控制器已判定complete。
+
+独立GPU完成审核通过：72任务exit0、96份NPZ完整17块；5个supervisor和35个worker正常退出。remaining的69jobs/90NPZ实际起止为UTC21:22:36.525211–21:35:21.490939，耗时764.966秒、7.059 NPZ/分钟；pilot耗时496.095秒，pilot后人工验收/派发间隔371.505秒。因此整个96份GPU扫描固定wall为1,632.565秒、3.528 NPZ/分钟，含该间隔，不能用扫描完成后仍增长的status elapsed代替。heldout双history任务wall均值444.963秒，train单history任务250.990秒；完整17块sampler-only均值heldout gt88.813秒/generated86.973秒/train gt87.263秒，排除准备/GT VAE/RGB导出，与完整job wall分开保留。全部96份峰值allocated最大35.534GiB。详见 [formal_step500_gpu_completion.json](formal_step500_gpu_completion.json)（SHA256 `f8b08ce07209cf1b3f05e6785d1703c3cd160fcb1abb820b35d7ede86b6fd19c`）。
+
+独立只读指标复核对9组的all/17块/第17块共171个scope从保存的leaf累加量重新合并，腕/手形、MSE后PSNR及pooled整体光流均一致；5个基线与冻结旧report字典逐位一致。工具、plan、binding、snapshot、父清单、NPZ和baseline/audit哈希匹配。UTC21:44:59的真实W&B API查询确认本次run仍running、step666的两路loss继续上传，同时本地step667无STOP，下一里程碑仍待真实保存。
+
+### 8.3 三档完整指标与 V0.2 同口径对照
+
+所有值来自冻结 heldout8 或 train16 的完整17块。光流按320×180整体点积/全局范数聚合；腕部末端相对原始GT，每块等权；手形对原始GT，按action数合并；PSNR先合并MSE再转dB。旧基线均为step1000、历史sigma0，本次为step500、历史sigma {.02,.05,.1}。训练长度、历史噪声及配方不同，以下为阶段诊断，不能据此归因单一改动。
+
+| 模型 / step | 数据 / history | 历史sigma | 光流幅值 / GT | 整体余弦 | 左 / 右腕末端 mm | PSNR dB |
+|---|---|---:|---:|---:|---:|---:|
+| V0.2 lr2e-5 / 1000 | heldout8 / gt | 0 | 1.077061 | 0.103794 | 65.03 / 57.33 | 16.930 |
+| V0.2 lr2e-5 / 1000 | heldout8 / generated | 0 | 1.644089 | -0.016639 | 281.79 / 243.13 | 12.221 |
+| V0.2 lr1e-4 / 1000 | heldout8 / gt | 0 | 1.073728 | 0.035371 | 68.09 / 55.89 | 16.954 |
+| V0.2 lr1e-4 / 1000 | heldout8 / generated | 0 | 1.737592 | 0.015020 | 319.54 / 234.48 | 11.882 |
+| V0.2 lr1e-4 / 1000 | train16 / gt | 0 | 0.814540 | 0.182111 | 39.28 / 50.51 | 17.898 |
+| V0.3 prefix / 500 | heldout8 / gt | 0.02 | 1.048147 | 0.045631 | 76.61 / 60.99 | 16.571 |
+| V0.3 prefix / 500 | heldout8 / generated | 0.02 | 0.913982 | -0.065689 | 358.99 / 286.46 | 12.196 |
+| V0.3 prefix / 500 | train16 / gt | 0.02 | 0.798580 | 0.155789 | 42.92 / 56.37 | 17.609 |
+| V0.3 prefix / 500 | heldout8 / gt | 0.05 | 1.015988 | 0.041053 | 75.59 / 59.23 | 16.608 |
+| V0.3 prefix / 500 | heldout8 / generated | 0.05 | 0.909706 | -0.075805 | 318.11 / 236.98 | 12.402 |
+| V0.3 prefix / 500 | train16 / gt | 0.05 | 0.784866 | 0.151950 | 41.96 / 55.81 | 17.634 |
+| V0.3 prefix / 500 | heldout8 / gt | 0.1 | 0.978880 | 0.044110 | 72.30 / 58.15 | 16.645 |
+| V0.3 prefix / 500 | heldout8 / generated | 0.1 | 0.874987 | -0.060351 | 315.09 / 230.87 | 12.535 |
+| V0.3 prefix / 500 | train16 / gt | 0.1 | 0.755776 | 0.164885 | 41.80 / 55.55 | 17.670 |
+
+| 模型 / step | 数据 / history | 历史sigma | 左 / 右腕旋转 degrees | 左 / 右局部手形 MPJPE mm | 第17块左 / 右腕末端 mm |
+|---|---|---:|---:|---:|---:|
+| V0.2 lr2e-5 / 1000 | heldout8 / gt | 0 | 未汇总 | 8.36 / 8.42 | 37.34 / 43.95 |
+| V0.2 lr2e-5 / 1000 | heldout8 / generated | 0 | 未汇总 | 18.08 / 18.93 | 436.31 / 341.19 |
+| V0.2 lr1e-4 / 1000 | heldout8 / gt | 0 | 未汇总 | 8.31 / 8.21 | 41.38 / 40.60 |
+| V0.2 lr1e-4 / 1000 | heldout8 / generated | 0 | 未汇总 | 18.35 / 18.39 | 472.79 / 320.32 |
+| V0.2 lr1e-4 / 1000 | train16 / gt | 0 | 未汇总 | 7.22 / 8.27 | 30.05 / 33.05 |
+| V0.3 prefix / 500 | heldout8 / gt | 0.02 | 26.06 / 24.18 | 8.89 / 8.46 | 47.72 / 48.20 |
+| V0.3 prefix / 500 | heldout8 / generated | 0.02 | 92.51 / 71.51 | 36.77 / 29.77 | 577.95 / 500.75 |
+| V0.3 prefix / 500 | train16 / gt | 0.02 | 23.30 / 28.82 | 7.90 / 8.96 | 30.98 / 34.11 |
+| V0.3 prefix / 500 | heldout8 / gt | 0.05 | 25.52 / 23.96 | 8.87 / 8.53 | 40.89 / 37.05 |
+| V0.3 prefix / 500 | heldout8 / generated | 0.05 | 97.06 / 59.72 | 33.36 / 22.62 | 508.77 / 377.39 |
+| V0.3 prefix / 500 | train16 / gt | 0.05 | 23.52 / 28.84 | 8.06 / 9.14 | 30.86 / 32.62 |
+| V0.3 prefix / 500 | heldout8 / gt | 0.1 | 24.33 / 23.65 | 8.71 / 8.43 | 40.99 / 37.20 |
+| V0.3 prefix / 500 | heldout8 / generated | 0.1 | 86.34 / 61.58 | 27.16 / 19.43 | 489.95 / 352.56 |
+| V0.3 prefix / 500 | train16 / gt | 0.1 | 23.24 / 28.69 | 8.11 / 9.13 | 32.34 / 33.44 |
+
+旧汇总未记录腕旋转的组标记为“未汇总”，不编造数值。旧lr2e-5两组的shift/CFG/history sigma来自历史源码与启动审计，NPZ本身缺显式字段；保留旧审计限制。lr1e-4三组NPZ显式记录shift5/CFG1/history sigma0。
+
+![完整step500三档与旧step1000的1–17块曲线](figures/formal_step500_sigma_scan.png)
+
+完整逐窗原始报告为评测根 `metrics/comparison.json`（SHA256 `5570f7d61d818fa7caf8dbf4f4cab84573a2d49e0ef2ed28b526290d5053cbc9`，14,481,347 bytes）。[formal_step500_metrics.json](formal_step500_metrics.json) 保留全部9组与5个基线的1–17块指标、存档身份/SHA、source/配置/清单/tool hash、CPU资源和验收回执，省略逐窗重复metadata；原始逐窗结果未删除。
+
+阶段观察：heldout/gt的三档整体光流余弦约.041–.046；sigma=.1的左右腕72.30/58.15mm，比本次.02的76.61/60.99mm低，但仍高于旧lr1e-4/1000的68.09/55.89mm。train16/gt的PSNR17.61–17.67dB和腕误差也尚未达到旧step1000参照。
+
+generated的运动幅值比为.875–.914，较旧两组1.644–1.738更接近GT，但整体方向余弦-.076至-.060，不能将幅值接近1视作运动正确。sigma=.1相比本次.02的全程腕/手形误差更低、PSNR更高（12.535对12.196dB），第17块仍为489.95/352.56mm累计漂移；局部手形27.16/19.43mm仍高于旧lr1e-4的18.35/18.39mm。三档没有消除长历史误差，本次只有500步，不改变训练/默认sigma/停止规则，继续在1000/2000/3000评测同一冻结计划。
