@@ -209,3 +209,22 @@ video loss 在约 100 步后基本不再下降；action loss 持续缓慢下降�
 逐块曲线：第1块三组完全重合（右腕46.52 mm、PSNR14.99）；到第3块pred_history视频已降到12.24 dB，与generated的12.30接近，之后约11.6–12.7波动；gt保持约15–19 dB。pred_history右腕升高后波动，并非随块数单调增长；generated呈明显累积增长。第17块右腕gt/pred_history/generated为43.95/85.94/341.19 mm，PSNR为17.43/12.23/12.06 dB。
 
 产物：新目录 `comparison.json`、`runtime_validation.json`、`curves.csv/json/png/svg`（1…17块、每块8窗口）；完整逐窗口指标在 `inference_pred_history/summary.json`。网页已加入相同前三窗口的pred_history视频与曲线，位于本地 `eval_videos/ar_v0.2/ablation_20260930/pred_history/`。本次页面改为内嵌统计数据，可直接打开本地 `index.html`，不依赖HTTP读取JSON；本会话网络权限不允许重新监听54712端口。未启动任何训练。
+
+## 10. 过拟合与历史视频加噪并行对照（2026-10-01）
+
+用户授权两组同时启动；本节区分计划、已通过测试和实际运行结果，不把未完成评测写成结论。
+
+| 组 | 数据和目标 | 步数/保存 | 节点计划 |
+|---|---|---|---|
+| overfit16_clean_history | train split 固定16个273帧窗口，16个不同episode；不加历史噪声 | 300步，每100步保存并验收 | Tdebug1 + Tdebug3，16卡 |
+| history_video_noise_p50_s020 | 完整原train split；每sample 50%概率扰动历史视频，每历史chunk独立σ~Uniform(0,0.2) | 1000步，每500步保存 | Tdebug2 + Tdebug6，16卡 |
+
+两组从同一官方Nano初始化，复用官方 `launch_ar_v0_2.sh` → Cosmos Trainer；HSDP shard8/replicate2，C4/K8、历史15chunk、60K预算、PCA15和两套57D统计不变。加噪组除新增历史增强和job身份外，配置逐项对照原正式配方一致：LR2e-5、指定五组×5、warmup100/cycle1000/f_min0.1、联合loss系数1、确定性cuDNN、clip tiers=(273,257,129,65,33)。过拟合组仅另改窗口白名单、max_iter=300、save_iter=100、num_workers=1；避免16窗口在16×3个iterable worker间出现空分片，其学习率曲线保留原cycle1000。原始全量audit和normalizer绑定hash不改，不用小集合重新拟合统计。
+
+增强公式 `(1−σ)·V + σ·ε`，ε为标准高斯。仅在teacher-forcing条件前向的独立video副本施加；U、S、历史action输入及GT监督目标不改。对应video timestep=σ×官方训练时间尺度；官方 `mse_loss_indexes` 在该条件前向中只用于timestep路由，该副本不参与loss计算。独立seed由train seed/iteration/rank派生，不消耗原目标噪声RNG；相同历史chunk供后续query读取同一份噪声。σ=0返回原pack，走原数值路径。
+
+准备/测试目录 `outputs/maintenance/training_diagnostics_20261001/`。固定训练清单 `cosmos3_joint_video_hand_pose/configs/overfit16_windows_20261001.json`，SHA256 `7e088380b461fce4ea34ec6aeea141d445d1aff6c3acf81f2cbfb401a6bb9ee4`；train/heldout不交叉，保留原8窗口hash `8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d`。完整seed、episode列表、原审计hash在该目录manifest.json。
+
+已通过回归：CPU主组123通过/1项GPU测试跳过，补充组27通过/1项GPU测试跳过，GPU 7通过。覆盖C=1…4与尾块、σ=0官方网络输出逐位一致、σ>0仅直接修改历史V及其timestep、目标/动作/U不变、概率抽样与独立RNG，以及配方全量等价和模型条件/目标hook。CPU组合配置检查及16个独立episode/精确窗口核验通过；GPU数值测试使用小骨干和官方网络/attention模块，不冒充完整Nano训练生命周期验收。
+
+评测：过拟合每100步在固定16训练窗口检查gt/oracle，并对照“不动”与原step1000；最终两组模型在同一8个heldout窗口、同一seed、shift5/CFG1、C4联合30步上扫历史σ={0,0.05,0.1,0.2}和gt/pred_history/generated。原step1000也做同样网格，已有σ=0结果经hash核对复用。推理噪声只在完成chunk写入历史KV时施加，保存/显示的预测及下一块U/S构造仍用未加噪的结果；不额外对当前目标去噪加噪。逐块曲线报告相机/左右腕、手形、PSNR、边界跳变，chunk17单列；主指标使用原始GT。新输出独立，不覆盖9节诊断。W&B必须online，并以API核实真实step/loss后记录链接。训练尚未启动。

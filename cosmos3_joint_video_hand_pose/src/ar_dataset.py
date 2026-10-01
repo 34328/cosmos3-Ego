@@ -177,6 +177,24 @@ def expand_state_group(per_frame: torch.Tensor, tokens_per_latent: int) -> torch
     return torch.cat([per_frame[:1].repeat(*repeat), per_frame[1:]], dim=0)
 
 
+def select_fixed_windows(rows, items):
+    """Whitelist exact audited training windows without rebinding normalizer hashes."""
+    by_id = {f"{r['episode_hash']}:{r['span_index']}:{r['start_idx']}:{r['end_idx']}": r for r in rows}
+    selected, seen = [], set()
+    for item in items:
+        sid, start = item["sample_id"], item["start"]
+        if (sid, start) in seen or sid not in by_id:
+            raise ValueError("duplicate or unknown fixed training window")
+        row = by_id[sid]
+        if type(start) is not int or start not in row.get("_valid_starts", ()) or item["frames"] != row["_clip_frames"]:
+            raise ValueError("fixed training window is not in the original audit")
+        seen.add((sid, start))
+        selected.append(dict(row, _valid_starts=[start]))
+    if not selected:
+        raise ValueError("empty fixed training windows")
+    return selected
+
+
 class EgoVerseARSegmentDataset(Dataset):
     """Map-style manifest dataset producing unpadded 57D AR clips."""
 
@@ -202,6 +220,7 @@ class EgoVerseARSegmentDataset(Dataset):
         future_normalizer: str | Path | None = None,
         right_codec: str | Path | None = None,
         left_codec: str | Path | None = None,
+        fixed_windows_manifest: str | Path | None = None,
     ):
         if prompt_mode not in PROMPT_MODES:
             raise ValueError(f"unsupported prompt mode {prompt_mode!r}; expected one of {PROMPT_MODES}")
@@ -330,6 +349,10 @@ class EgoVerseARSegmentDataset(Dataset):
             self.tier_counts[str(row["_clip_frames"])] += 1
         if not self.rows:
             raise ValueError(f"no {split!r} segment is long enough for the smallest clip tier")
+        if fixed_windows_manifest is not None:
+            if split != "train":
+                raise ValueError("fixed training subset must not restrict heldout evaluation")
+            self.rows = select_fixed_windows(self.rows, json.loads(Path(fixed_windows_manifest).read_text()))
 
     def _init_fixed(self, state_path, future_path, manifest_path, codec_paths,
                     episodes_path, segments_path, split):
@@ -628,6 +651,7 @@ def get_egoverse_ar_dataset(
     action_representation: str | None = None,
     right_codec: str | None = None,
     left_codec: str | None = None,
+    fixed_windows_manifest: str | None = None,
 ):
     from cosmos_framework.data.generator.action.datasets.action_sft_dataset import ActionIterableShuffleDataset
     from cosmos_framework.data.generator.action.utils.transforms import ActionTransformPipeline
@@ -658,6 +682,7 @@ def get_egoverse_ar_dataset(
         future_normalizer=future_normalizer,
         right_codec=right_codec,
         left_codec=left_codec,
+        fixed_windows_manifest=fixed_windows_manifest,
     )
     transform = ActionTransformPipeline(
         pad_keys=[],

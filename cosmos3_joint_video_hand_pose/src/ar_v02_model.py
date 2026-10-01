@@ -18,7 +18,8 @@ class EgoVerseARV02Model(EgoVerseARModel):
         # preserves the last partial chunk, including every future action row.
         return False
 
-    def __init__(self, config, chunk_state_conditioning=True, seed=42, action_representation="legacy_local_delta_absolute_hand_v1"):
+    def __init__(self, config, chunk_state_conditioning=True, seed=42, action_representation="legacy_local_delta_absolute_hand_v1",
+                 history_video_noise_prob=0.0, history_video_noise_sigma_max=0.2):
         if action_representation not in ("legacy_local_delta_absolute_hand_v1", "fixed_camera_wrist_local_delta_latent_v1"):
             raise ValueError("unsupported action representation")
         self.action_representation = action_representation
@@ -37,6 +38,10 @@ class EgoVerseARV02Model(EgoVerseARModel):
         self.chunk_state_conditioning = True
         self._joint_layout = None
         self._joint_layouts = []
+        if not 0 <= history_video_noise_prob <= 1 or not 0 <= history_video_noise_sigma_max <= 1:
+            raise ValueError("invalid history-video noise settings")
+        self.history_video_noise_prob = float(history_video_noise_prob)
+        self.history_video_noise_sigma_max = float(history_video_noise_sigma_max)
 
     def _sample_step_context(self, iteration: int) -> ARStepContext:
         """V0.2 training uses a fixed four-latent chunk and 15-chunk history."""
@@ -78,6 +83,7 @@ class EgoVerseARV02Model(EgoVerseARModel):
         return result
 
     def _prepare_training_data(self, data_batch, iteration):
+        self._history_noise_iteration = int(iteration)
         if self._ar_step is None or self._ar_step.window != 15:
             raise ValueError("choose C and H=15 before preparation")
         versions = data_batch.get("ar_layout_version")
@@ -311,6 +317,16 @@ class EgoVerseARV02Model(EgoVerseARModel):
         return memory
 
     def denoise(self, net=None, data_batch_packed=None, memory=None, video_temporal_causal=None):
+        if (self.training and getattr(memory, "pass_number", None) == 1
+                and getattr(self, "history_video_noise_prob", 0) > 0):
+            from .ar_v02_history_noise import sample_history_sigmas, history_noise_pack
+            rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
+            seed = (self.ar_seed * 1_000_003 + self._history_noise_iteration) * 4099 + rank
+            sigmas, generator = sample_history_sigmas(self._joint_layouts,
+                probability=self.history_video_noise_prob, sigma_max=self.history_video_noise_sigma_max,
+                seed=seed, device=data_batch_packed.vision.tokens[0].device)
+            data_batch_packed = history_noise_pack(data_batch_packed, sigmas, generator=generator,
+                max_timestep=self.rectified_flow_video.noise_scheduler.config.num_train_timesteps)
         from .ar_v02_compact import compact_joint_targets, restore_joint_predictions, CompactJointMemory
 
         compact = (

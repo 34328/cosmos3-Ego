@@ -9,7 +9,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WORKDIR="${WORKDIR:-$PROJECT_ROOT}"
 TRAINING_MODULE="${TRAINING_MODULE:-cosmos3_joint_video_hand_pose.src.train}"
 TRAINING_PYTHONPATH="${TRAINING_PYTHONPATH:-$PROJECT_ROOT:$PROJECT_ROOT/packages/cosmos3}"
-TOML_FILE="$PROJECT_ROOT/cosmos3_joint_video_hand_pose/configs/ar_v0_2_fixed_camera.toml"
+TOML_FILE="${TOML_FILE:-$PROJECT_ROOT/cosmos3_joint_video_hand_pose/configs/ar_v0_2_fixed_camera.toml}"
 
 : "${BASE_CHECKPOINT_PATH:=/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp}"
 : "${WAN_VAE_PATH:=/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth}"

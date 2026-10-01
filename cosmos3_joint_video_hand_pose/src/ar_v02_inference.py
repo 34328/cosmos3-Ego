@@ -175,6 +175,12 @@ class JointARSampler:
                     mark_modality_as_clean_condition(modality)
                 else:
                     modality.timesteps.fill_(float(sigma) * flow.noise_scheduler.config.num_train_timesteps)
+        if phase == "refresh" and getattr(self, "history_video_sigma", 0) > 0:
+            from .ar_v02_history_noise import history_noise_pack
+            generator = torch.Generator(device=video.device).manual_seed(self._history_noise_seed + chunk)
+            packed = history_noise_pack(packed,
+                [torch.full((packed.vision.tokens[0].shape[2],), self.history_video_sigma, device=video.device)],
+                generator=generator, max_timestep=self.model.rectified_flow_video.noise_scheduler.config.num_train_timesteps)
         if self._cache_phase != (chunk, phase):
             self.cache.begin(indexes, chunk=chunk, capture=capture, include_text=initial)
             self._cache_phase = (chunk, phase)
@@ -208,6 +214,7 @@ class JointARSampler:
         verify_cache=False,
         video_schedule=None,
         action_schedule=None,
+        history_video_sigma=0.0,
     ):
         if steps != JOINT_STEPS:
             raise ValueError("AR v0.2 requires exactly 30 joint Euler steps")
@@ -215,6 +222,12 @@ class JointARSampler:
             raise ValueError("unsupported history mode")
         if verify_cache and not use_cache:
             raise ValueError("verify_cache requires use_cache")
+        if not 0 <= history_video_sigma <= 1:
+            raise ValueError("history_video_sigma must be finite and in [0,1]")
+        if history_video_sigma and (not use_cache or verify_cache):
+            raise ValueError("history noise currently requires persistent cache without clean-reference verification")
+        self.history_video_sigma = float(history_video_sigma)
+        self._history_noise_seed = int(seed) * 1_000_003 + 17
         device = self.gt_video.device
         generator = torch.Generator(device=device).manual_seed(seed)
         vr, vc, _ = self.layout.video_metadata(device=device)

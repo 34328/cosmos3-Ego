@@ -454,6 +454,7 @@ def sample(args):
             episodes_manifest=str(args.episodes_manifest),
             segments_manifest=str(args.segments_manifest),
             split=args.split,
+            fixed_windows_manifest=None,
         )
         raw = dataset.dataset
         if not raw.chunk_camera_mode:
@@ -522,6 +523,7 @@ def sample(args):
                 video, action = sampler.sample(
                     history=history, seed=item["seed"], use_cache=not args.no_cache, verify_cache=args.verify_cache,
                     video_schedule=flow_sigmas(JOINT_STEPS, video_shift),
+                    history_video_sigma=getattr(args, "history_video_sigma", 0.0),
                 )
                 rgb = decode_video_chunks(model, sampler.layout, video)
                 _, gt_future, _ = sampler.layout.unpack_action(sampler.gt_action)
@@ -532,6 +534,7 @@ def sample(args):
                     history=history,
                     seed=item["seed"],
                     video_shift=video_shift, action_shift=5.0,
+                    history_video_sigma=getattr(args, "history_video_sigma", 0.0),
                     video_guidance=video_guidance, action_guidance=1.0,
                     source_offset=item["start"],
                     source_fps=fps,
@@ -604,6 +607,8 @@ def parser():
     run.add_argument("--limit", type=int, help="explicit subset of the frozen list, recorded in metadata")
     run.add_argument("--no-cache", action="store_true")
     run.add_argument("--video-shift", type=float, default=5.0)
+    run.add_argument("--history-video-sigma", type=float, default=0.0,
+                     help="video-only noise when committing completed chunks to history; U/S/action stay clean")
     run.add_argument("--video-guidance", type=float, default=1.0,
                      help="text CFG on video only; action retains conditional velocity")
     run.add_argument(

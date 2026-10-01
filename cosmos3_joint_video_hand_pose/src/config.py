@@ -361,6 +361,30 @@ ConfigStore.instance().store(
 )
 
 
+def _history_noise_experiment():
+    experiment = _ar_v02_fixed_camera_experiment()
+    experiment["model"].update(history_video_noise_prob=0.5, history_video_noise_sigma_max=0.2)
+    experiment["job"].update(group="ar_v0_2_training_diagnostics", name="history_video_noise_p50_s020")
+    return experiment
+
+
+def _overfit16_experiment():
+    experiment = _ar_v02_fixed_camera_experiment()
+    experiment["job"].update(group="ar_v0_2_training_diagnostics", name="overfit16_clean_history")
+    experiment["trainer"]["max_iter"] = 300
+    experiment["checkpoint"]["save_iter"] = 100
+    # Sixteen episodes / sixteen DP ranks: one worker avoids empty iterable shards.
+    experiment["dataloader_train"]["dataloader"]["num_workers"] = 1
+    experiment["dataloader_train"]["dataloader"]["datasets"]["egoverse"]["dataset"].update(
+        fixed_windows_manifest=str(COSMOS_REPO_ROOT / "cosmos3_joint_video_hand_pose/configs/overfit16_windows_20261001.json"))
+    return experiment
+
+
+for _name, _factory in (("history_video_noise", _history_noise_experiment), ("overfit16", _overfit16_experiment)):
+    ConfigStore.instance().store(group="experiment", package="_global_",
+        name="rbs_wam_ar_v0_2_" + _name, node=_factory())
+
+
 def make_config():
     """Expose the native Cosmos config factory required by inference loaders."""
     from cosmos_framework.configs.base.config import make_config as make_base_config
