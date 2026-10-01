@@ -281,3 +281,22 @@
 ![新step20三sigma扫描：动作漂移与整体光流](figures/prefix_sigma_scan.png)
 
 截至本节记录完成，正式训练尚未启动。本轮采样修订、20步及48份扫描结果先交用户确认，再执行双节点HSDP 8×2 / online W&B与API核实。停止规则、token预算、数据及V0.2历史产物均保持原约定。
+
+## 7. 前缀均匀低噪声 DF 正式训练启动（2026-10-02）
+
+用户确认“最后没问题了 就开始训练吧”后，正式训练已启动。运行名为 `formal_prefix_uniform_t273_20261001T182754Z`，实际输出目录为 `outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z/`；训练代码源提交 `9eac1859d2a94c6a4c41d12dee1f2ea92957bbdf`。从官方 Cosmos3-Nano DCP 加载模型，使用官方启动器、Trainer、优化器、调度器、checkpoint 和 W&B 生命周期，无自动重启。正式实际配置 SHA256 为 `e7c5ab0150300247f139405470c16cbd668a8f22a8ce0cecf97795bda952ae66`。
+
+- Tdebug4 rank0 / Tdebug2 rank1，各8张H800，HSDP shard8×replicate2、CP1；两端启动UTC分别为 `2026-10-01T18:48:10.985850+00:00`、`18:48:15.349632+00:00`（北京时间10月2日02:48）。启动前两端8卡均4MiB/0%且无compute进程，使用lzh；CPU quota120核、充足空闲内存及低负载已检查。
+- master `10.3.12.21:29843`，另一端 `10.3.12.18`；`NCCL_IB_DISABLE=1`、`NCCL_NET=Socket`、`NCCL_SOCKET_IFNAME=eth0`。实际两端NCCL日志确认Socket使用上述内网IP，16-rank world正常建立；此前双向TCP和2-rank CPU Gloo测试通过。节点分别经MCP启动，没有节点间SSH。
+- 实际snapshot为online、max_iter3000/save_iter500、grad_accum1；单遍DF、prefix开启/Uniform[0,.1)、默认推理sigma_small=.02、57维腕权3，以及原有PCA15/C4/K8/H15/数据/clip/联合30步均按设计生效。正式配置没有短测回调或20步覆盖。
+- 正式实际学习率回执：step0=0、step100=1e-4、step1500=6.689486180048961e-5、step3000=3e-5。实际优化器将default及五个新模块放在同倍率组，412个parameter tensors，initial_lr约1e-4、step0 actual_lr=0；启动前CPU官方dryrun exit0。
+
+本次在线记录：[W&B b7fdsq94](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/b7fdsq94)，entity `alexlzh431564`、project `joint_video_hand_pose`、group `ar_v0_3`。2026-10-01T18:54:23Z的API查询确认本次run处于running，真实step1–5的video/action loss均已上传且有限；18:55:17Z另行确认step1–8的8个action字段原始未加权loss完整上传。没有把本地日志/run ID当作在线上传证明。
+
+首10步启动验收：全部loss和梯度范数有限，无STOPPED/停止原因。首步计算27.896秒，step2–10平均15.986秒；峰值allocated36.224GiB、reserved45.395GiB。首10步均触发clip，尚在100步warmup内，既定post-warmup判定和其他停止阈值保持原值。该统计仅描述双节点正式启动，不能直接代替第6.2节同节点单遍/两遍20步对照，也不能判断最终生成质量。
+
+完整启动、实际配置/学习率、首10步和两项API证据见 [formal_startup_receipt.json](formal_startup_receipt.json)。原始启动与API回执、两端独立console/正式日志保存在 `outputs/maintenance/ar_v03_formal_preflight_20261001T182754Z/`。
+
+后续跟进已建立当前对话heartbeat `ar-v0-3`，每10分钟检查真实训练状态、停止规则和W&B上传。正式评测持久计划根 `outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/`；500/1000/2000/3000每个checkpoint均扫描sigma_small {.02,.05,.1}：heldout8的gt/generated、训练固定16窗的gt，合计每次72jobs/96NPZ，四次288jobs/384NPZ。计划准备时四个checkpoint尚未保存、0绑定、0评测GPU启动，不预先伪造checkpoint绑定。
+
+评测只在实际官方保存标记、四类DCP metadata及所有storage范围完整后绑定；优先使用Tdebug1/3/5/6空闲资源，排除训练中的Tdebug4/2。先三档heldout首窗pilot共6份验收，再推进其余69jobs；CPU串行/并行一致性检查后按24workers汇总96份/9组。持久claim和阶段记录阻止重复派发，失败不自动覆盖/重试。光流仍为320×180 pooled整体余弦，腕/手形对原始GT、PSNR先合并MSE，并与V0.2 step1000和lr1e-4组及train16参照同表。正式结果在对应checkpoint实际完成后逐项追加，保留源、配置及清单hash。
