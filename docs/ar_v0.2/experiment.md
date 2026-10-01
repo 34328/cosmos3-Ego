@@ -227,4 +227,16 @@ video loss 在约 100 步后基本不再下降；action loss 持续缓慢下降�
 
 已通过回归：CPU主组123通过/1项GPU测试跳过，补充组27通过/1项GPU测试跳过，GPU 7通过。覆盖C=1…4与尾块、σ=0官方网络输出逐位一致、σ>0仅直接修改历史V及其timestep、目标/动作/U不变、概率抽样与独立RNG，以及配方全量等价和模型条件/目标hook。CPU组合配置检查及16个独立episode/精确窗口核验通过；GPU数值测试使用小骨干和官方网络/attention模块，不冒充完整Nano训练生命周期验收。
 
-评测：过拟合每100步在固定16训练窗口检查gt/oracle，并对照“不动”与原step1000；最终两组模型在同一8个heldout窗口、同一seed、shift5/CFG1、C4联合30步上扫历史σ={0,0.05,0.1,0.2}和gt/pred_history/generated。原step1000也做同样网格，已有σ=0结果经hash核对复用。推理噪声只在完成chunk写入历史KV时施加，保存/显示的预测及下一块U/S构造仍用未加噪的结果；不额外对当前目标去噪加噪。逐块曲线报告相机/左右腕、手形、PSNR、边界跳变，chunk17单列；主指标使用原始GT。新输出独立，不覆盖9节诊断。W&B必须online，并以API核实真实step/loss后记录链接。训练尚未启动。
+评测：过拟合每100步在固定16训练窗口检查gt/oracle，并对照“不动”与原step1000；最终两组模型在同一8个heldout窗口、同一seed、shift5/CFG1、C4联合30步上扫历史σ={0,0.05,0.1,0.2}和gt/pred_history/generated。原step1000也做同样网格，已有σ=0结果经hash核对复用。推理噪声只在完成chunk写入历史KV时施加，保存/显示的预测及下一块U/S构造仍用未加噪的结果；不额外对当前目标去噪加噪。逐块曲线报告相机/左右腕、手形、PSNR、边界跳变，chunk17单列；主指标使用原始GT。新输出独立，不覆盖9节诊断。W&B必须online，并以API核实真实step/loss后记录链接。实际启动记录如下。
+
+
+实际启动：2026-10-01 10:46（北京时间），代码commit `d8a3ee9dc443fc90f8b7df9297f048bbd559b24a`，已push到origin/ar-video-action。四节点启动前8卡均空闲且无计算进程，NCCL走eth0/TCP、IB关闭。两组实际optimizer分组校验通过：基础初始LR≈2e-5，五个指定组≈1e-4；warmup起点实际LR=0，符合原配方。
+
+| 运行 | 输出根目录 | 在线W&B |
+|---|---|---|
+| 16窗口过拟合 | `outputs/joint_video_hand_pose/ar_v0_2/overfit16_20261001T1045` | [overfit16_clean_history](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/uksp0fsg) |
+| 历史视频加噪 | `outputs/joint_video_hand_pose/ar_v0_2/history_video_noise_20261001T1045` | [history_video_noise_p50_s020](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/rek6cap5) |
+
+W&B API已返回两组真实iteration及`loss/video_raw`、`loss/action_raw`、`loss/total`和8项字段loss，证据在准备目录`wandb_verification.json`；不只是本地run ID。10:57检查：过拟合17/300，video/action=0.2233/0.1719，global batch16，约21.1s/同步训练步，峰值allocated49.27/reserved58.56GiB；加噪15/1000，video/action=0.2683/0.2651，global batch39（动态packing），约24.8s/同步训练步，峰值allocated55.72/reserved71.64GiB。两组均无stop_reason；warmup裁剪率100%按原规则仅记录，不能把前期loss变化当作效果验收。
+
+评测同时在Tdebug4/Tdebug5空闲8卡启动原step1000的σ=.05/.1网格；剩余σ=.2、训练窗口对照及新checkpoint评测由同目录`evaluation_plan.json`冻结，`eval_watcher.py`核实官方保存完成标记与本节点GPU空闲后派发原生项目评测入口。输出在`eval/<group>/`，完成标记、逐窗口指标和视频均独立保存；当前尚无完整评测结论。每100步保存的过拟合checkpoint会分别验收，最终两组四个σ和三种历史模式均需完成，不能用单组/单窗口代替全网格。线程继续每30分钟跟进并同步本节；后台检测逐步执行，不受汇报频率影响。
