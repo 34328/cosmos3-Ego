@@ -116,9 +116,9 @@
 | V0.2 lr1e-4 / 1000 | heldout / 8 | gt | 0 | 1.073728 | 0.035371 |
 | V0.2 lr1e-4 / 1000 | heldout / 8 | generated | 0 | 1.737592 | 0.015020 |
 | V0.2 lr1e-4 / 1000 | train / 16 | gt | 0 | 0.814540 | 0.182111 |
-| V0.3 / 500、1000、2000、3000 | heldout / 8 | gt | .02 | 待评测 | 待评测 |
-| V0.3 / 500、1000、2000、3000 | heldout / 8 | generated | .02 | 待评测 | 待评测 |
-| V0.3 / 500、1000、2000、3000 | train / 16 | gt | .02 | 待评测 | 待评测 |
+| V0.3 / 500、1000、2000、3000 | heldout / 8 | gt | .02/.05/.1（各自一行） | 待评测 | 待评测 |
+| V0.3 / 500、1000、2000、3000 | heldout / 8 | generated | .02/.05/.1（各自一行） | 待评测 | 待评测 |
+| V0.3 / 500、1000、2000、3000 | train / 16 | gt | .02/.05/.1（各自一行） | 待评测 | 待评测 |
 
 ## 6. Review 后修订：前缀低噪声 DF
 
@@ -132,8 +132,8 @@
 - 新CPU/GPU/10k统计回执：`outputs/maintenance/ar_v03_prefix_implementation_20261002/`。CPU regression 43 passed/1 CUDA skipped，sigma 专项12 passed，config/monitor 专项25 passed；原生 CLI dryrun exit=0，最终配置默认 prefix=True/histmax=.1，并支持 CLI 关闭/覆盖。
 - 前缀开/关均覆盖官方小网络真实 GPU training_step 与 noisy flow target 自身/后续/合并梯度，共4 passed（35.04秒）。GPU 前核查 Tdebug6，无其他 compute 进程；使用空闲GPU2。关闭前缀时原有 sigma、timestep 和后续随机数逐位一致；启用时后缀抽样不变，U/S=0，物理sigma直接路由到flow timestep，未重复shift。
 - 新20步目录：`outputs/maintenance/ar_v03_prefix_short_20261001T172706/`。实时确认空闲的 Tdebug4（8×H800、CPU quota120、MemAvailable约1.37TiB）上已完成20/20、exit=0；官方step20 DCP保存25.25秒。
-- 性能参考直接复用第4节已完成的同机V0.2真实20步，路径在新目录 `v02_reference.json` 明确记录，不复制冒充新训练。两组最终输入身份仍须逐rank/step重新相等后才比较；不相等则不报公平速度结论。
-- 新20步checkpoint会先做heldout8 gt/generated三σ扫描，24任务/48NPZ。按固定清单拆成单窗，先一个固定窗口三σpilot（6NPZ）验证完整17块及吞吐，再用空闲GPU并行其余21任务；不减少8窗口。用户已确认短测和正式checkpoint均扫三档；正式每checkpoint96份。
+- 性能参考直接复用第4节已完成的同机V0.2真实20步，路径在新目录 `v02_reference.json` 明确记录，不复制冒充新训练。两组输入身份已逐rank/step重新核对，160组全部相同，才生成6.2的比较结果。
+- 新20步checkpoint的heldout8 gt/generated三σ扫描已完成24任务/48NPZ。固定清单拆成单窗，先一个固定窗口三σpilot（6NPZ）验证完整17块及吞吐，再并行其余21任务，不减少8窗口。用户确认短测和正式checkpoint均扫三档；正式每checkpoint96份。
 - 10k直方图及短测实际σ都分三口径：前缀内、逐块、所有后继块的紧前历史位置（排除各样本末块）。前缀内100%<.1，历史汇总约50%加原分布低σ；逐块比例不应固定50%。
 - 正式训练尚未启动。修订后的短测/σ扫描结果须给用户确认，再进入正式HSDP/W&B online阶段。
 
@@ -188,6 +188,8 @@
 
 计时沿用第4节的模型准备、forward/backward、optimizer/scheduler/zero_grad口径，包含只读诊断，不含dataloader/H2D/checkpoint。第20步官方iter_speed包含25.25秒保存，表内用FormalTrainingMonitor排除保存的14.155秒；不混用两种计时。
 
+新短测增加实际sigma捕获，旧V0.2参考没有这项诊断；因此表为两次完整短测的实测速度，未宣称完全相同诊断开销的纯内核benchmark。新sigma_diagnostic_seconds在160条rank/step记录中均值.552540秒，包含等待已经提交的GPU准备工作同步，不能简单从step时间扣除后当作生产速度；正式双节点速度须在正式运行中另测。
+
 | 新前缀V0.3 loss | 首5步均值 | 末5步均值 | 降幅 |
 |---|---:|---:|---:|
 | video | .525698 | .456431 | 13.18% |
@@ -227,3 +229,55 @@
 ![实际短测前缀内和紧前历史sigma直方图](figures/prefix_short_sigma_histograms.png)
 
 ![实际短测逐块sigma](figures/prefix_short_sigma_perchunk.png)
+
+### 6.3 新step20 checkpoint三档推理扫描
+
+扫描根为新短测目录下 `sigma_scan_step000020/`；24/24 jobs exit0、48/48 NPZ通过原生load_rollout及完整metadata验收，全部17块。冻结heldout8 parent SHA与第5节一致；每个独立单窗fragment另存hash，保留parent的固定序号、seed42、源起点、273帧。三σ均为联合30步、shift5/CFG1/persistent KV、C4/K8/H15；每块32次forward = 条件prefill1 + 去噪30 + noisy refresh1，U/S仍干净。
+
+- 新训练snapshot SHA：`63e108b424ac3d2b25c6660b6446e92f08950da66bd3867dec1fd49bfa8f372b`，明确prefix_enabled=true、histmax=.1。
+- 新DCP metadata SHA：`a41dbfd2670c0eb67ea735fbe8495adcda043161d24927cf41e16682b14bb44f`，886键，contract与五模块完整；GPU实际全权重重载成功，不再仅为metadata/contract检查。
+- 派发入口19项CPU测试通过；pilot Tdebug1 GPU0/1/2，6份全通过后，Tdebug1 GPU3–7 + Tdebug2/3各8卡并行剩余21任务。每次启动前记录quota120核、1.4–1.7TiB可用内存、低CPU负载，目标GPU无compute进程；各节点分别经MCP启动，无节点间SSH。所有GPU worker正常退出，无失败/OOM/覆盖或自动重启。
+- 额外15项真实pilot检查通过：三σ及双mode首块action/RGB/U/S按dtype/shape/bytes SHA逐位一致，GT全17块条件/原始GT跨σ一致。后续generated条件允许随历史改变。独立refresh RNG的幅度变化只影响历史写入，不扰动当前块初始噪声。回执为scan根 `parallel_seed_validation.json`。
+- CPU两份pilot结果workers1/2严格逐位相同：32.418/18.718秒（含worker启动）。完整汇总复用这两份，剩余46份由24workers、每进程BLAS/OpenMP/OpenCV线程1计算；CPU metrics不再次采样。回执为 `metrics/pilot_cpu_consistency.json`。
+
+24任务真实起止UTC 17:51:34–18:10:59，完整墙钟1164.434秒、2.473份/分钟；含pilot与资源检查的间隔。pilot三任务501.663秒，剩余21任务（含跨节点启动差）542.989秒、4.641份/分钟。单任务模型加载受节点缓存影响：pilot138.12秒，Tdebug1暖缓存约43.8秒，Tdebug2/3约146.7秒；不把模型加载/导出时间冒充sampler速度。
+
+| sigma_small | gt采样均值秒/窗口 | generated采样均值秒/窗口 | gt峰值allocated GiB | generated峰值allocated GiB |
+|---:|---:|---:|---:|---:|
+| .02 | 89.363 | 86.868 | 33.362 | 35.534 |
+| .05 | 89.358 | 86.931 | 33.362 | 35.534 |
+| .1 | 89.989 | 86.928 | 33.362 | 35.534 |
+
+完整采样和验收回执：[prefix_sigma_scan_runtime.json](prefix_sigma_scan_runtime.json)。CPU资源再次核查Tdebug6：quota120（affinity200）、MemAvailable约1.39TiB、低负载，24workers计算46份、复用2份pilot，37.053秒（含pool启动/回收），exit0；末任务36.153秒，1.272份/秒。六组各8窗口×17块=136 flow pairs、320×180全像素；另以math.fsum独立累加所有dot/norm，整体余弦差<1e-14。
+
+以下表与第5节V0.2统一口径相同。左右腕为每块末端对原始GT的误差、合并8×17个块末；generated包含历史漂移。PSNR先合并future RGB MSE再转dB。V0.2参照为1000步/历史sigma0，新V0.3只有20步且仍处100步warmup内，不能作为相同训练时长的效果对照。
+
+| 模型 / step | history | sigma_small | 光流幅值比 | 整体方向余弦 | 左/右腕末端 mm | PSNR dB |
+|---|---|---:|---:|---:|---:|---:|
+| V0.2 lr2e-5 / 1000 | gt | 0 | 1.077061 | .103794 | 65.03 / 57.33 | 16.930 |
+| V0.2 lr2e-5 / 1000 | generated | 0 | 1.644089 | -.016639 | 281.79 / 243.13 | 12.221 |
+| V0.2 lr1e-4 / 1000 | gt | 0 | 1.073728 | .035371 | 68.09 / 55.89 | 16.954 |
+| V0.2 lr1e-4 / 1000 | generated | 0 | 1.737592 | .015020 | 319.54 / 234.48 | 11.882 |
+| V0.3 prefix / 20 | gt | .02 | 1.303027 | .001800 | 93.41 / 101.98 | 14.915 |
+| V0.3 prefix / 20 | generated | .02 | .098235 | .018836 | 365.98 / 443.47 | 13.059 |
+| V0.3 prefix / 20 | gt | .05 | 1.330901 | .009290 | 88.71 / 92.83 | 14.891 |
+| V0.3 prefix / 20 | generated | .05 | .090283 | .015135 | 407.65 / 444.94 | 13.071 |
+| V0.3 prefix / 20 | gt | .1 | 1.362764 | .027037 | 85.24 / 87.56 | 15.061 |
+| V0.3 prefix / 20 | generated | .1 | .122525 | .005423 | 409.30 / 435.18 | 12.940 |
+
+| sigma / history | 左/右腕旋转误差 degrees | 左/右局部手形 MPJPE mm | 第17块左/右腕末端 mm |
+|---|---:|---:|---:|
+| .02 / gt | 33.70 / 40.01 | 16.35 / 18.38 | 79.67 / 71.40 |
+| .02 / generated | 107.23 / 139.58 | 266.62 / 208.10 | 517.44 / 668.63 |
+| .05 / gt | 32.16 / 36.54 | 14.97 / 16.96 | 77.72 / 67.20 |
+| .05 / generated | 113.88 / 135.83 | 283.65 / 218.53 | 691.22 / 729.12 |
+| .1 / gt | 31.27 / 34.23 | 14.43 / 16.08 | 73.23 / 63.17 |
+| .1 / generated | 109.33 / 134.24 | 288.24 / 203.14 | 825.15 / 713.89 |
+
+这轮训练链路、mask/梯度/采样/refresh/速度/显存和完整推理验收通过，但20步generated质量明显不足：运动幅值只有GT的9–12%，腕部随历史累计漂移，手形误差也大。gt模式提高sigma可改善这次短测部分指标，generated各指标无一致最优；不能据此改默认sigma或宣称V0.3优于V0.2。正式默认仍为.02并持续三档扫描，在实际500/1000/2000/3000步checkpoint评估质量。
+
+完整逐窗原始指标保存在scan根 `metrics/comparison.json`（SHA256 `09ef870a311e284ad0eec59d4558f2966f1273d81b7f4e1bbe9e692d8f7f2d07`，约7.94MB）；精简可复查的全部组、1–17块、腕/手形/光流及基线来源见 [prefix_sigma_scan_metrics.json](prefix_sigma_scan_metrics.json)。精简只省略逐窗重复metadata，原始结果、工具源码及hash仍保留于独立scan根。
+
+![新step20三sigma扫描：动作漂移与整体光流](figures/prefix_sigma_scan.png)
+
+截至本节记录完成，正式训练尚未启动。本轮采样修订、20步及48份扫描结果先交用户确认，再执行双节点HSDP 8×2 / online W&B与API核实。停止规则、token预算、数据及V0.2历史产物均保持原约定。

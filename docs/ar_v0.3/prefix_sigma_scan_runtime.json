@@ -1,0 +1,1050 @@
+{
+  "schema": "ar_v03_prefix_sigma_scan_runtime_v1",
+  "status": "complete",
+  "jobs": 24,
+  "archives": 48,
+  "successful_jobs": 24,
+  "start_utc": "2026-10-01T17:51:34.740270+00:00",
+  "end_utc": "2026-10-01T18:10:59.174251+00:00",
+  "complete_wall_seconds": 1164.4339816570282,
+  "archives_per_minute": 2.4733046659301925,
+  "phase_durations": {
+    "pilot": {
+      "jobs": 3,
+      "archives": 6,
+      "concurrent_GPU_workers": 3,
+      "wall_seconds": 501.6630218029022,
+      "archives_per_minute": 0.7176131872471158,
+      "job_wall_mean_seconds": 501.0512313048045
+    },
+    "remaining": {
+      "jobs": 21,
+      "archives": 42,
+      "concurrent_GPU_workers": 21,
+      "wall_seconds": 542.9887664318085,
+      "archives_per_minute": 4.6409799903594795,
+      "job_wall_mean_seconds": 467.9960542519887
+    }
+  },
+  "sampler": {
+    "0.02/gt": {
+      "windows": 8,
+      "seconds_mean": 89.36259304831037,
+      "seconds_min": 86.32280679792166,
+      "seconds_max": 91.3082959940657,
+      "peak_allocated_gib": 33.361759185791016
+    },
+    "0.02/generated": {
+      "windows": 8,
+      "seconds_mean": 86.86779626391944,
+      "seconds_min": 85.87869950663298,
+      "seconds_max": 87.79689306858927,
+      "peak_allocated_gib": 35.53447484970093
+    },
+    "0.05/gt": {
+      "windows": 8,
+      "seconds_mean": 89.35815989953699,
+      "seconds_min": 85.97688620281406,
+      "seconds_max": 91.19445477984846,
+      "peak_allocated_gib": 33.361759185791016
+    },
+    "0.05/generated": {
+      "windows": 8,
+      "seconds_mean": 86.93112441411358,
+      "seconds_min": 86.06445897510275,
+      "seconds_max": 87.72625817358494,
+      "peak_allocated_gib": 35.53447484970093
+    },
+    "0.1/gt": {
+      "windows": 8,
+      "seconds_mean": 89.98898262550938,
+      "seconds_min": 86.55738211190328,
+      "seconds_max": 91.70445771329105,
+      "peak_allocated_gib": 33.361759185791016
+    },
+    "0.1/generated": {
+      "windows": 8,
+      "seconds_mean": 86.92801928301924,
+      "seconds_min": 86.0976442862302,
+      "seconds_max": 87.70465046912432,
+      "peak_allocated_gib": 35.53447484970093
+    }
+  },
+  "supervisors": {
+    "pilot_dispatch.log": {
+      "node_label": "Tdebug1",
+      "worker_exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "time": "2026-10-01T17:59:57.032793+00:00",
+      "completed_jobs": 3,
+      "total_jobs": 24,
+      "completed_results": 6,
+      "total_results": 48,
+      "running_jobs": 0,
+      "failed_jobs": [],
+      "elapsed_seconds": 502.29251527786255,
+      "results_per_minute": 0.7167138451204117
+    },
+    "Tdebug3_remaining_dispatch.log": {
+      "node_label": "Tdebug3",
+      "worker_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "time": "2026-10-01T18:10:59.706495+00:00",
+      "completed_jobs": 24,
+      "total_jobs": 24,
+      "completed_results": 48,
+      "total_results": 48,
+      "running_jobs": 0,
+      "failed_jobs": [],
+      "elapsed_seconds": 1164.9662189483643,
+      "results_per_minute": 2.4721746889792455
+    },
+    "Tdebug1_remaining_dispatch.log": {
+      "node_label": "Tdebug1",
+      "worker_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "time": "2026-10-01T18:07:45.185331+00:00",
+      "completed_jobs": 8,
+      "total_jobs": 24,
+      "completed_results": 16,
+      "total_results": 48,
+      "running_jobs": 16,
+      "failed_jobs": [],
+      "elapsed_seconds": 970.4450552463531,
+      "results_per_minute": 0.9892368401591767
+    },
+    "Tdebug2_remaining_dispatch.log": {
+      "node_label": "Tdebug2",
+      "worker_exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "time": "2026-10-01T18:10:31.179139+00:00",
+      "completed_jobs": 16,
+      "total_jobs": 24,
+      "completed_results": 32,
+      "total_results": 48,
+      "running_jobs": 8,
+      "failed_jobs": [],
+      "elapsed_seconds": 1136.4388637542725,
+      "results_per_minute": 1.689488155708791
+    }
+  },
+  "binding": {
+    "schema": "ar_v03_sigma_scan_v1",
+    "bound_at": "2026-10-01T17:50:04.570854+00:00",
+    "plan_sha256": "df3e6990619d32f60ca7b4f6aaa7bad187ab6a04dea0a4639815f3a487d1e3f5",
+    "checkpoint": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/joint_video_hand_pose/ar_v0_3_short_compare/v03/checkpoints/iter_000000020/model",
+    "checkpoint_metadata_sha256": "a41dbfd2670c0eb67ea735fbe8495adcda043161d24927cf41e16682b14bb44f",
+    "checkpoint_metadata_keys": 886,
+    "snapshot": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/joint_video_hand_pose/ar_v0_3_short_compare/v03/config.yaml",
+    "snapshot_sha256": "63e108b424ac3d2b25c6660b6446e92f08950da66bd3867dec1fd49bfa8f372b",
+    "model_target": "cosmos3_joint_video_hand_pose.src.ar_v03_model.EgoVerseARV03Model",
+    "prefix_low_noise_enabled": true,
+    "sigma_hist_max": 0.1,
+    "action_representation": "fixed_camera_wrist_local_delta_latent_v1",
+    "frozen_artifacts": {
+      "state_normalizer": {
+        "path": "/mnt/lzh/cosmos-EgoWAM/outputs/data_expansion_20260928/prepared_fixed_camera_wrist_local_delta_latent_v1_t273/chunk_state_normalizer.json",
+        "sha256": "4391094264957130f4384d71ed2147d26274c5839790064f45204353a0e34722"
+      },
+      "future_normalizer": {
+        "path": "/mnt/lzh/cosmos-EgoWAM/outputs/data_expansion_20260928/prepared_fixed_camera_wrist_local_delta_latent_v1_t273/future_normalizer.json",
+        "sha256": "e76997fbfad439df11dd5af0459eb5e9b033516b6bad2826a3a36739a793d30a"
+      },
+      "right_codec": {
+        "path": "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/artifacts/cosmos3_hand_codecs/v3_wrist_local_pca15_train744/right_pca15.pt",
+        "sha256": "7b32b7c69f1ce7e3cfc278296b382e1eedc312c9c555e76eca3622b5d9a78174"
+      },
+      "left_codec": {
+        "path": "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/artifacts/cosmos3_hand_codecs/v3_wrist_local_pca15_train744/left_pca15.pt",
+        "sha256": "9f0fd9219e2bc9e0a312e8445fd84193652989df3fa978cd12eb0e70686a646e"
+      },
+      "valid_windows_manifest": {
+        "path": "/mnt/lzh/cosmos-EgoWAM/outputs/data_expansion_20260928/prepared_fixed_camera_wrist_local_delta_latent_v1_t273/valid_windows.json",
+        "sha256": "e70d2d14a12612442aabaad9d3e0e7b7b295d6bea0fe9cbe85d181fe41b675ae"
+      }
+    },
+    "contract_schema": "ar_v02_training_contract_v2",
+    "contract_matches_snapshot": true,
+    "source_commit": "31206d7d62034ad78bacb7a37a0b5380c0776ab1",
+    "source_files": {
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/ar_v03_attention.py": "2480cd6cc26be540d4848b6300e4044838fbad95428eeda1aaf633d6838ba94a",
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/ar_v03_config.py": "ffb5df5e4b356f2a0e82170ae1c5f5f865555c6305ada83bf4828b9ed1a1bf44",
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/ar_v03_eval.py": "2261840e9013da5ec16818e56505d476df37586db002ae5e292a3ada532a1bb1",
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/ar_v03_inference.py": "28ded4a44f4e037622489c94ce89bf0d4195d43e3de723ef80aa1464e625ced5",
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/ar_v03_loss.py": "292ace3afca1977d5e246dd722e558a13be39ac1c253118e5d6228611a047247",
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/ar_v03_model.py": "d87288b31312e41b5af6360c9f76c890d7f014d6fd82f140bcc7de417a962aab",
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/ar_v03_sigma.py": "9783b213304daf6ae07aa5704bc8045ff4713f3109740aa3d3a7702a9cb3bd0b",
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/ar_v03_smoke_monitor.py": "c7f7e78580a3933c383bca93e4e6f3fecb1841c0448fc6d067a91829a15de7c1",
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/scripts/ar_v03_sigma_scan.py": "80866379c8a4ea093cd24276c5b3594ec5a73abcfe8bc471ac963192b52f3b1a",
+      "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/configs/ar_v0_3.toml": "5de44472138ba4cf669547ddbf2b894b265caf5d0a2f8fbd5bcc6fab2b2fbf4a"
+    },
+    "verification_scope": "CPU metadata and contract only; no Nano weight load or GPU"
+  },
+  "pilot_validation": {
+    "schema": "ar_v03_sigma_scan_v1",
+    "checked_at": "2026-10-01T17:59:57.034253+00:00",
+    "status": "passed",
+    "jobs": [
+      "heldout_sigma_020_window00",
+      "heldout_sigma_050_window00",
+      "heldout_sigma_100_window00"
+    ],
+    "results": 6,
+    "acceptance": "three sigmas and both history modes; full native archive validation, metadata and 17 chunks",
+    "validations": {
+      "heldout_sigma_020_window00": [
+        {
+          "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_020/heldout/window00/0000_gt.npz",
+          "sha256": "8c112c9e2f576f06d54f94d71a7e9dfef33315f808658b6c25fed4188b50d1ef",
+          "bytes": 390514096,
+          "history": "gt",
+          "sigma_small": 0.02,
+          "chunks": 17,
+          "source_offset": 1736,
+          "sampler_seconds": 90.04548422410153,
+          "peak_memory_bytes": 35820441600,
+          "parent_manifest_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+          "fragment_manifest_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888"
+        },
+        {
+          "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_020/heldout/window00/0000_generated.npz",
+          "sha256": "f49b360c461a75149a1004602c85eef32a7fb2998ed541dccf2c4dbc7699fc09",
+          "bytes": 395413596,
+          "history": "generated",
+          "sigma_small": 0.02,
+          "chunks": 17,
+          "source_offset": 1736,
+          "sampler_seconds": 86.41771565261297,
+          "peak_memory_bytes": 38153377280,
+          "parent_manifest_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+          "fragment_manifest_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888"
+        }
+      ],
+      "heldout_sigma_050_window00": [
+        {
+          "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_050/heldout/window00/0000_gt.npz",
+          "sha256": "5ee011b59ce3cad2dcccc5c115ed7755b0a2feb622923da396bb18d2453e95ad",
+          "bytes": 389908361,
+          "history": "gt",
+          "sigma_small": 0.05,
+          "chunks": 17,
+          "source_offset": 1736,
+          "sampler_seconds": 90.99272075737827,
+          "peak_memory_bytes": 35820441600,
+          "parent_manifest_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+          "fragment_manifest_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888"
+        },
+        {
+          "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_050/heldout/window00/0000_generated.npz",
+          "sha256": "772c0d9d46ea4835eb789795b511c9299b7bfb9c7becbb7fda9ef56c3f1033f1",
+          "bytes": 390745670,
+          "history": "generated",
+          "sigma_small": 0.05,
+          "chunks": 17,
+          "source_offset": 1736,
+          "sampler_seconds": 87.34281501127407,
+          "peak_memory_bytes": 38153377280,
+          "parent_manifest_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+          "fragment_manifest_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888"
+        }
+      ],
+      "heldout_sigma_100_window00": [
+        {
+          "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_100/heldout/window00/0000_gt.npz",
+          "sha256": "6ccb35049b48180a2e49451ffafb3417f8674672f9c19da20332fc0d2ecc1f47",
+          "bytes": 390736961,
+          "history": "gt",
+          "sigma_small": 0.1,
+          "chunks": 17,
+          "source_offset": 1736,
+          "sampler_seconds": 90.40553005295806,
+          "peak_memory_bytes": 35820441600,
+          "parent_manifest_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+          "fragment_manifest_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888"
+        },
+        {
+          "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_100/heldout/window00/0000_generated.npz",
+          "sha256": "28eb77dc7d52c7881994f58be6a648944076cb05a28618b53d433094bd5e2fce",
+          "bytes": 388718508,
+          "history": "generated",
+          "sigma_small": 0.1,
+          "chunks": 17,
+          "source_offset": 1736,
+          "sampler_seconds": 86.8650268423371,
+          "peak_memory_bytes": 38153377280,
+          "parent_manifest_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+          "fragment_manifest_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888"
+        }
+      ]
+    },
+    "throughput": {
+      "time": "2026-10-01T17:59:57.044843+00:00",
+      "completed_jobs": 3,
+      "total_jobs": 24,
+      "completed_results": 6,
+      "total_results": 48,
+      "running_jobs": 0,
+      "failed_jobs": [],
+      "elapsed_seconds": 502.3045711517334,
+      "results_per_minute": 0.7166966431831518
+    }
+  },
+  "parallel_seed_validation": {
+    "schema": "ar_v03_parallel_seed_validation_v1",
+    "validated_at": "2026-10-01T18:00:57.855713+00:00",
+    "status": "passed",
+    "checks": {
+      "first_block_action": true,
+      "first_block_rgb": true,
+      "first_block_conditions_action": true,
+      "first_condition_rgb": true,
+      "gt_future": true,
+      "boundary_states": true,
+      "raw_gt_keypoints": true,
+      "raw_gt_camera_poses": true,
+      "raw_gt_source_indexes": true,
+      "gt_rgb": true,
+      "gt_state_conditions_action": true,
+      "gt_condition_rgb": true,
+      "sigma_metadata_matches_each_task": true,
+      "source_checkpoint_hash_binding": true,
+      "parent_and_fragment_identity": true
+    },
+    "scope": "six real pilot archives: first-block outputs bitwise identical across sigmas/modes; GT U/S all blocks; generated U/S first block only",
+    "mathematical_seed_review": {
+      "sampler_noise_seed": "item.seed, independently reset for every sample(history=...)",
+      "refresh_noise_seed": "item.seed*1000003+17+chunk, recreated per block, video then action draw order",
+      "source_and_split": "each fragment exactly the unchanged original parent item; output index is never a seed input",
+      "serial_parallel_math_equivalent": true
+    },
+    "groups": {
+      "0.02/gt": {
+        "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_020/heldout/window00/0000_gt.npz",
+        "archive_sha256": "8c112c9e2f576f06d54f94d71a7e9dfef33315f808658b6c25fed4188b50d1ef",
+        "node_label": "Tdebug1",
+        "gpu": 2,
+        "first_block_action": {
+          "shape": [
+            33,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "a20b43d8bb2bdc31bbe91e0d31f3b571becff143bd654e518b045809931ad35a"
+        },
+        "first_block_rgb": {
+          "shape": [
+            17,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "8e2129a0fe7e36731a7e4abca1d923fdddb5154a3c5bd72cee4d606b0f01f9b5"
+        },
+        "first_block_conditions_action": {
+          "shape": [
+            1,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "838e0be1458a6527faba58743a9b4bb806b1e27feb27e4cd092108328f517f3d"
+        },
+        "gt_state_conditions_action": {
+          "shape": [
+            17,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "6dbe744851c18df95af857f64ace8173621cbbeb362ab1f4df78fb51bfe81d86"
+        },
+        "gt_condition_rgb": {
+          "shape": [
+            17,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "a9777dc8ee78b5e3dfae5affe712006ecf21cae2b4f5e32d90be07860e590ff2"
+        },
+        "first_condition_rgb": {
+          "shape": [
+            1,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "2ea46543f9f059e6dfbf56abb128c88514d49ff6f2803328cab6feeecb26009a"
+        },
+        "gt_future": {
+          "shape": [
+            544,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "943a80d611292c7eaeb245987637bed5577731ea4acf99ede9ebd8f6a810a5e6"
+        },
+        "boundary_states": {
+          "shape": [
+            68,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "c1330388b895e498feb6acf0846d131162f56e1db3a3e9a514bd1d045e8a1485"
+        },
+        "raw_gt_keypoints": {
+          "shape": [
+            545,
+            2,
+            21,
+            3
+          ],
+          "dtype": "float64",
+          "sha256": "a02c41da366c998a4d289da109f056bc88e0463761bf2fd36c9535221cfebc50"
+        },
+        "raw_gt_camera_poses": {
+          "shape": [
+            545,
+            4,
+            4
+          ],
+          "dtype": "float64",
+          "sha256": "7b0bf97caf7208ea4736845a587552f1769f1020b9eb61191296e593c43c0bc3"
+        },
+        "raw_gt_source_indexes": {
+          "shape": [
+            545
+          ],
+          "dtype": "int64",
+          "sha256": "0e895e85d512a82474dbe43f284767ac73dd72dd09e5766b70435220d1516276"
+        },
+        "gt_rgb": {
+          "shape": [
+            545,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "64a33004da7f9d8d859a9ae3036efd4be75fafbebe932cdeac8e68b0cef4992b"
+        },
+        "checkpoint": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/joint_video_hand_pose/ar_v0_3_short_compare/v03/checkpoints/iter_000000020/model",
+        "fragment_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888",
+        "parent_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+        "model_version": "ar_v0.3.0",
+        "sigma_fields": {
+          "sigma_small": 0.02,
+          "history_video_sigma": 0.02,
+          "history_action_sigma": 0.02
+        }
+      },
+      "0.02/generated": {
+        "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_020/heldout/window00/0000_generated.npz",
+        "archive_sha256": "f49b360c461a75149a1004602c85eef32a7fb2998ed541dccf2c4dbc7699fc09",
+        "node_label": "Tdebug1",
+        "gpu": 2,
+        "first_block_action": {
+          "shape": [
+            33,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "a20b43d8bb2bdc31bbe91e0d31f3b571becff143bd654e518b045809931ad35a"
+        },
+        "first_block_rgb": {
+          "shape": [
+            17,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "8e2129a0fe7e36731a7e4abca1d923fdddb5154a3c5bd72cee4d606b0f01f9b5"
+        },
+        "first_block_conditions_action": {
+          "shape": [
+            1,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "838e0be1458a6527faba58743a9b4bb806b1e27feb27e4cd092108328f517f3d"
+        },
+        "gt_state_conditions_action": null,
+        "gt_condition_rgb": null,
+        "first_condition_rgb": {
+          "shape": [
+            1,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "2ea46543f9f059e6dfbf56abb128c88514d49ff6f2803328cab6feeecb26009a"
+        },
+        "gt_future": {
+          "shape": [
+            544,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "943a80d611292c7eaeb245987637bed5577731ea4acf99ede9ebd8f6a810a5e6"
+        },
+        "boundary_states": {
+          "shape": [
+            68,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "c1330388b895e498feb6acf0846d131162f56e1db3a3e9a514bd1d045e8a1485"
+        },
+        "raw_gt_keypoints": {
+          "shape": [
+            545,
+            2,
+            21,
+            3
+          ],
+          "dtype": "float64",
+          "sha256": "a02c41da366c998a4d289da109f056bc88e0463761bf2fd36c9535221cfebc50"
+        },
+        "raw_gt_camera_poses": {
+          "shape": [
+            545,
+            4,
+            4
+          ],
+          "dtype": "float64",
+          "sha256": "7b0bf97caf7208ea4736845a587552f1769f1020b9eb61191296e593c43c0bc3"
+        },
+        "raw_gt_source_indexes": {
+          "shape": [
+            545
+          ],
+          "dtype": "int64",
+          "sha256": "0e895e85d512a82474dbe43f284767ac73dd72dd09e5766b70435220d1516276"
+        },
+        "gt_rgb": {
+          "shape": [
+            545,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "64a33004da7f9d8d859a9ae3036efd4be75fafbebe932cdeac8e68b0cef4992b"
+        },
+        "checkpoint": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/joint_video_hand_pose/ar_v0_3_short_compare/v03/checkpoints/iter_000000020/model",
+        "fragment_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888",
+        "parent_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+        "model_version": "ar_v0.3.0",
+        "sigma_fields": {
+          "sigma_small": 0.02,
+          "history_video_sigma": 0.02,
+          "history_action_sigma": 0.02
+        }
+      },
+      "0.05/gt": {
+        "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_050/heldout/window00/0000_gt.npz",
+        "archive_sha256": "5ee011b59ce3cad2dcccc5c115ed7755b0a2feb622923da396bb18d2453e95ad",
+        "node_label": "Tdebug1",
+        "gpu": 1,
+        "first_block_action": {
+          "shape": [
+            33,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "a20b43d8bb2bdc31bbe91e0d31f3b571becff143bd654e518b045809931ad35a"
+        },
+        "first_block_rgb": {
+          "shape": [
+            17,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "8e2129a0fe7e36731a7e4abca1d923fdddb5154a3c5bd72cee4d606b0f01f9b5"
+        },
+        "first_block_conditions_action": {
+          "shape": [
+            1,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "838e0be1458a6527faba58743a9b4bb806b1e27feb27e4cd092108328f517f3d"
+        },
+        "gt_state_conditions_action": {
+          "shape": [
+            17,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "6dbe744851c18df95af857f64ace8173621cbbeb362ab1f4df78fb51bfe81d86"
+        },
+        "gt_condition_rgb": {
+          "shape": [
+            17,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "a9777dc8ee78b5e3dfae5affe712006ecf21cae2b4f5e32d90be07860e590ff2"
+        },
+        "first_condition_rgb": {
+          "shape": [
+            1,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "2ea46543f9f059e6dfbf56abb128c88514d49ff6f2803328cab6feeecb26009a"
+        },
+        "gt_future": {
+          "shape": [
+            544,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "943a80d611292c7eaeb245987637bed5577731ea4acf99ede9ebd8f6a810a5e6"
+        },
+        "boundary_states": {
+          "shape": [
+            68,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "c1330388b895e498feb6acf0846d131162f56e1db3a3e9a514bd1d045e8a1485"
+        },
+        "raw_gt_keypoints": {
+          "shape": [
+            545,
+            2,
+            21,
+            3
+          ],
+          "dtype": "float64",
+          "sha256": "a02c41da366c998a4d289da109f056bc88e0463761bf2fd36c9535221cfebc50"
+        },
+        "raw_gt_camera_poses": {
+          "shape": [
+            545,
+            4,
+            4
+          ],
+          "dtype": "float64",
+          "sha256": "7b0bf97caf7208ea4736845a587552f1769f1020b9eb61191296e593c43c0bc3"
+        },
+        "raw_gt_source_indexes": {
+          "shape": [
+            545
+          ],
+          "dtype": "int64",
+          "sha256": "0e895e85d512a82474dbe43f284767ac73dd72dd09e5766b70435220d1516276"
+        },
+        "gt_rgb": {
+          "shape": [
+            545,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "64a33004da7f9d8d859a9ae3036efd4be75fafbebe932cdeac8e68b0cef4992b"
+        },
+        "checkpoint": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/joint_video_hand_pose/ar_v0_3_short_compare/v03/checkpoints/iter_000000020/model",
+        "fragment_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888",
+        "parent_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+        "model_version": "ar_v0.3.0",
+        "sigma_fields": {
+          "sigma_small": 0.05,
+          "history_video_sigma": 0.05,
+          "history_action_sigma": 0.05
+        }
+      },
+      "0.05/generated": {
+        "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_050/heldout/window00/0000_generated.npz",
+        "archive_sha256": "772c0d9d46ea4835eb789795b511c9299b7bfb9c7becbb7fda9ef56c3f1033f1",
+        "node_label": "Tdebug1",
+        "gpu": 1,
+        "first_block_action": {
+          "shape": [
+            33,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "a20b43d8bb2bdc31bbe91e0d31f3b571becff143bd654e518b045809931ad35a"
+        },
+        "first_block_rgb": {
+          "shape": [
+            17,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "8e2129a0fe7e36731a7e4abca1d923fdddb5154a3c5bd72cee4d606b0f01f9b5"
+        },
+        "first_block_conditions_action": {
+          "shape": [
+            1,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "838e0be1458a6527faba58743a9b4bb806b1e27feb27e4cd092108328f517f3d"
+        },
+        "gt_state_conditions_action": null,
+        "gt_condition_rgb": null,
+        "first_condition_rgb": {
+          "shape": [
+            1,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "2ea46543f9f059e6dfbf56abb128c88514d49ff6f2803328cab6feeecb26009a"
+        },
+        "gt_future": {
+          "shape": [
+            544,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "943a80d611292c7eaeb245987637bed5577731ea4acf99ede9ebd8f6a810a5e6"
+        },
+        "boundary_states": {
+          "shape": [
+            68,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "c1330388b895e498feb6acf0846d131162f56e1db3a3e9a514bd1d045e8a1485"
+        },
+        "raw_gt_keypoints": {
+          "shape": [
+            545,
+            2,
+            21,
+            3
+          ],
+          "dtype": "float64",
+          "sha256": "a02c41da366c998a4d289da109f056bc88e0463761bf2fd36c9535221cfebc50"
+        },
+        "raw_gt_camera_poses": {
+          "shape": [
+            545,
+            4,
+            4
+          ],
+          "dtype": "float64",
+          "sha256": "7b0bf97caf7208ea4736845a587552f1769f1020b9eb61191296e593c43c0bc3"
+        },
+        "raw_gt_source_indexes": {
+          "shape": [
+            545
+          ],
+          "dtype": "int64",
+          "sha256": "0e895e85d512a82474dbe43f284767ac73dd72dd09e5766b70435220d1516276"
+        },
+        "gt_rgb": {
+          "shape": [
+            545,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "64a33004da7f9d8d859a9ae3036efd4be75fafbebe932cdeac8e68b0cef4992b"
+        },
+        "checkpoint": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/joint_video_hand_pose/ar_v0_3_short_compare/v03/checkpoints/iter_000000020/model",
+        "fragment_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888",
+        "parent_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+        "model_version": "ar_v0.3.0",
+        "sigma_fields": {
+          "sigma_small": 0.05,
+          "history_video_sigma": 0.05,
+          "history_action_sigma": 0.05
+        }
+      },
+      "0.1/gt": {
+        "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_100/heldout/window00/0000_gt.npz",
+        "archive_sha256": "6ccb35049b48180a2e49451ffafb3417f8674672f9c19da20332fc0d2ecc1f47",
+        "node_label": "Tdebug1",
+        "gpu": 0,
+        "first_block_action": {
+          "shape": [
+            33,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "a20b43d8bb2bdc31bbe91e0d31f3b571becff143bd654e518b045809931ad35a"
+        },
+        "first_block_rgb": {
+          "shape": [
+            17,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "8e2129a0fe7e36731a7e4abca1d923fdddb5154a3c5bd72cee4d606b0f01f9b5"
+        },
+        "first_block_conditions_action": {
+          "shape": [
+            1,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "838e0be1458a6527faba58743a9b4bb806b1e27feb27e4cd092108328f517f3d"
+        },
+        "gt_state_conditions_action": {
+          "shape": [
+            17,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "6dbe744851c18df95af857f64ace8173621cbbeb362ab1f4df78fb51bfe81d86"
+        },
+        "gt_condition_rgb": {
+          "shape": [
+            17,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "a9777dc8ee78b5e3dfae5affe712006ecf21cae2b4f5e32d90be07860e590ff2"
+        },
+        "first_condition_rgb": {
+          "shape": [
+            1,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "2ea46543f9f059e6dfbf56abb128c88514d49ff6f2803328cab6feeecb26009a"
+        },
+        "gt_future": {
+          "shape": [
+            544,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "943a80d611292c7eaeb245987637bed5577731ea4acf99ede9ebd8f6a810a5e6"
+        },
+        "boundary_states": {
+          "shape": [
+            68,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "c1330388b895e498feb6acf0846d131162f56e1db3a3e9a514bd1d045e8a1485"
+        },
+        "raw_gt_keypoints": {
+          "shape": [
+            545,
+            2,
+            21,
+            3
+          ],
+          "dtype": "float64",
+          "sha256": "a02c41da366c998a4d289da109f056bc88e0463761bf2fd36c9535221cfebc50"
+        },
+        "raw_gt_camera_poses": {
+          "shape": [
+            545,
+            4,
+            4
+          ],
+          "dtype": "float64",
+          "sha256": "7b0bf97caf7208ea4736845a587552f1769f1020b9eb61191296e593c43c0bc3"
+        },
+        "raw_gt_source_indexes": {
+          "shape": [
+            545
+          ],
+          "dtype": "int64",
+          "sha256": "0e895e85d512a82474dbe43f284767ac73dd72dd09e5766b70435220d1516276"
+        },
+        "gt_rgb": {
+          "shape": [
+            545,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "64a33004da7f9d8d859a9ae3036efd4be75fafbebe932cdeac8e68b0cef4992b"
+        },
+        "checkpoint": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/joint_video_hand_pose/ar_v0_3_short_compare/v03/checkpoints/iter_000000020/model",
+        "fragment_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888",
+        "parent_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+        "model_version": "ar_v0.3.0",
+        "sigma_fields": {
+          "sigma_small": 0.1,
+          "history_video_sigma": 0.1,
+          "history_action_sigma": 0.1
+        }
+      },
+      "0.1/generated": {
+        "archive": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/sigma_scan_step000020/eval/sigma_100/heldout/window00/0000_generated.npz",
+        "archive_sha256": "28eb77dc7d52c7881994f58be6a648944076cb05a28618b53d433094bd5e2fce",
+        "node_label": "Tdebug1",
+        "gpu": 0,
+        "first_block_action": {
+          "shape": [
+            33,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "a20b43d8bb2bdc31bbe91e0d31f3b571becff143bd654e518b045809931ad35a"
+        },
+        "first_block_rgb": {
+          "shape": [
+            17,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "8e2129a0fe7e36731a7e4abca1d923fdddb5154a3c5bd72cee4d606b0f01f9b5"
+        },
+        "first_block_conditions_action": {
+          "shape": [
+            1,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "838e0be1458a6527faba58743a9b4bb806b1e27feb27e4cd092108328f517f3d"
+        },
+        "gt_state_conditions_action": null,
+        "gt_condition_rgb": null,
+        "first_condition_rgb": {
+          "shape": [
+            1,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "2ea46543f9f059e6dfbf56abb128c88514d49ff6f2803328cab6feeecb26009a"
+        },
+        "gt_future": {
+          "shape": [
+            544,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "943a80d611292c7eaeb245987637bed5577731ea4acf99ede9ebd8f6a810a5e6"
+        },
+        "boundary_states": {
+          "shape": [
+            68,
+            64
+          ],
+          "dtype": "float32",
+          "sha256": "c1330388b895e498feb6acf0846d131162f56e1db3a3e9a514bd1d045e8a1485"
+        },
+        "raw_gt_keypoints": {
+          "shape": [
+            545,
+            2,
+            21,
+            3
+          ],
+          "dtype": "float64",
+          "sha256": "a02c41da366c998a4d289da109f056bc88e0463761bf2fd36c9535221cfebc50"
+        },
+        "raw_gt_camera_poses": {
+          "shape": [
+            545,
+            4,
+            4
+          ],
+          "dtype": "float64",
+          "sha256": "7b0bf97caf7208ea4736845a587552f1769f1020b9eb61191296e593c43c0bc3"
+        },
+        "raw_gt_source_indexes": {
+          "shape": [
+            545
+          ],
+          "dtype": "int64",
+          "sha256": "0e895e85d512a82474dbe43f284767ac73dd72dd09e5766b70435220d1516276"
+        },
+        "gt_rgb": {
+          "shape": [
+            545,
+            368,
+            640,
+            3
+          ],
+          "dtype": "uint8",
+          "sha256": "64a33004da7f9d8d859a9ae3036efd4be75fafbebe932cdeac8e68b0cef4992b"
+        },
+        "checkpoint": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_prefix_short_20261001T172706/joint_video_hand_pose/ar_v0_3_short_compare/v03/checkpoints/iter_000000020/model",
+        "fragment_sha256": "6518544c825a550d3d9fdcc22fff774adc3a7b751ca0942624d6597c92cb4888",
+        "parent_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+        "model_version": "ar_v0.3.0",
+        "sigma_fields": {
+          "sigma_small": 0.1,
+          "history_video_sigma": 0.1,
+          "history_action_sigma": 0.1
+        }
+      }
+    },
+    "binding_snapshot_sha256": "63e108b424ac3d2b25c6660b6446e92f08950da66bd3867dec1fd49bfa8f372b",
+    "binding_checkpoint_metadata_sha256": "a41dbfd2670c0eb67ea735fbe8495adcda043161d24927cf41e16682b14bb44f",
+    "frozen_parent_sha256": "8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d",
+    "cpu_resources": {
+      "affinity_cpus": 200,
+      "quota_cpus": 120.0,
+      "effective_cpus": 120.0,
+      "memory": {
+        "MemTotal": 2016444370944,
+        "MemAvailable": 1511464497152
+      },
+      "load_average": [
+        0.9951171875,
+        4.32080078125,
+        7.7919921875
+      ]
+    },
+    "parallel_read_workers": 6,
+    "elapsed_seconds": 10.253235598094761,
+    "GPU_used": false,
+    "Nano_weights_loaded": false,
+    "limitations": [
+      "No separate duplicate serial GPU run was started; seed/split invariance was reviewed in the stable sampler and these six real pilot outputs.",
+      "Later generated-mode conditions are expected to differ across sigma because earlier history changes; they are not asserted equal."
+    ]
+  }
+}
