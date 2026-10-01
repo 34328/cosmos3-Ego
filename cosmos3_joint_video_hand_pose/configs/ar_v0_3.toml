@@ -1,0 +1,50 @@
+# AR V0.3.0: single-pass diffusion forcing and weighted wrists.
+[job]
+task = "vfm"
+experiment = "rbs_wam_ar_v0_3_diffusion_forcing_wrist_weight_v1"
+project = "joint_video_hand_pose"
+group = "ar_v0_3"
+name = "diffusion_forcing_wrist_weight_v1"
+wandb_mode = "online"
+
+[model]
+precision = "bfloat16"
+
+[model.parallelism]
+data_parallel_shard_degree = 8
+data_parallel_replicate_degree = 2
+context_parallel_shard_degree = 1
+
+[model.activation_checkpointing]
+mode = "full"
+
+[model.compile]
+enabled = false
+
+[model.tokenizer]
+vae_path = "${oc.env:WAN_VAE_PATH,/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth}"
+
+[optimizer]
+lr = 1.0e-4
+
+[optimizer.lr_multipliers]
+action2llm = 1
+llm2action = 1
+action_modality_embed = 1
+action_state_embed = 1
+vision_condition_embed = 1
+
+[scheduler]
+warm_up_steps = [100]
+cycle_lengths = [3000]
+f_start = [0.0]
+f_max = [1.0]
+f_min = [0.3]
+
+[trainer]
+max_iter = 3000
+logging_iter = 1
+
+[checkpoint]
+load_path = "${oc.env:BASE_CHECKPOINT_PATH,/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp}"
+save_iter = 500
