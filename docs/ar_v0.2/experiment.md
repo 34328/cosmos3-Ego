@@ -554,3 +554,25 @@ Tdebug1/3/4/5上的评测watcher正常，过拟合heldout四档网格均完成�
 用户要求追加训练过的较长视频。独立输出`outputs/maintenance/training_showcase_20261001T200956/`；按rank0训练trace中首个t273训练片段确定，不按生成结果挑样本：`69b368d9c68645217fa07e02:1:1124:2248`，任务“用牙刷清洁鞋底”。rank0 iteration0的sample_ids确认该片段参与过history-noise训练，episode与窗口审计split均为train。trace不记录精确随机裁剪起点，因此只证明片段确实训练过；展示窗口取审计合法起点的中位数1414，不能声称是某个训练step的同一窗口。
 
 使用加噪组iter1000，seed42/C4/联合30步/shift5/CFG1/推理历史σ0，两张空闲Tdebug5 GPU分别运行gt和generated，官方sample/evaluate/overlay均成功。完整预测273采样帧、545个30Hz原始帧，视频约18.17秒，对应episode47.13–65.27秒；同时导出原训练视频2248帧/30Hz=74.93秒，明确标注为GT而非生成视频。新增三个播放器与来源回执在[训练集展示](http://127.0.0.1:54712/history_noise_eval_20261001T1905/#train-sample)，单独标注训练集，不纳入第12.1节验证集表和曲线；未修改模型、训练配方或启动训练。
+
+## 13. 官方 Nano 零样本 AR 对照（2026-10-01，用户授权，不训练）
+
+使用原版 `Cosmos3-Nano-official-dcp`（实际目录 `/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp/model`），调用官方 `OmniMoTCausalModel.iter_samples_from_batch_autoregressive`，没有走整段 image2video 采样器，也没有修改模型代码。API 的 `mode="image2video"` 只指定首帧条件。加载和实际生成均通过；DCP 严格加载，没有跳过缺失权重。预检一开始误选 HF 发布配置，因它包含 DCP 没有的理解视觉塔而加载失败；随后复用仓内完整 `vision_sft_nano` DCP 配置及官方 causal 配置默认值，未放宽加载检查。此前配置准备失败的回执保留在独立目录的 `preflight_attempts/`，不算有效评测。
+
+同一批8个 heldout 窗口、首帧和原始文本；窗口清单 hash `8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d`。首帧加17个预测块，每块4个视频 latent，总69 latent／273采样帧；640×368输入、640×360有效区域，源30Hz／stride2／视频15FPS，seed42，30步，shift5，CFG1。两档都采用官方 diffusion-forcing cache 写入规则，只改变 `sigma_diffusion_forcing=0/0.02`。σ0缓存干净的**生成历史**，不是读取GT历史的 teacher forcing；σ0.02也用于官方首帧预填。没有 action、U/S 条件输入。原正式训练 step1000 的 generated 存档直接复用，不重新推理。
+
+Tdebug4／5的16张H800经占用检查后用于本次评测，未占Tdebug1／3。两档16次推理全部成功。独立输出 `outputs/maintenance/official_nano_ar_zeroshot_20261001T203439/`，启动源码commit `445d4f16e250722aa2c1777b064f9d0a3ef8b743`；manifest、输入审计、配置、源码hash、加载与逐块运行回执均保留。
+
+| 组别 | 逐帧PSNR↑ (dB) | 块首→块末光流幅值比 (理想1) | 方向余弦↑ | 第1块PSNR | 第17块PSNR |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 我们的原正式step1000 / generated | 12.221 | 1.380 | -0.033 | 14.993 | 12.057 |
+| 官方原版Nano AR / cache σ0 | 10.892 | 1.561 | -0.004 | 10.619 | 11.129 |
+| 官方原版Nano AR / cache σ0.02 | 11.101 | 1.527 | 0.001 | 11.362 | 11.239 |
+
+PSNR仅计272个future采样帧，由跨窗口／块的RGB平方误差总和换算；原始GT时间位置对应2,4,…,544。光流复用项目已验收的640×360 Farneback及有效像素规则，幅值按和之比、方向按有效数加权，保留覆盖率；与第12节原模型数值一致。8个窗口×17块×3组共408条逐块数据，所有组在同一张曲线上。官方输出连续VAE解码，我们已有输出按块解码；官方保持原生默认完整历史cache，我们的历史窗口是15个chunk。因此这是原生AR整体入口对照，不能视为只改变权重的一项消融。
+
+官方两档平均AR生成约38.44／37.97秒/窗口，峰值分配显存33.09GiB；此时间从进入AR API到最后一块生成回调，包含首帧编码／预填，不含模型加载及离线RGB解码／保存。我们的原存档记录平均86.97秒，口径排除初始GT准备和离线导出，且包含联合action路径；不能据此精确归因某个模块的开销。
+
+结论：原版双向权重可以严格加载并运行官方AR接口，但本组出现明显纹理破碎，两档PSNR均更低、运动方向余弦接近0；σ0.02仅小幅改善，不能视为可用的零样本AR视频。第一块已经退化，问题并非只在长历史或第17块才出现。本对照不能证明我们训练实现无bug，也不代表经过AR训练的官方模型上限。
+
+[逐块曲线与固定前3个验证窗口视频](http://127.0.0.1:54712/official_nano_ar_zeroshot_20261001T203439/#videos)：四宫格为GT、我们step1000、官方σ0、官方σ0.02；每段273帧／15FPS／18.2秒，没有另挑样本。指标JSON、曲线及3段视频已同步本地，6个交付文件hash逐一核对；浏览器确认3段视频无错误且可播放。
