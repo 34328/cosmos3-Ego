@@ -302,3 +302,35 @@
 评测只在实际官方保存标记、四类DCP metadata及所有storage范围完整后绑定；优先使用Tdebug1/3/5/6空闲资源，排除训练中的Tdebug4/2。先三档heldout首窗pilot共6份验收，再推进其余69jobs；CPU串行/并行一致性检查后按24workers汇总96份/9组。持久claim和阶段记录阻止重复派发，失败不自动覆盖/重试。光流仍为320×180 pooled整体余弦，腕/手形对原始GT、PSNR先合并MSE，并与V0.2 step1000和lr1e-4组及train16参照同表。正式结果在对应checkpoint实际完成后逐项追加，保留源、配置及清单hash。
 
 新增正式评测CPU控制器 `cosmos3_joint_video_hand_pose/scripts/ar_v03_eval_followup.py` 和汇总器 `ar_v03_formal_cpu_metrics.py`。两者联合61项CPU测试通过（控制器25、汇总器36，10.18秒），语法/空白检查通过；包括原生tiny CPU DCP完整性/截断拒绝、四milestone保存门槛、训练节点排除、九组数学与五基线映射、防重复claim、异常退出核查。CPU阶段须通过实际节点的只读MCP probe验证hostname/PID birth tick，失活或孤儿进程报告attention且不自动重试。测试仅为CPU夹具及契约验收，不代替正式checkpoint的实际重载和96份结果验收。四计划、代码/清单hash和测试范围见 [formal_eval_preparation.json](formal_eval_preparation.json)，远端评测根另存 `operations_template.txt`。
+
+## 8. 正式 step500 checkpoint 与评测
+
+### 8.1 保存与训练统计（2026-10-02）
+
+`checkpoints/iter_000000500/` 已于北京时间05:00:54完成官方保存，保存耗时24.76秒。官方latest marker为 `iter_000000500`；model/trainer/optim/scheduler四类metadata及每个引用storage范围均完整。model有886键、8份shard，metadata SHA256 `9586c9017996a1d4df5214515a61688ecd3687a252cebd45db05d3cbae61de7d`；配置SHA与第7节一致。评测根为 `outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step000500/`，绑定时仓库HEAD `4e42cf7`，训练核心源仍为 `9eac185`，两者分别记录。
+
+下表按本次真实日志的完整step1–500，逐步等权取均值。action列是腕权3的训练目标；另记的8字段始终为未加权原始值。低σ前缀及目标加权均改变loss定义/难度，不以异配方loss绝对值宣称生成质量改善。
+
+| step段 | video均值 | action均值（腕权3） | total均值 | clip次数 |
+|---|---:|---:|---:|---:|
+| 1–100 | .442659 | .274212 | .716871 | 16 |
+| 101–200 | .416167 | .197481 | .613648 | 0 |
+| 201–300 | .416408 | .190671 | .607079 | 0 |
+| 301–400 | .415387 | .184803 | .600190 | 5 |
+| 401–500 | .419646 | .183969 | .603615 | 0 |
+
+全部loss/梯度范数有限，停止原因均为null。warmup后101–500的clip率5/400=1.25%，preclip norm均值.349753、p95 .436718。5次clip集中step327/329/330/331/332；step331 norm42.044392、video/action/total .59159/.27930/.87089，均为有限值，任意10步最多5次clip，未触既定9/10停止阈值。峰值allocated36.234GiB/reserved45.449GiB；step2以后驻留allocated15.170–15.202GiB，稳定。
+
+FormalMonitor覆盖计算段的500步均值14.787秒；官方wall计时61–500均值15.388秒、53,193 tokens/s，原生日志step2–500完整wall均值15.403秒、2.641 clips/s。两种计时范围不同，包含加载/官方回调/保存的wall值与计算段值分开保留。单遍/两遍速度对照仍采用第6.2节相同节点/窗口/20步口径。
+
+W&B API在step495–504有界查询中核实第500步8个原始字段及base/action两路LR与本地完全一致。本次step500更新使用schedule499的9.67810338e-5；保存后的scheduler500为9.67651358e-5，供下一次更新使用。这是官方先optimizer更新、后scheduler推进的生命周期计数，理论step0/100/1500/3000回执保持第7节数值。没有修改调度器顺序。
+
+完整分段、8字段、峰值、计时来源、5个梯度峰原始行、LR计数及API证据见 [formal_step500_training.json](formal_step500_training.json)（SHA256 `b3fcf1cedbaa775862d634c3917b9f750fcc36480776b3727790afe8fbb298c5`）。源JSONL仍追加，回执另保存恰好1–500步原始行SHA，避免将后续文件hash误写为固定500步快照。
+
+![正式前500步训练曲线及实际资源](figures/formal_step500_training.png)
+
+### 8.2 三档评测进度
+
+已按冻结计划绑定实际step500，并在Tdebug1 GPU0/1/2启动三σ首窗pilot（gt/generated共6份）。启动前检查quota120核、约1.74TiB可用内存、低负载及GPU空闲；实际全模型DCP加载成功，单任务DCP加载约141.6–141.8秒。评测包括初始化、采样和导出，因此加载时间单独记录。此阶段训练继续在Tdebug4/2推进，W&B持续online。
+
+截至本条记录，pilot仍在进行，尚未完成正式96份/9组指标汇总。首窗metadata、完整17块及跨σ首块/条件一致性验收通过后，再推进其余69jobs；正式整体光流/腕/手形/PSNR及V0.2参照表在实际完成后补入本节，不以pilot或训练loss代替完整评测。

@@ -1,0 +1,1284 @@
+{
+  "schema": "ar_v03_training_step500_receipt_v1",
+  "created_utc": "2026-10-01T21:12:33.823697+00:00",
+  "run": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z",
+  "evaluation_root": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step000500",
+  "training_source_commit": "9eac185",
+  "repository_current_head": "4e42cf7",
+  "verification_scope": "read-only CPU first500 complete JSONL rows, bounded W&B API495<=step<505, scheduler-only 8198B; no model or optimizer tensor load, no GPU launch, no document or bound-source edits",
+  "reader_host": "nb-1678910729611554048-cr786mpgj9xc",
+  "sources": [
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z/formal_monitor.jsonl",
+      "selected_complete_rows": 500,
+      "step_range": [
+        1,
+        500
+      ],
+      "selected_raw_lines_sha256": "db83253c60503748d47f376c9f03d38d498811b839c4d8b0c44693e7e767e5c0",
+      "complete_observed_byte_prefix_sha256": "b77ab72bcbbcc7052d0570326f89d844a8644d8ed25faa1d80d2c253427de9de",
+      "complete_observed_bytes": 537468,
+      "complete_observed_rows": 542,
+      "last_observed_step": 542,
+      "note": "append-only source; selected raw line SHA binds exactly steps1..500, observed-file hash binds the byte prefix read at this time"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z/loss_metrics.jsonl",
+      "selected_complete_rows": 500,
+      "step_range": [
+        1,
+        500
+      ],
+      "selected_raw_lines_sha256": "76c8efc26002fa6cb622b4e65301378063a0f5275b745f490488326defbf9c1c",
+      "complete_observed_byte_prefix_sha256": "57fa64aa0834ae9eff737a1e4f37aa515fa139a0de02fe512dad39d151087c1b",
+      "complete_observed_bytes": 734653,
+      "complete_observed_rows": 542,
+      "last_observed_step": 542,
+      "note": "append-only source; selected raw line SHA binds exactly steps1..500, observed-file hash binds the byte prefix read at this time"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z/config.yaml",
+      "sha256": "e7c5ab0150300247f139405470c16cbd668a8f22a8ce0cecf97795bda952ae66"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z/learning_rate_receipt.json",
+      "sha256": "06dbda434ea95e37475a37f964bcf85ead695d4b658d0184a3737d24f2fbda4f"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z/optimizer_lr_groups.json",
+      "sha256": "0d1bf4cd310b6ba0ab72e29ec2a7c9c7f504e9af9808cc2b115dc030d6a4881f"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z/checkpoints/iter_000000500/model/.metadata",
+      "sha256": "9586c9017996a1d4df5214515a61688ecd3687a252cebd45db05d3cbae61de7d"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z/checkpoints/iter_000000500/scheduler/.metadata",
+      "sha256": "9ee6273bc7e896725cc1dc526c1434e457fe5774951ff6d9fcbe11bf2b50e242"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/formal_monitor.py",
+      "sha256": "e485fe9039454948bbe51d34b746f5ef5fb4a88d199b4373913583548472fe0e"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/src/wandb_metrics.py",
+      "sha256": "5b01586b1f5177c2321beee02729cedea53714bf03733fecd5ef8da7e88dc74b"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/packages/cosmos3/cosmos_framework/callbacks/iter_speed.py",
+      "sha256": "216bc4ebf7ddfabe592cd92c0844b380e32720a5a2d3fa1a1f97cc8085ab7d42"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/packages/cosmos3/cosmos_framework/utils/generator/optimizer.py",
+      "sha256": "a2386c0c86e4588b229422e1b9f2d23a33f16507c6290dfa2d1145012b152171"
+    }
+  ],
+  "console_read_evidence": {
+    "path": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_preflight_20261001T182754Z/Tdebug4/console.log",
+    "observed_byte_prefix_sha256": "7fab1f656f7e3107bbb631d6099c7fd73e9763d16262ce8218bf8f5a4e2cdb34",
+    "observed_bytes": 325447,
+    "checkpoint_save_completed_lines": [
+      "[10-02 05:00:54|INFO|packages/cosmos3/cosmos_framework/checkpoint/dcp.py:1262:save] Checkpoint save completed: Time taken: 24.76 seconds"
+    ]
+  },
+  "sampling_and_loss_semantics": {
+    "prefix_low_noise_enabled": true,
+    "sigma_hist_max": 0.1,
+    "wrist_weight": 3,
+    "raw8_unweighted": [
+      "loss/action_camera_translation_raw",
+      "loss/action_camera_rotation_raw",
+      "loss/action_right_wrist_translation_raw",
+      "loss/action_right_wrist_rotation_raw",
+      "loss/action_right_hand_latent_raw",
+      "loss/action_left_wrist_translation_raw",
+      "loss/action_left_wrist_rotation_raw",
+      "loss/action_left_hand_latent_raw"
+    ],
+    "loss_mean": "unweighted arithmetic mean of logged completed steps; losses have existing native rank/sample reduction; no changed sample weighting"
+  },
+  "segments": [
+    {
+      "steps": [
+        1,
+        100
+      ],
+      "count": 100,
+      "loss_mean": {
+        "loss/video_raw": 0.44265891883755104,
+        "loss/action_raw": 0.2742118665692396,
+        "loss/total": 0.7168707847688347
+      },
+      "raw8_mean": {
+        "loss/action_camera_translation_raw": 0.17850079765339616,
+        "loss/action_camera_rotation_raw": 0.14928500714744586,
+        "loss/action_right_wrist_translation_raw": 0.3297312510944903,
+        "loss/action_right_wrist_rotation_raw": 0.23542327987379394,
+        "loss/action_right_hand_latent_raw": 0.31642805418232456,
+        "loss/action_left_wrist_translation_raw": 0.3356714561476838,
+        "loss/action_left_wrist_rotation_raw": 0.2437455764670449,
+        "loss/action_left_hand_latent_raw": 0.3140271007514093
+      },
+      "clip_events": 16,
+      "clip_rate": 0.16,
+      "preclip_norm": {
+        "count": 100,
+        "mean": 0.6193822611868381,
+        "min": 0.18935246765613556,
+        "median": 0.3783255070447922,
+        "p95": 2.0025384426116943,
+        "max": 3.323103189468384
+      },
+      "monitor_train_step_seconds": {
+        "count": 100,
+        "mean": 15.004386360859499,
+        "min": 13.729207743890584,
+        "median": 14.479474646039307,
+        "p95": 16.336859674192965,
+        "max": 27.89569648914039
+      },
+      "global_clips": 4172,
+      "sum_monitor_step_seconds": 1500.4386360859498,
+      "clips_per_monitor_second": 2.7805202423226687
+    },
+    {
+      "steps": [
+        101,
+        200
+      ],
+      "count": 100,
+      "loss_mean": {
+        "loss/video_raw": 0.416167430547066,
+        "loss/action_raw": 0.19748093988018808,
+        "loss/total": 0.6136483709653839
+      },
+      "raw8_mean": {
+        "loss/action_camera_translation_raw": 0.11047027958189574,
+        "loss/action_camera_rotation_raw": 0.06048705318602515,
+        "loss/action_right_wrist_translation_raw": 0.24355141894047846,
+        "loss/action_right_wrist_rotation_raw": 0.15678541976318228,
+        "loss/action_right_hand_latent_raw": 0.25218832048471085,
+        "loss/action_left_wrist_translation_raw": 0.2508156269683968,
+        "loss/action_left_wrist_rotation_raw": 0.16070501790120034,
+        "loss/action_left_hand_latent_raw": 0.24829587631422328
+      },
+      "clip_events": 0,
+      "clip_rate": 0,
+      "preclip_norm": {
+        "count": 100,
+        "mean": 0.2490223242342472,
+        "min": 0.14450962841510773,
+        "median": 0.21334435790777206,
+        "p95": 0.44144880771636963,
+        "max": 0.7426098585128784
+      },
+      "monitor_train_step_seconds": {
+        "count": 100,
+        "mean": 14.71112722968217,
+        "min": 13.667739451862872,
+        "median": 14.430746026337147,
+        "p95": 15.810254693031311,
+        "max": 16.61235577892512
+      },
+      "global_clips": 4022,
+      "sum_monitor_step_seconds": 1471.112722968217,
+      "clips_per_monitor_second": 2.733984919853687
+    },
+    {
+      "steps": [
+        201,
+        300
+      ],
+      "count": 100,
+      "loss_mean": {
+        "loss/video_raw": 0.41640835063997655,
+        "loss/action_raw": 0.1906706503177702,
+        "loss/total": 0.6070790007989854
+      },
+      "raw8_mean": {
+        "loss/action_camera_translation_raw": 0.10118283389681892,
+        "loss/action_camera_rotation_raw": 0.05289939539875377,
+        "loss/action_right_wrist_translation_raw": 0.23215808366374405,
+        "loss/action_right_wrist_rotation_raw": 0.14900322668225272,
+        "loss/action_right_hand_latent_raw": 0.24686259736601643,
+        "loss/action_left_wrist_translation_raw": 0.24157601776380033,
+        "loss/action_left_wrist_rotation_raw": 0.1542130302019359,
+        "loss/action_left_hand_latent_raw": 0.24579913881083484
+      },
+      "clip_events": 0,
+      "clip_rate": 0,
+      "preclip_norm": {
+        "count": 100,
+        "mean": 0.2453206866979599,
+        "min": 0.12619012594223022,
+        "median": 0.22308386117219925,
+        "p95": 0.42928948998451233,
+        "max": 0.6327237486839294
+      },
+      "monitor_train_step_seconds": {
+        "count": 100,
+        "mean": 14.789171943510883,
+        "min": 13.718197661451995,
+        "median": 14.487039568368345,
+        "p95": 16.045039958320558,
+        "max": 16.776742544956505
+      },
+      "global_clips": 4048,
+      "sum_monitor_step_seconds": 1478.9171943510883,
+      "clips_per_monitor_second": 2.7371376947011297
+    },
+    {
+      "steps": [
+        301,
+        400
+      ],
+      "count": 100,
+      "loss_mean": {
+        "loss/video_raw": 0.41538665674394,
+        "loss/action_raw": 0.18480343083152548,
+        "loss/total": 0.6001900874706917
+      },
+      "raw8_mean": {
+        "loss/action_camera_translation_raw": 0.09463501682981587,
+        "loss/action_camera_rotation_raw": 0.05007282038435733,
+        "loss/action_right_wrist_translation_raw": 0.22519451333675533,
+        "loss/action_right_wrist_rotation_raw": 0.1446887059052824,
+        "loss/action_right_hand_latent_raw": 0.2428410627017729,
+        "loss/action_left_wrist_translation_raw": 0.2300527603138471,
+        "loss/action_left_wrist_rotation_raw": 0.14678085296371138,
+        "loss/action_left_hand_latent_raw": 0.24107224296894855
+      },
+      "clip_events": 5,
+      "clip_rate": 0.05,
+      "preclip_norm": {
+        "count": 100,
+        "mean": 0.695426350980997,
+        "min": 0.11184169352054596,
+        "median": 0.1912742182612419,
+        "p95": 0.8109108805656433,
+        "max": 42.04439163208008
+      },
+      "monitor_train_step_seconds": {
+        "count": 100,
+        "mean": 14.71614039692562,
+        "min": 13.71129917819053,
+        "median": 14.475500897038728,
+        "p95": 15.841539593413472,
+        "max": 16.78392035374418
+      },
+      "global_clips": 3984,
+      "sum_monitor_step_seconds": 1471.614039692562,
+      "clips_per_monitor_second": 2.7072315787584533
+    },
+    {
+      "steps": [
+        401,
+        500
+      ],
+      "count": 100,
+      "loss_mean": {
+        "loss/video_raw": 0.41964603365166114,
+        "loss/action_raw": 0.18396926304441877,
+        "loss/total": 0.6036152961105108
+      },
+      "raw8_mean": {
+        "loss/action_camera_translation_raw": 0.0933973294549287,
+        "loss/action_camera_rotation_raw": 0.04748416209582501,
+        "loss/action_right_wrist_translation_raw": 0.22316288446672844,
+        "loss/action_right_wrist_rotation_raw": 0.1424318171339837,
+        "loss/action_right_hand_latent_raw": 0.2438258260214934,
+        "loss/action_left_wrist_translation_raw": 0.22910852982160576,
+        "loss/action_left_wrist_rotation_raw": 0.1461852582692518,
+        "loss/action_left_hand_latent_raw": 0.24140713736866018
+      },
+      "clip_events": 0,
+      "clip_rate": 0,
+      "preclip_norm": {
+        "count": 100,
+        "mean": 0.20924429416656495,
+        "min": 0.11693479865789413,
+        "median": 0.18102262169122696,
+        "p95": 0.33946147561073303,
+        "max": 0.5747294425964355
+      },
+      "monitor_train_step_seconds": {
+        "count": 100,
+        "mean": 14.712302676592953,
+        "min": 13.758522933349013,
+        "median": 14.434056587750092,
+        "p95": 15.87411358486861,
+        "max": 17.898342022672296
+      },
+      "global_clips": 4132,
+      "sum_monitor_step_seconds": 1471.2302676592954,
+      "clips_per_monitor_second": 2.808533844653664
+    }
+  ],
+  "all500": {
+    "steps": [
+      1,
+      500
+    ],
+    "count": 500,
+    "loss_mean": {
+      "loss/video_raw": 0.4220534780840389,
+      "loss/action_raw": 0.20622723012862842,
+      "loss/total": 0.6282807080228813
+    },
+    "raw8_mean": {
+      "loss/action_camera_translation_raw": 0.11563725148337108,
+      "loss/action_camera_rotation_raw": 0.07204568764248143,
+      "loss/action_right_wrist_translation_raw": 0.2507596303004393,
+      "loss/action_right_wrist_rotation_raw": 0.16566648987169902,
+      "loss/action_right_hand_latent_raw": 0.26042917215126365,
+      "loss/action_left_wrist_translation_raw": 0.2574448782030668,
+      "loss/action_left_wrist_rotation_raw": 0.17032594716062885,
+      "loss/action_left_hand_latent_raw": 0.2581202992428152
+    },
+    "clip_events": 21,
+    "clip_rate": 0.042,
+    "preclip_norm": {
+      "count": 500,
+      "mean": 0.40367918345332143,
+      "min": 0.11184169352054596,
+      "median": 0.22392316162586212,
+      "p95": 0.7426098585128784,
+      "max": 42.04439163208008
+    },
+    "monitor_train_step_seconds": {
+      "count": 500,
+      "mean": 14.786625721514225,
+      "min": 13.667739451862872,
+      "median": 14.459674979560077,
+      "p95": 16.111946729943156,
+      "max": 27.89569648914039
+    },
+    "global_clips": 20358,
+    "sum_monitor_step_seconds": 7393.3128607571125,
+    "clips_per_monitor_second": 2.753569392154093
+  },
+  "post_warmup": {
+    "steps": [
+      101,
+      500
+    ],
+    "count": 400,
+    "loss_mean": {
+      "loss/video_raw": 0.4169021178956609,
+      "loss/action_raw": 0.18923107101847564,
+      "loss/total": 0.606133188836393
+    },
+    "raw8_mean": {
+      "loss/action_camera_translation_raw": 0.0999213649408648,
+      "loss/action_camera_rotation_raw": 0.05273585776624032,
+      "loss/action_right_wrist_translation_raw": 0.23101672510192656,
+      "loss/action_right_wrist_rotation_raw": 0.14822729237117527,
+      "loss/action_right_hand_latent_raw": 0.2464294516434984,
+      "loss/action_left_wrist_translation_raw": 0.2378882337169125,
+      "loss/action_left_wrist_rotation_raw": 0.15197103983402485,
+      "loss/action_left_hand_latent_raw": 0.24414359886566672
+    },
+    "clip_events": 5,
+    "clip_rate": 0.0125,
+    "preclip_norm": {
+      "count": 400,
+      "mean": 0.3497534140199423,
+      "min": 0.11184169352054596,
+      "median": 0.20526587218046188,
+      "p95": 0.4367179572582245,
+      "max": 42.04439163208008
+    },
+    "monitor_train_step_seconds": {
+      "count": 400,
+      "mean": 14.732185561677907,
+      "min": 13.667739451862872,
+      "median": 14.448995156912133,
+      "p95": 15.89943896792829,
+      "max": 17.898342022672296
+    },
+    "global_clips": 16186,
+    "sum_monitor_step_seconds": 5892.874224671163,
+    "clips_per_monitor_second": 2.7467071895469175
+  },
+  "first10": {
+    "steps": [
+      1,
+      10
+    ],
+    "count": 10,
+    "loss_mean": {
+      "loss/video_raw": 0.5215447138063609,
+      "loss/action_raw": 0.5296330828219652,
+      "loss/total": 1.0511777952313424
+    },
+    "raw8_mean": {
+      "loss/action_camera_translation_raw": 0.27352314721792936,
+      "loss/action_camera_rotation_raw": 0.5510297099128365,
+      "loss/action_right_wrist_translation_raw": 0.4517281213309616,
+      "loss/action_right_wrist_rotation_raw": 0.5421126907691359,
+      "loss/action_right_hand_latent_raw": 0.5635678069666028,
+      "loss/action_left_wrist_translation_raw": 0.44286150033585725,
+      "loss/action_left_wrist_rotation_raw": 0.5771617704071105,
+      "loss/action_left_hand_latent_raw": 0.5651576679199934
+    },
+    "clip_events": 10,
+    "clip_rate": 1,
+    "preclip_norm": {
+      "count": 10,
+      "mean": 2.202954947948456,
+      "min": 1.039570927619934,
+      "median": 2.162430167198181,
+      "p95": 3.323103189468384,
+      "max": 3.323103189468384
+    },
+    "monitor_train_step_seconds": {
+      "count": 10,
+      "mean": 17.176829333091156,
+      "min": 14.351666120812297,
+      "median": 16.346416763262823,
+      "p95": 27.89569648914039,
+      "max": 27.89569648914039
+    },
+    "global_clips": 450,
+    "sum_monitor_step_seconds": 171.76829333091155,
+    "clips_per_monitor_second": 2.619808296826209
+  },
+  "last10": {
+    "steps": [
+      491,
+      500
+    ],
+    "count": 10,
+    "loss_mean": {
+      "loss/video_raw": 0.42383805201388897,
+      "loss/action_raw": 0.17938482022145763,
+      "loss/total": 0.6032228748779744
+    },
+    "raw8_mean": {
+      "loss/action_camera_translation_raw": 0.09049084148864495,
+      "loss/action_camera_rotation_raw": 0.04409840742155211,
+      "loss/action_right_wrist_translation_raw": 0.2156166262808256,
+      "loss/action_right_wrist_rotation_raw": 0.1355956916406285,
+      "loss/action_right_hand_latent_raw": 0.2367493957048282,
+      "loss/action_left_wrist_translation_raw": 0.2208235366269946,
+      "loss/action_left_wrist_rotation_raw": 0.14527440345846115,
+      "loss/action_left_hand_latent_raw": 0.2407907423330471
+    },
+    "clip_events": 0,
+    "clip_rate": 0,
+    "preclip_norm": {
+      "count": 10,
+      "mean": 0.17698751613497735,
+      "min": 0.11693479865789413,
+      "median": 0.16249172389507294,
+      "p95": 0.2939015328884125,
+      "max": 0.2939015328884125
+    },
+    "monitor_train_step_seconds": {
+      "count": 10,
+      "mean": 14.384537651669234,
+      "min": 14.293272578157485,
+      "median": 14.352598153520375,
+      "p95": 14.591693301685154,
+      "max": 14.591693301685154
+    },
+    "global_clips": 408,
+    "sum_monitor_step_seconds": 143.84537651669234,
+    "clips_per_monitor_second": 2.8363789638567507
+  },
+  "clipping": {
+    "clip_norm": 1.0,
+    "warmup_steps": [
+      1,
+      100
+    ],
+    "post_warmup_steps": [
+      101,
+      500
+    ],
+    "post_warmup_events": 5,
+    "post_warmup_rate": 0.0125,
+    "max_events_in_fully_post_warmup_10step_window": 5,
+    "stop_threshold": 9,
+    "all_500_stop_reasons": [],
+    "STOPPED_json_exists": false,
+    "post_warmup_event_rows": [
+      {
+        "step": 327,
+        "preclip_norm": 1.1562838554382324,
+        "grad_clip_triggered": true,
+        "loss/video_raw": 0.4123361576348543,
+        "loss/action_raw": 0.19741959823295474,
+        "loss/total": 0.6097557544708252,
+        "stop_reason": null
+      },
+      {
+        "step": 329,
+        "preclip_norm": 2.9493491649627686,
+        "grad_clip_triggered": true,
+        "loss/video_raw": 0.4443318387493491,
+        "loss/action_raw": 0.18157631740905344,
+        "loss/total": 0.625908151268959,
+        "stop_reason": null
+      },
+      {
+        "step": 330,
+        "preclip_norm": 1.1190614700317383,
+        "grad_clip_triggered": true,
+        "loss/video_raw": 0.4218634758144617,
+        "loss/action_raw": 0.1932356667239219,
+        "loss/total": 0.6150991497561336,
+        "stop_reason": null
+      },
+      {
+        "step": 331,
+        "preclip_norm": 42.04439163208008,
+        "grad_clip_triggered": true,
+        "loss/video_raw": 0.5915870270691812,
+        "loss/action_raw": 0.2793004969134927,
+        "loss/total": 0.8708875197917223,
+        "stop_reason": null
+      },
+      {
+        "step": 332,
+        "preclip_norm": 1.3818707466125488,
+        "grad_clip_triggered": true,
+        "loss/video_raw": 0.5013633607886732,
+        "loss/action_raw": 0.20181644125841558,
+        "loss/total": 0.7031798018142581,
+        "stop_reason": null
+      }
+    ]
+  },
+  "finite": {
+    "numeric_and_loss_violations": [],
+    "status_ok_count": 500,
+    "raw_gradient_nonfinite_flags": [],
+    "raw_gradient_checks": "presence flags all500; element-count detailed diagnostics only early configured iterations",
+    "preclip_and_losses_finite": true
+  },
+  "speed": {
+    "monitor_all500": {
+      "count": 500,
+      "mean": 14.786625721514225,
+      "min": 13.667739451862872,
+      "median": 14.459674979560077,
+      "p95": 16.111946729943156,
+      "max": 27.89569648914039
+    },
+    "monitor_semantics": "max across ranks, callback training-step start to training-step-batch end; does not include all optimizer/checkpoint/log/data-wait overhead",
+    "official_wall_clock_windows": {
+      "covered_steps": [
+        61,
+        500
+      ],
+      "logged_end_steps": [
+        70,
+        500
+      ],
+      "windows": 44,
+      "covered_iterations": 440,
+      "mean_seconds_per_iteration": 15.387954545454544,
+      "tokens_per_iteration": 818535.9090909091,
+      "pooled_tokens_per_second": 53193.28872937806,
+      "clips_per_second": 2.637836560473806,
+      "logging_precision": "seconds rounded to0.01 and token averages rounded by native console output",
+      "records": [
+        {
+          "step": 70,
+          "timestamp_node_local": "10-02 03:10:37",
+          "seconds_per_iteration": 15.31,
+          "tokens_per_iteration": 819418,
+          "tokens_per_second_logged": 53527
+        },
+        {
+          "step": 80,
+          "timestamp_node_local": "10-02 03:13:13",
+          "seconds_per_iteration": 15.62,
+          "tokens_per_iteration": 830196,
+          "tokens_per_second_logged": 53145
+        },
+        {
+          "step": 90,
+          "timestamp_node_local": "10-02 03:15:47",
+          "seconds_per_iteration": 15.45,
+          "tokens_per_iteration": 849514,
+          "tokens_per_second_logged": 54993
+        },
+        {
+          "step": 100,
+          "timestamp_node_local": "10-02 03:18:18",
+          "seconds_per_iteration": 15.05,
+          "tokens_per_iteration": 814274,
+          "tokens_per_second_logged": 54099
+        },
+        {
+          "step": 110,
+          "timestamp_node_local": "10-02 03:20:50",
+          "seconds_per_iteration": 15.21,
+          "tokens_per_iteration": 823490,
+          "tokens_per_second_logged": 54134
+        },
+        {
+          "step": 120,
+          "timestamp_node_local": "10-02 03:23:24",
+          "seconds_per_iteration": 15.42,
+          "tokens_per_iteration": 821469,
+          "tokens_per_second_logged": 53288
+        },
+        {
+          "step": 130,
+          "timestamp_node_local": "10-02 03:25:59",
+          "seconds_per_iteration": 15.51,
+          "tokens_per_iteration": 821037,
+          "tokens_per_second_logged": 52930
+        },
+        {
+          "step": 140,
+          "timestamp_node_local": "10-02 03:28:32",
+          "seconds_per_iteration": 15.26,
+          "tokens_per_iteration": 829254,
+          "tokens_per_second_logged": 54349
+        },
+        {
+          "step": 150,
+          "timestamp_node_local": "10-02 03:31:05",
+          "seconds_per_iteration": 15.3,
+          "tokens_per_iteration": 815500,
+          "tokens_per_second_logged": 53307
+        },
+        {
+          "step": 160,
+          "timestamp_node_local": "10-02 03:33:40",
+          "seconds_per_iteration": 15.52,
+          "tokens_per_iteration": 821024,
+          "tokens_per_second_logged": 52914
+        },
+        {
+          "step": 170,
+          "timestamp_node_local": "10-02 03:36:10",
+          "seconds_per_iteration": 14.98,
+          "tokens_per_iteration": 796066,
+          "tokens_per_second_logged": 53144
+        },
+        {
+          "step": 180,
+          "timestamp_node_local": "10-02 03:38:46",
+          "seconds_per_iteration": 15.58,
+          "tokens_per_iteration": 819712,
+          "tokens_per_second_logged": 52599
+        },
+        {
+          "step": 190,
+          "timestamp_node_local": "10-02 03:41:17",
+          "seconds_per_iteration": 15.14,
+          "tokens_per_iteration": 809540,
+          "tokens_per_second_logged": 53486
+        },
+        {
+          "step": 200,
+          "timestamp_node_local": "10-02 03:43:47",
+          "seconds_per_iteration": 14.98,
+          "tokens_per_iteration": 810758,
+          "tokens_per_second_logged": 54135
+        },
+        {
+          "step": 210,
+          "timestamp_node_local": "10-02 03:46:23",
+          "seconds_per_iteration": 15.68,
+          "tokens_per_iteration": 814316,
+          "tokens_per_second_logged": 51934
+        },
+        {
+          "step": 220,
+          "timestamp_node_local": "10-02 03:48:58",
+          "seconds_per_iteration": 15.47,
+          "tokens_per_iteration": 812558,
+          "tokens_per_second_logged": 52540
+        },
+        {
+          "step": 230,
+          "timestamp_node_local": "10-02 03:51:31",
+          "seconds_per_iteration": 15.31,
+          "tokens_per_iteration": 827531,
+          "tokens_per_second_logged": 54049
+        },
+        {
+          "step": 240,
+          "timestamp_node_local": "10-02 03:54:10",
+          "seconds_per_iteration": 15.87,
+          "tokens_per_iteration": 812875,
+          "tokens_per_second_logged": 51206
+        },
+        {
+          "step": 250,
+          "timestamp_node_local": "10-02 03:56:43",
+          "seconds_per_iteration": 15.29,
+          "tokens_per_iteration": 811021,
+          "tokens_per_second_logged": 53052
+        },
+        {
+          "step": 260,
+          "timestamp_node_local": "10-02 03:59:17",
+          "seconds_per_iteration": 15.45,
+          "tokens_per_iteration": 823973,
+          "tokens_per_second_logged": 53336
+        },
+        {
+          "step": 270,
+          "timestamp_node_local": "10-02 04:01:50",
+          "seconds_per_iteration": 15.25,
+          "tokens_per_iteration": 818305,
+          "tokens_per_second_logged": 53643
+        },
+        {
+          "step": 280,
+          "timestamp_node_local": "10-02 04:04:22",
+          "seconds_per_iteration": 15.19,
+          "tokens_per_iteration": 829140,
+          "tokens_per_second_logged": 54590
+        },
+        {
+          "step": 290,
+          "timestamp_node_local": "10-02 04:06:55",
+          "seconds_per_iteration": 15.32,
+          "tokens_per_iteration": 803801,
+          "tokens_per_second_logged": 52452
+        },
+        {
+          "step": 300,
+          "timestamp_node_local": "10-02 04:09:27",
+          "seconds_per_iteration": 15.21,
+          "tokens_per_iteration": 812273,
+          "tokens_per_second_logged": 53420
+        },
+        {
+          "step": 310,
+          "timestamp_node_local": "10-02 04:11:59",
+          "seconds_per_iteration": 15.21,
+          "tokens_per_iteration": 822680,
+          "tokens_per_second_logged": 54075
+        },
+        {
+          "step": 320,
+          "timestamp_node_local": "10-02 04:14:35",
+          "seconds_per_iteration": 15.6,
+          "tokens_per_iteration": 824129,
+          "tokens_per_second_logged": 52836
+        },
+        {
+          "step": 330,
+          "timestamp_node_local": "10-02 04:17:08",
+          "seconds_per_iteration": 15.3,
+          "tokens_per_iteration": 822460,
+          "tokens_per_second_logged": 53757
+        },
+        {
+          "step": 340,
+          "timestamp_node_local": "10-02 04:19:43",
+          "seconds_per_iteration": 15.5,
+          "tokens_per_iteration": 814082,
+          "tokens_per_second_logged": 52514
+        },
+        {
+          "step": 350,
+          "timestamp_node_local": "10-02 04:22:17",
+          "seconds_per_iteration": 15.35,
+          "tokens_per_iteration": 809180,
+          "tokens_per_second_logged": 52714
+        },
+        {
+          "step": 360,
+          "timestamp_node_local": "10-02 04:24:48",
+          "seconds_per_iteration": 15.15,
+          "tokens_per_iteration": 817682,
+          "tokens_per_second_logged": 53968
+        },
+        {
+          "step": 370,
+          "timestamp_node_local": "10-02 04:27:19",
+          "seconds_per_iteration": 15.1,
+          "tokens_per_iteration": 821137,
+          "tokens_per_second_logged": 54389
+        },
+        {
+          "step": 380,
+          "timestamp_node_local": "10-02 04:29:53",
+          "seconds_per_iteration": 15.42,
+          "tokens_per_iteration": 811901,
+          "tokens_per_second_logged": 52661
+        },
+        {
+          "step": 390,
+          "timestamp_node_local": "10-02 04:32:26",
+          "seconds_per_iteration": 15.22,
+          "tokens_per_iteration": 806938,
+          "tokens_per_second_logged": 53013
+        },
+        {
+          "step": 400,
+          "timestamp_node_local": "10-02 04:34:57",
+          "seconds_per_iteration": 15.19,
+          "tokens_per_iteration": 803471,
+          "tokens_per_second_logged": 52909
+        },
+        {
+          "step": 410,
+          "timestamp_node_local": "10-02 04:37:31",
+          "seconds_per_iteration": 15.39,
+          "tokens_per_iteration": 800749,
+          "tokens_per_second_logged": 52038
+        },
+        {
+          "step": 420,
+          "timestamp_node_local": "10-02 04:40:04",
+          "seconds_per_iteration": 15.31,
+          "tokens_per_iteration": 831589,
+          "tokens_per_second_logged": 54312
+        },
+        {
+          "step": 430,
+          "timestamp_node_local": "10-02 04:42:38",
+          "seconds_per_iteration": 15.34,
+          "tokens_per_iteration": 815274,
+          "tokens_per_second_logged": 53140
+        },
+        {
+          "step": 440,
+          "timestamp_node_local": "10-02 04:45:11",
+          "seconds_per_iteration": 15.29,
+          "tokens_per_iteration": 835407,
+          "tokens_per_second_logged": 54654
+        },
+        {
+          "step": 450,
+          "timestamp_node_local": "10-02 04:47:42",
+          "seconds_per_iteration": 15.14,
+          "tokens_per_iteration": 828992,
+          "tokens_per_second_logged": 54767
+        },
+        {
+          "step": 460,
+          "timestamp_node_local": "10-02 04:50:16",
+          "seconds_per_iteration": 15.36,
+          "tokens_per_iteration": 815148,
+          "tokens_per_second_logged": 53070
+        },
+        {
+          "step": 470,
+          "timestamp_node_local": "10-02 04:52:51",
+          "seconds_per_iteration": 15.49,
+          "tokens_per_iteration": 810587,
+          "tokens_per_second_logged": 52320
+        },
+        {
+          "step": 480,
+          "timestamp_node_local": "10-02 04:55:27",
+          "seconds_per_iteration": 15.59,
+          "tokens_per_iteration": 843117,
+          "tokens_per_second_logged": 54063
+        },
+        {
+          "step": 490,
+          "timestamp_node_local": "10-02 04:57:59",
+          "seconds_per_iteration": 15.27,
+          "tokens_per_iteration": 819143,
+          "tokens_per_second_logged": 53638
+        },
+        {
+          "step": 500,
+          "timestamp_node_local": "10-02 05:00:54",
+          "seconds_per_iteration": 17.48,
+          "tokens_per_iteration": 814869,
+          "tokens_per_second_logged": 46619
+        }
+      ]
+    },
+    "full_update_log_wall_clock": {
+      "covered_steps": [
+        2,
+        500
+      ],
+      "iterations": 499,
+      "start_event_step": 1,
+      "end_event_step": 500,
+      "start_timestamp_node_local": "10-02 02:52:49",
+      "end_timestamp_node_local": "10-02 05:00:55",
+      "elapsed_seconds": 7686.0,
+      "mean_seconds_per_iteration": 15.402805611222444,
+      "clips": 20301,
+      "clips_per_second": 2.641295862607338,
+      "precision": "node log timestamps resolve one second; includes checkpoint/optimizer/callback overhead between clip-step-end events"
+    }
+  },
+  "memory": {
+    "scope": "maximum across all16 ranks, monitor step-start resident and step-local allocator peaks",
+    "first500_peak_allocated_gib": 36.23440217971802,
+    "first500_peak_reserved_gib": 45.44921875,
+    "post_warmup_resident_allocated_gib": {
+      "count": 400,
+      "mean": 15.194036812782288,
+      "min": 15.169783115386963,
+      "median": 15.190951347351074,
+      "p95": 15.20152759552002,
+      "max": 15.202194690704346
+    },
+    "step500": {
+      "peak_allocated_gib": 35.63997411727905,
+      "peak_reserved_gib": 45.44921875,
+      "resident_allocated_gib": 15.190951347351074
+    }
+  },
+  "learning_rate": {
+    "config_optimizer_lr": 0.0001,
+    "lr_multipliers": {
+      "action2llm": 1,
+      "action_modality_embed": 1,
+      "action_state_embed": 1,
+      "llm2action": 1,
+      "vision_condition_embed": 1
+    },
+    "official_scheduler_config": {
+      "_target_": "cosmos_framework.utils.generator.optimizer.build_lr_scheduler",
+      "cycle_lengths": [
+        3000
+      ],
+      "f_max": [
+        1.0
+      ],
+      "f_min": [
+        0.3
+      ],
+      "f_start": [
+        0.0
+      ],
+      "lr_scheduler_type": "LambdaCosine",
+      "optimizer": null,
+      "verbosity_interval": 0,
+      "warm_up_steps": [
+        100
+      ]
+    },
+    "step500_update_used_schedule_index": 499,
+    "step500_update_logged_lr": {
+      "optim/lr_base": 9.678103378973901e-05,
+      "optim/lr_action": 9.678103378973901e-05
+    },
+    "theoretical_lr_schedule499": 9.678104146631937e-05,
+    "theoretical_lr_schedule500": 9.67651396884835e-05,
+    "checkpoint500_scheduler_state": {
+      "last_epoch": 500,
+      "_step_count": 501,
+      "_is_initial": false,
+      "_get_lr_called_within_step": false,
+      "base_lrs.0": 9.999999747378752e-05,
+      "_last_lr.0": 9.676513582235202e-05
+    },
+    "scheduler_bytes_read": 8198,
+    "checkpoint_scheduler_actual_lr_for_next_step501": 9.676513582235202e-05,
+    "explanation": "project diagnostics copy Python float LR before optimizer step under iteration499, later log completed step500; native optimizer update then scheduler.step advances last_epoch500 before checkpoint; tiny theoretical differences are FP32 LR representation"
+  },
+  "wandb_api": {
+    "url": "https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/b7fdsq94",
+    "run_id": "b7fdsq94",
+    "state": "running",
+    "scan_history_arguments": {
+      "keys": [
+        "_step",
+        "loss/video_raw",
+        "loss/action_raw",
+        "loss/total",
+        "loss/action_camera_translation_raw",
+        "loss/action_camera_rotation_raw",
+        "loss/action_right_wrist_translation_raw",
+        "loss/action_right_wrist_rotation_raw",
+        "loss/action_right_hand_latent_raw",
+        "loss/action_left_wrist_translation_raw",
+        "loss/action_left_wrist_rotation_raw",
+        "loss/action_left_hand_latent_raw",
+        "optim/lr_base",
+        "optim/lr_action"
+      ],
+      "page_size": 100,
+      "min_step": 495,
+      "max_step": 505,
+      "use_cache": false
+    },
+    "rows": [
+      {
+        "optim/lr_base": 9.685999248176813e-05,
+        "optim/lr_action": 9.685999248176813e-05,
+        "_step": 495,
+        "loss/video_raw": 0.4351915419101715,
+        "loss/action_raw": 0.19159358739852905,
+        "loss/total": 0.626785159111023,
+        "loss/action_right_wrist_translation_raw": 0.25571489334106445,
+        "loss/action_right_wrist_rotation_raw": 0.1434449404478073,
+        "loss/action_right_hand_latent_raw": 0.24872741103172302,
+        "loss/action_left_wrist_rotation_raw": 0.15830227732658386,
+        "loss/action_camera_translation_raw": 0.1058323085308075,
+        "loss/action_camera_rotation_raw": 0.05437780171632767,
+        "loss/action_left_wrist_translation_raw": 0.22828981280326843,
+        "loss/action_left_hand_latent_raw": 0.24373571574687958
+      },
+      {
+        "loss/action_left_hand_latent_raw": 0.22192350029945374,
+        "loss/action_camera_translation_raw": 0.07462602853775024,
+        "loss/action_camera_rotation_raw": 0.03425312042236328,
+        "loss/action_right_wrist_rotation_raw": 0.12345300614833832,
+        "loss/action_left_wrist_translation_raw": 0.18303872644901276,
+        "optim/lr_base": 9.684426913736388e-05,
+        "optim/lr_action": 9.684426913736388e-05,
+        "_step": 496,
+        "loss/video_raw": 0.40438318252563477,
+        "loss/action_raw": 0.15997186303138733,
+        "loss/total": 0.5643550753593445,
+        "loss/action_right_wrist_translation_raw": 0.18792656064033508,
+        "loss/action_right_hand_latent_raw": 0.23388101160526276,
+        "loss/action_left_wrist_rotation_raw": 0.11389317363500595
+      },
+      {
+        "loss/action_camera_rotation_raw": 0.04400140792131424,
+        "loss/action_right_wrist_translation_raw": 0.18933767080307007,
+        "loss/action_right_wrist_rotation_raw": 0.12156276404857635,
+        "loss/action_left_wrist_translation_raw": 0.20506227016448975,
+        "optim/lr_action": 9.682851668912917e-05,
+        "loss/video_raw": 0.40904831886291504,
+        "loss/action_raw": 0.1702427864074707,
+        "loss/action_camera_translation_raw": 0.07732028514146805,
+        "loss/action_right_hand_latent_raw": 0.22709134221076965,
+        "loss/action_left_wrist_rotation_raw": 0.14906850457191467,
+        "loss/action_left_hand_latent_raw": 0.2339518815279007,
+        "optim/lr_base": 9.682851668912917e-05,
+        "_step": 497,
+        "loss/total": 0.5792911052703857
+      },
+      {
+        "loss/video_raw": 0.4429285228252411,
+        "loss/action_raw": 0.18569070100784302,
+        "loss/action_camera_translation_raw": 0.10461542010307312,
+        "loss/action_camera_rotation_raw": 0.05377357825636864,
+        "loss/action_right_wrist_translation_raw": 0.20650756359100342,
+        "loss/action_right_wrist_rotation_raw": 0.13097169995307922,
+        "loss/action_right_hand_latent_raw": 0.22280308604240417,
+        "loss/action_left_hand_latent_raw": 0.2503165900707245,
+        "_step": 498,
+        "loss/total": 0.6286191940307617,
+        "loss/action_left_wrist_translation_raw": 0.26056569814682007,
+        "loss/action_left_wrist_rotation_raw": 0.16526676714420319,
+        "optim/lr_base": 9.68127278611064e-05,
+        "optim/lr_action": 9.68127278611064e-05
+      },
+      {
+        "loss/action_camera_translation_raw": 0.11459793150424957,
+        "loss/action_camera_rotation_raw": 0.044990770518779755,
+        "loss/action_right_wrist_translation_raw": 0.24432314932346344,
+        "loss/action_right_hand_latent_raw": 0.2675684690475464,
+        "optim/lr_base": 9.679690265329555e-05,
+        "optim/lr_action": 9.679690265329555e-05,
+        "loss/video_raw": 0.4450981616973877,
+        "loss/total": 0.6427066922187805,
+        "loss/action_right_wrist_rotation_raw": 0.15505000948905945,
+        "loss/action_left_wrist_translation_raw": 0.24187973141670227,
+        "loss/action_left_wrist_rotation_raw": 0.15507620573043823,
+        "loss/action_left_hand_latent_raw": 0.2528151571750641,
+        "_step": 499,
+        "loss/action_raw": 0.19760850071907043
+      },
+      {
+        "loss/action_right_wrist_rotation_raw": 0.1399255096912384,
+        "loss/action_right_hand_latent_raw": 0.22873716056346893,
+        "loss/action_left_wrist_rotation_raw": 0.15151362121105194,
+        "optim/lr_base": 9.678103378973901e-05,
+        "_step": 500,
+        "loss/video_raw": 0.3908598721027374,
+        "loss/total": 0.5708702802658081,
+        "loss/action_camera_translation_raw": 0.08664976805448532,
+        "loss/action_left_wrist_translation_raw": 0.20724177360534668,
+        "loss/action_left_hand_latent_raw": 0.25364622473716736,
+        "optim/lr_action": 9.678103378973901e-05,
+        "loss/action_raw": 0.1800103485584259,
+        "loss/action_camera_rotation_raw": 0.03848963975906372,
+        "loss/action_right_wrist_translation_raw": 0.2114715874195099
+      },
+      {
+        "_step": 501,
+        "loss/video_raw": 0.469577431678772,
+        "loss/action_camera_translation_raw": 0.11459370702505112,
+        "loss/action_camera_rotation_raw": 0.052165403962135315,
+        "loss/action_right_wrist_translation_raw": 0.2582210302352905,
+        "loss/action_right_hand_latent_raw": 0.27231061458587646,
+        "loss/action_left_wrist_translation_raw": 0.2734401226043701,
+        "loss/action_left_wrist_rotation_raw": 0.17250728607177734,
+        "loss/action_raw": 0.21225057542324066,
+        "loss/total": 0.6818280220031738,
+        "loss/action_right_wrist_rotation_raw": 0.16533541679382324,
+        "loss/action_left_hand_latent_raw": 0.275450199842453,
+        "optim/lr_base": 9.676513582235202e-05,
+        "optim/lr_action": 9.676513582235202e-05
+      },
+      {
+        "loss/total": 0.5442612171173096,
+        "loss/action_right_hand_latent_raw": 0.20618107914924622,
+        "loss/action_left_wrist_translation_raw": 0.2125985473394394,
+        "loss/action_left_hand_latent_raw": 0.22840285301208496,
+        "optim/lr_action": 9.674919419921935e-05,
+        "loss/video_raw": 0.3820968568325043,
+        "loss/action_camera_translation_raw": 0.07240193337202072,
+        "loss/action_camera_rotation_raw": 0.035575177520513535,
+        "loss/action_right_wrist_translation_raw": 0.1922970414161682,
+        "loss/action_right_wrist_rotation_raw": 0.12094978988170624,
+        "loss/action_left_wrist_rotation_raw": 0.12837310135364532,
+        "optim/lr_base": 9.674919419921935e-05,
+        "_step": 502,
+        "loss/action_raw": 0.16216439008712769
+      },
+      {
+        "optim/lr_base": 9.673322347225621e-05,
+        "optim/lr_action": 9.673322347225621e-05,
+        "loss/video_raw": 0.40067610144615173,
+        "loss/total": 0.5772411227226257,
+        "loss/action_right_wrist_translation_raw": 0.2187141478061676,
+        "loss/action_right_wrist_rotation_raw": 0.13721022009849548,
+        "loss/action_right_hand_latent_raw": 0.23017935454845428,
+        "loss/action_left_wrist_translation_raw": 0.2118801772594452,
+        "loss/action_left_hand_latent_raw": 0.23664221167564392,
+        "_step": 503,
+        "loss/action_raw": 0.176565021276474,
+        "loss/action_camera_translation_raw": 0.07989726960659027,
+        "loss/action_camera_rotation_raw": 0.04688579589128494,
+        "loss/action_left_wrist_rotation_raw": 0.1417824774980545
+      },
+      {
+        "optim/lr_action": 9.67172090895474e-05,
+        "_step": 504,
+        "loss/video_raw": 0.414924293756485,
+        "loss/action_raw": 0.16162028908729553,
+        "loss/action_camera_translation_raw": 0.05609649419784546,
+        "loss/action_right_wrist_translation_raw": 0.20157787203788757,
+        "loss/action_right_hand_latent_raw": 0.21943357586860657,
+        "loss/action_left_wrist_translation_raw": 0.19484150409698486,
+        "optim/lr_base": 9.67172090895474e-05,
+        "loss/total": 0.5765446424484253,
+        "loss/action_camera_rotation_raw": 0.03736438602209091,
+        "loss/action_right_wrist_rotation_raw": 0.12534308433532715,
+        "loss/action_left_wrist_rotation_raw": 0.13074320554733276,
+        "loss/action_left_hand_latent_raw": 0.21129201352596283
+      }
+    ],
+    "step500": {
+      "loss/action_right_wrist_rotation_raw": 0.1399255096912384,
+      "loss/action_right_hand_latent_raw": 0.22873716056346893,
+      "loss/action_left_wrist_rotation_raw": 0.15151362121105194,
+      "optim/lr_base": 9.678103378973901e-05,
+      "_step": 500,
+      "loss/video_raw": 0.3908598721027374,
+      "loss/total": 0.5708702802658081,
+      "loss/action_camera_translation_raw": 0.08664976805448532,
+      "loss/action_left_wrist_translation_raw": 0.20724177360534668,
+      "loss/action_left_hand_latent_raw": 0.25364622473716736,
+      "optim/lr_action": 9.678103378973901e-05,
+      "loss/action_raw": 0.1800103485584259,
+      "loss/action_camera_rotation_raw": 0.03848963975906372,
+      "loss/action_right_wrist_translation_raw": 0.2114715874195099
+    },
+    "step500_exact_matches_local_loss_metrics": {
+      "loss/video_raw": true,
+      "loss/action_raw": true,
+      "loss/total": true,
+      "loss/action_camera_translation_raw": true,
+      "loss/action_camera_rotation_raw": true,
+      "loss/action_right_wrist_translation_raw": true,
+      "loss/action_right_wrist_rotation_raw": true,
+      "loss/action_right_hand_latent_raw": true,
+      "loss/action_left_wrist_translation_raw": true,
+      "loss/action_left_wrist_rotation_raw": true,
+      "loss/action_left_hand_latent_raw": true,
+      "optim/lr_base": true,
+      "optim/lr_action": true
+    },
+    "returned_rows_json_sha256": "36d1e8d1e4d59318037065a659db71a81d08c94b6c75e940b1ada4d253dbe5a7",
+    "raw8_present_and_finite": true
+  },
+  "step500_formal_monitor": {
+    "step": 500,
+    "global_batch": 42,
+    "clips_per_rank": [
+      3,
+      3,
+      3,
+      1,
+      2,
+      4,
+      4,
+      1,
+      2,
+      2,
+      3,
+      1,
+      3,
+      3,
+      3,
+      4
+    ],
+    "peak_allocated_gib": 35.63997411727905,
+    "peak_reserved_gib": 45.44921875,
+    "train_step_seconds": 14.293272578157485,
+    "preclip_norm": 0.13080404698848724,
+    "resident_allocated_gib": 15.190951347351074,
+    "grad_clip_triggered": false,
+    "grad_clip_trigger_rate": 0.0,
+    "report_due": true,
+    "stop_reason": null,
+    "loss/video_raw": 0.3908598884008825,
+    "loss/action_raw": 0.18001035414636135,
+    "loss/total": 0.5708702458068728,
+    "loss/action_camera_translation_raw": 0.08664977323496714,
+    "loss/action_camera_rotation_raw": 0.03848963885684498,
+    "loss/action_right_wrist_translation_raw": 0.21147159300744534,
+    "loss/action_right_wrist_rotation_raw": 0.13992552738636732,
+    "loss/action_right_hand_latent_raw": 0.22873715637251735,
+    "loss/action_left_wrist_translation_raw": 0.20724177081137896,
+    "loss/action_left_wrist_rotation_raw": 0.1515136263333261,
+    "loss/action_left_hand_latent_raw": 0.2536462238058448
+  },
+  "step500_loss_metrics": {
+    "step": 500,
+    "status": "ok",
+    "loss/video_raw": 0.3908598721027374,
+    "loss/action_raw": 0.1800103485584259,
+    "loss/total": 0.5708702802658081,
+    "loss/action_camera_translation_raw": 0.08664976805448532,
+    "loss/action_camera_rotation_raw": 0.03848963975906372,
+    "loss/action_right_wrist_translation_raw": 0.2114715874195099,
+    "loss/action_right_wrist_rotation_raw": 0.1399255096912384,
+    "loss/action_right_hand_latent_raw": 0.22873716056346893,
+    "loss/action_left_wrist_translation_raw": 0.20724177360534668,
+    "loss/action_left_wrist_rotation_raw": 0.15151362121105194,
+    "loss/action_left_hand_latent_raw": 0.25364622473716736,
+    "sigma/action_mean": 0.5810566544532776,
+    "sigma/video_mean": 0.2795766294002533,
+    "sigma/video_min": 0.0,
+    "sigma/video_max": 0.9549483060836792,
+    "sigma/video_low_0_1_fraction": 0.6637561321258545,
+    "sigma/video_low_0_2_fraction": 0.6686581373214722,
+    "grad_norm/shared_pre_clip": 0.1182563453912735,
+    "grad_norm/video_projection_pre_clip": 0.038110725581645966,
+    "grad_norm/action_projection_pre_clip": 0.040898773819208145,
+    "grad_norm/all_selected_pre_clip": 0.13080404698848724,
+    "grad_nonfinite/shared_present": 0.0,
+    "grad_nonfinite/video_projection_present": 0.0,
+    "grad_nonfinite/action_projection_present": 0.0,
+    "grad_nonfinite/all_selected_present": 0.0,
+    "optim/lr_base": 9.678103378973901e-05,
+    "optim/lr_action": 9.678103378973901e-05
+  },
+  "plot": {
+    "path": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step000500/training_step500_statistics.png",
+    "sha256": "cf59965094d0cad7d4848edc79838207f16a6f25b944866bb2dad91d7bc16412"
+  },
+  "anomalies": [],
+  "observations": [
+    "Post-warmup gradients have five finite clipped outliers (largest42.044 at listed step); none meet9/10 clipping stop condition. This receipt reports training statistics, not heldout quality or a matched V02 comparison."
+  ]
+}
