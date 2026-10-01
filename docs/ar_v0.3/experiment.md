@@ -300,3 +300,5 @@
 后续跟进已建立当前对话heartbeat `ar-v0-3`，每10分钟检查真实训练状态、停止规则和W&B上传。正式评测持久计划根 `outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/`；500/1000/2000/3000每个checkpoint均扫描sigma_small {.02,.05,.1}：heldout8的gt/generated、训练固定16窗的gt，合计每次72jobs/96NPZ，四次288jobs/384NPZ。计划准备时四个checkpoint尚未保存、0绑定、0评测GPU启动，不预先伪造checkpoint绑定。
 
 评测只在实际官方保存标记、四类DCP metadata及所有storage范围完整后绑定；优先使用Tdebug1/3/5/6空闲资源，排除训练中的Tdebug4/2。先三档heldout首窗pilot共6份验收，再推进其余69jobs；CPU串行/并行一致性检查后按24workers汇总96份/9组。持久claim和阶段记录阻止重复派发，失败不自动覆盖/重试。光流仍为320×180 pooled整体余弦，腕/手形对原始GT、PSNR先合并MSE，并与V0.2 step1000和lr1e-4组及train16参照同表。正式结果在对应checkpoint实际完成后逐项追加，保留源、配置及清单hash。
+
+新增正式评测CPU控制器 `cosmos3_joint_video_hand_pose/scripts/ar_v03_eval_followup.py` 和汇总器 `ar_v03_formal_cpu_metrics.py`。两者联合61项CPU测试通过（控制器25、汇总器36，10.18秒），语法/空白检查通过；包括原生tiny CPU DCP完整性/截断拒绝、四milestone保存门槛、训练节点排除、九组数学与五基线映射、防重复claim、异常退出核查。CPU阶段须通过实际节点的只读MCP probe验证hostname/PID birth tick，失活或孤儿进程报告attention且不自动重试。测试仅为CPU夹具及契约验收，不代替正式checkpoint的实际重载和96份结果验收。四计划、代码/清单hash和测试范围见 [formal_eval_preparation.json](formal_eval_preparation.json)，远端评测根另存 `operations_template.txt`。

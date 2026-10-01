@@ -1,0 +1,182 @@
+{
+  "schema": "ar_v03_formal_eval_preparation_validation_v1",
+  "time": "2026-10-01T18:59:43.368413+00:00",
+  "repository_head_at_validation": "9eac1859d2a94c6a4c41d12dee1f2ea92957bbdf",
+  "validation_scope": "CPU unit/native tiny DCP fixture + source/schema/math review; no formal model tensors loaded, no milestone bound, no GPU or real formal metrics launched",
+  "tests": {
+    "followup": 25,
+    "formal_cpu_metrics": 36,
+    "total_passed": 61,
+    "seconds": 10.18,
+    "warnings": "two official torch warnings from tiny single-process CPU DCP fixture"
+  },
+  "py_compile": "passed",
+  "tracked_git_diff_check": "passed",
+  "all_four_new_files_trailing_whitespace_check": "passed",
+  "files": [
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/scripts/ar_v03_eval_followup.py",
+      "sha256": "f968b843d3d7fdaedf89f07defa8aa48123184e30eff8ba57ab8bfd69ab41e1e"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/scripts/ar_v03_formal_cpu_metrics.py",
+      "sha256": "d25e9379bd4106d8deb5e11d65b2d4d9c6945c62d7241cbb7d6abfb86047cfa3"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/cosmos3_joint_video_hand_pose/tests/test_ar_v03_eval_followup.py",
+      "sha256": "f61c35d40897ae5ca47cf81af958f7cf73520ff0f41243d650cc3319c02907b0"
+    },
+    {
+      "path": "/mnt/lzh/cosmos-EgoWAM/tests/test_ar_v03_formal_cpu_metrics.py",
+      "sha256": "1d50f39242ae04ab1ce0908174a8bb74aa0131437cffc1b962a25b9dad2bd8d3"
+    }
+  ],
+  "followup_configuration": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/followup.json",
+  "campaigns": [
+    {
+      "step": 500,
+      "scan_root": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step000500",
+      "jobs": 72,
+      "results": 96,
+      "plan_sha256": "33db513c58a20b5c04cd372ff5046ae7d227707350b3d75d274208c707c380da"
+    },
+    {
+      "step": 1000,
+      "scan_root": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step001000",
+      "jobs": 72,
+      "results": 96,
+      "plan_sha256": "4b8d2ac010026ab075d9bc44d0f50378d00e4e22d1dbb2546784bb00612cf886"
+    },
+    {
+      "step": 2000,
+      "scan_root": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step002000",
+      "jobs": 72,
+      "results": 96,
+      "plan_sha256": "883ea68f6917ac3e6143928351f8f983cab97ac7893c245799a36fb78712c848"
+    },
+    {
+      "step": 3000,
+      "scan_root": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step003000",
+      "jobs": 72,
+      "results": 96,
+      "plan_sha256": "78d1e2a68acc1f8afeff8b68753a3b3616ebfc2b42f65c4be2d2629265eae3a8"
+    }
+  ],
+  "total_planned_jobs": 288,
+  "total_planned_results": 384,
+  "excluded_training_nodes": [
+    "Tdebug4",
+    "Tdebug2"
+  ],
+  "readiness_status": {
+    "schema": "ar_v03_formal_eval_followup_v1",
+    "inspected_at": "2026-10-01T18:59:43.364748+00:00",
+    "training_output_root": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z",
+    "discovered_run_dir": "/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3/formal_prefix_uniform_t273_20261001T182754Z",
+    "snapshot_wait_reason": null,
+    "excluded_training_nodes": [
+      "Tdebug4",
+      "Tdebug2"
+    ],
+    "permitted_evaluation_nodes": [
+      "Tdebug1",
+      "Tdebug3",
+      "Tdebug5",
+      "Tdebug6"
+    ],
+    "campaigns": [
+      {
+        "step": 500,
+        "scan_root": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step000500",
+        "progress": {
+          "time": "2026-10-01T18:59:42.881430+00:00",
+          "completed_jobs": 0,
+          "total_jobs": 72,
+          "completed_results": 0,
+          "total_results": 96,
+          "running_jobs": 0,
+          "failed_jobs": [],
+          "elapsed_seconds": 0.0,
+          "results_per_minute": 0.0
+        },
+        "readiness": {
+          "ready": false,
+          "reason": "latest_checkpoint.txt has not appeared"
+        },
+        "phase": "waiting_checkpoint",
+        "next_action": "wait quietly until official save completes"
+      },
+      {
+        "step": 1000,
+        "scan_root": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step001000",
+        "progress": {
+          "time": "2026-10-01T18:59:43.047173+00:00",
+          "completed_jobs": 0,
+          "total_jobs": 72,
+          "completed_results": 0,
+          "total_results": 96,
+          "running_jobs": 0,
+          "failed_jobs": [],
+          "elapsed_seconds": 0.0,
+          "results_per_minute": 0.0
+        },
+        "readiness": {
+          "ready": false,
+          "reason": "latest_checkpoint.txt has not appeared"
+        },
+        "phase": "waiting_checkpoint",
+        "next_action": "wait quietly until official save completes"
+      },
+      {
+        "step": 2000,
+        "scan_root": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step002000",
+        "progress": {
+          "time": "2026-10-01T18:59:43.199938+00:00",
+          "completed_jobs": 0,
+          "total_jobs": 72,
+          "completed_results": 0,
+          "total_results": 96,
+          "running_jobs": 0,
+          "failed_jobs": [],
+          "elapsed_seconds": 0.0,
+          "results_per_minute": 0.0
+        },
+        "readiness": {
+          "ready": false,
+          "reason": "latest_checkpoint.txt has not appeared"
+        },
+        "phase": "waiting_checkpoint",
+        "next_action": "wait quietly until official save completes"
+      },
+      {
+        "step": 3000,
+        "scan_root": "/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step003000",
+        "progress": {
+          "time": "2026-10-01T18:59:43.364651+00:00",
+          "completed_jobs": 0,
+          "total_jobs": 72,
+          "completed_results": 0,
+          "total_results": 96,
+          "running_jobs": 0,
+          "failed_jobs": [],
+          "elapsed_seconds": 0.0,
+          "results_per_minute": 0.0
+        },
+        "readiness": {
+          "ready": false,
+          "reason": "latest_checkpoint.txt has not appeared"
+        },
+        "phase": "waiting_checkpoint",
+        "next_action": "wait quietly until official save completes"
+      }
+    ],
+    "next_campaign": null,
+    "automatic_GPU_or_SSH_actions_performed": false
+  },
+  "review": {
+    "checkpoint_completion": "official latest marker at/above milestone; all model/trainer/optim/scheduler metadata referenced shard sizes; metadata-only",
+    "metrics": "nine distinct split/history/sigma groups; endpoint wrist arithmetic mean, shape action-count weighted; RGB PSNR frame-weighted MSE before log; native V02 pooled endpoint flow cosine",
+    "baselines": "five frozen window identity/split/history-aligned existing records; no invented legacy sampling metadata",
+    "process_failures": "MCP probe on recorded node/hostname with PID birth ticks; dead/orphaned wrapper reports attention; read-only, no automatic retry or overwrite"
+  }
+}
