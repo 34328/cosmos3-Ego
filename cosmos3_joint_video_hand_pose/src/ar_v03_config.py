@@ -87,6 +87,8 @@ def _ar_v03_experiment():
     model_config.causal_training_strategy = "diffusion_forcing"
     model_config.sigma_diffusion_forcing = 0.02
     model_config.sigma_small = 0.02
+    model_config.prefix_low_noise_enabled = True
+    model_config.sigma_hist_max = 0.1
     model_config.action_channel_weights = list(AR_V03_ACTION_CHANNEL_WEIGHTS)
     experiment["model"] = L(EgoVerseARV03Model)(
         config=model_config, chunk_state_conditioning=True, seed=42,

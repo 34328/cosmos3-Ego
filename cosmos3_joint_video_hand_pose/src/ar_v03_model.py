@@ -27,6 +27,8 @@ def wrist_channel_weights() -> list[float]:
 class EgoVerseARV03ModelConfig(OmniMoTCausalModelConfig):
     action_channel_weights: list[float] = attrs.field(factory=wrist_channel_weights)
     sigma_small: float = 0.02
+    prefix_low_noise_enabled: bool = True
+    sigma_hist_max: float = 0.1
 
 
 class JointDiffusionForcingMemoryState(TeacherForcingMemoryState):
@@ -69,6 +71,10 @@ class EgoVerseARV03Model(EgoVerseARV02Model):
             raise ValueError("action_channel_weights must be 57 finite positive values")
         if not 0 <= float(config.sigma_small) <= 1:
             raise ValueError("sigma_small must be in [0,1]")
+        if not isinstance(config.prefix_low_noise_enabled, bool):
+            raise ValueError("prefix_low_noise_enabled must be a bool")
+        if not 0 < float(config.sigma_hist_max) <= 1:
+            raise ValueError("sigma_hist_max must be in (0,1]")
         if kwargs.get("history_video_noise_prob", 0) != 0:
             raise ValueError("V0.3 uses diffusion forcing, not a second history-noise pass")
         super().__init__(config, **kwargs)
@@ -145,6 +151,25 @@ class EgoVerseARV03Model(EgoVerseARV02Model):
             resolutions=repeat(resolutions), num_tokens=repeat(num_tokens), iteration=iteration,
         )
         ts, sg = ts.reshape(batch_size, n), sg.reshape(batch_size, n)
+        step = self._ar_step
+        step.prefix_low_noise = []
+        step.prefix_low_noise_plan = None
+        if self.config.prefix_low_noise_enabled:
+            from .ar_v03_sigma import sample_prefix_low_noise, apply_prefix_low_noise, continuous_rf_timesteps
+
+            if getattr(self, "_ar_gradient_accumulation", 1) != 1:
+                raise ValueError("stateless prefix sampling requires grad_accum_iter=1")
+            # CP1/CFGP1 are required by V0.3, so world rank is the DP rank.
+            rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
+            plan = sample_prefix_low_noise(
+                [len(x.boundaries) for x in layouts], seed=self.ar_seed,
+                iteration=iteration, rank=rank, sigma_hist_max=self.config.sigma_hist_max,
+            )
+            sg = apply_prefix_low_noise(sg, plan)
+            ts = torch.where(plan.mask.to(ts.device), continuous_rf_timesteps(sg, self.rectified_flow_video), ts)
+            step.prefix_low_noise_plan = plan
+            step.prefix_low_noise = plan.metadata
+        step.video_chunk_sigmas = sg
         width = max(num_vision_latent_frames)
         timesteps, sigmas = ts.new_zeros(batch_size, width), sg.new_zeros(batch_size, width)
         for i, layout in enumerate(layouts):
@@ -153,6 +178,31 @@ class EgoVerseARV03Model(EgoVerseARV02Model):
             sigmas[i, :len(roles)] = torch.where(roles == CONDITION_VIDEO, 0, sg[i, chunks])
         self._ar_step.chunk_ids = torch.arange(n, device=sg.device)
         return timesteps, sigmas
+
+    def _get_train_noise_level_action(self, batch_size, iteration=None):
+        # Always consume the original official action draws first. Prefix
+        # sampling uses its private generator, so suffix values and the later
+        # epsilon draws retain the original global RNG sequence.
+        timesteps, sigmas = super()._get_train_noise_level_action(batch_size, iteration=iteration)
+        step = self._ar_step
+        plan = getattr(step, "prefix_low_noise_plan", None)
+        if plan is None:
+            return timesteps, sigmas
+        from .ar_v03_sigma import apply_prefix_low_noise, continuous_rf_timesteps
+
+        step.action_sigmas = apply_prefix_low_noise(step.action_sigmas, plan)
+        current = step.action_sigmas[:, 1:2]
+        timesteps = torch.where(plan.mask[:, 1:2].to(timesteps.device),
+                               continuous_rf_timesteps(current, self.rectified_flow_action), timesteps)
+        return timesteps, current
+
+    def _add_noise_to_input(self, *args, **kwargs):
+        result = super()._add_noise_to_input(*args, **kwargs)
+        # Ephemeral references for the short-test callback's read-only audit.
+        # The enclosing official training_step clears _ar_step on exit.
+        self._ar_step.noised_video_sigmas = result.sigmas_vision
+        self._ar_step.noised_action_sigmas = result.sigmas_action
+        return result
 
     def _compute_whole_losses(self, out_net, packed, noised, timesteps, is_image_batch):
         """Keep V0.2's global sample reduction and raw field logs, add weights.

@@ -38,6 +38,7 @@ def model_fixture(layouts, device="cpu", cls=EgoVerseARV03Model):
         causal_training_strategy="diffusion_forcing" if cls is EgoVerseARV03Model else "teacher_forcing",
         action_gen=True, vision_gen=True, sound_gen=False, lidar_gen=False, lbl=None, enable_moba=False,
         clamp_empty_varlen_kv=False, action_channel_weights=wrist_channel_weights(), correct_cp_gradients=True,
+        prefix_low_noise_enabled=False, sigma_hist_max=0.1,
         rectified_flow_training_config=SimpleNamespace(
             use_discrete_rf=False, shift={"480":5}, shift_action=5,
             independent_action_schedule=True, sample_level_loss_averaging=True,

@@ -1,4 +1,9 @@
 # AR V0.3.0: single-pass diffusion forcing and weighted wrists.
+# Project model fields are registered by ar_v03_config (the official TOML
+# model schema forbids unknown fields). Effective defaults:
+# model.config.prefix_low_noise_enabled=true; model.config.sigma_hist_max=0.1.
+# Override through the official dotted-path CLI, for example:
+# model.config.prefix_low_noise_enabled=false model.config.sigma_hist_max=0.05
 [job]
 task = "vfm"
 experiment = "rbs_wam_ar_v0_3_diffusion_forcing_wrist_weight_v1"

@@ -36,6 +36,8 @@ def test_versioned_recipe_preserves_data_contract_and_native_lifecycle():
     assert new["model"]["config"].teacher_forcing_frames_per_chunk == 4
     assert new["model"]["config"].causal_training_strategy == "diffusion_forcing"
     assert new["model"]["config"].sigma_small == 0.02
+    assert new["model"]["config"].prefix_low_noise_enabled is True
+    assert new["model"]["config"].sigma_hist_max == 0.1
     assert list(new["model"]["config"].action_channel_weights) == list(AR_V03_ACTION_CHANNEL_WEIGHTS)
     assert old == _ar_v02_fixed_camera_experiment()
 
@@ -58,6 +60,17 @@ def test_toml_composes_using_native_trainer_optimizer_and_scheduler():
     assert config.model.config.parallelism.context_parallel_shard_degree == 1
     assert "ar_v03_lr_receipt" in config.trainer.callbacks
     assert config.model.history_video_noise_prob == 0
+    assert config.model.config.prefix_low_noise_enabled is True
+    assert config.model.config.sigma_hist_max == 0.1
+
+
+def test_native_cli_overrides_prefix_fields_after_registered_defaults():
+    config = load(["model.config.prefix_low_noise_enabled=false", "model.config.sigma_hist_max=0.05"])
+    assert config.model.config.prefix_low_noise_enabled is False
+    assert config.model.config.sigma_hist_max == 0.05
+    assert config.model.config.sigma_small == 0.02
+    assert config.model.config.max_num_tokens_after_packing == 60000
+    assert config.dataloader_train == load().dataloader_train
 
 
 def test_receipt_uses_official_total_cycle_including_warmup():

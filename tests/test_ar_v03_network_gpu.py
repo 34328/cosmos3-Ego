@@ -13,9 +13,11 @@ from cosmos3_joint_video_hand_pose.src.ar_v02_packing import pack_joint_sequence
 pytestmark=pytest.mark.skipif(not torch.cuda.is_available(),reason="CUDA required")
 
 
-def test_official_training_step_runs_one_forward_and_real_backward():
+@pytest.mark.parametrize('prefix_low_noise_enabled', [False, True])
+def test_official_training_step_runs_one_forward_and_real_backward(prefix_low_noise_enabled):
     layouts=[JointChunkLayout(10,1,4),JointChunkLayout(6,1,4)]
     model=model_fixture(layouts,"cuda")
+    model.config.prefix_low_noise_enabled=prefix_low_noise_enabled
     model.net=make_network()
     data=data_fixture(layouts,"cuda")
     plans=[SimpleNamespace(has_action=True,has_sound=False) for _ in layouts]
@@ -40,12 +42,14 @@ def test_official_training_step_runs_one_forward_and_real_backward():
     handle.remove()
 
 
-def test_noisy_chunk_receives_self_and_later_loss_gradients_through_full_network():
+@pytest.mark.parametrize('prefix_low_noise_enabled', [False, True])
+def test_noisy_chunk_receives_self_and_later_loss_gradients_through_full_network(prefix_low_noise_enabled):
     from cosmos3_joint_video_hand_pose.src.ar_v02_layout import CONDITION_VIDEO, STATE
 
     torch.manual_seed(33)
     layout=JointChunkLayout(10,1,4)
     model=model_fixture([layout],"cuda")
+    model.config.prefix_low_noise_enabled=prefix_low_noise_enabled
     model.net=make_network()
     data=data_fixture([layout],"cuda")
     timesteps,sigmas=model._get_train_noise_level_vision(
@@ -134,4 +138,4 @@ def test_noisy_chunk_receives_self_and_later_loss_gradients_through_full_network
         future_later=(vc>2) if name=="video" else (ac>2)
         assert torch.count_nonzero(b[:,:,future_later] if name=="video" else b[future_later])==0
         torch.testing.assert_close(total,a+b,atol=1e-5,rtol=1e-4)
-        print(f"V03_NETWORK_NOISED_FLOW_GRAD {name} own={float(aa.norm())} later={float(bb.norm())}")
+        print(f"V03_NETWORK_NOISED_FLOW_GRAD prefix={prefix_low_noise_enabled} {name} own={float(aa.norm())} later={float(bb.norm())}")

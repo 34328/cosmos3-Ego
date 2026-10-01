@@ -9,6 +9,11 @@ import torch
 from cosmos_framework.callbacks.grad_clip import GradClip
 from cosmos3_joint_video_hand_pose.src import ar_v03_smoke_monitor as module
 from cosmos3_joint_video_hand_pose.src.ar_v03_smoke_monitor import ARV03SmokeMonitor, batch_identity
+from cosmos3_joint_video_hand_pose.src.ar_v02_layout import JointChunkLayout, CONDITION_VIDEO, STATE
+
+
+class ObservedModel:
+    pass
 
 
 class SmallJointNet(torch.nn.Module):
@@ -34,7 +39,9 @@ def setup_monitor(tmp_path, monkeypatch, strategy="diffusion_forcing"):
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     torch.manual_seed(42)
     net = SmallJointNet()
-    model = SimpleNamespace(net=net, config=SimpleNamespace(causal_training_strategy=strategy, parallelism=None))
+    model = ObservedModel()
+    model.net = net
+    model.config = SimpleNamespace(causal_training_strategy=strategy, parallelism=None)
     clip = GradClip(clip_norm=1.0)
     clip._last_global_norm[clip._state_key] = torch.tensor(3.25)
     monitor = ARV03SmokeMonitor(output_dir=str(tmp_path), run_label=strategy)
@@ -178,3 +185,106 @@ def test_missing_window_metadata_uses_loaded_input_hash_including_bfloat16():
         assert changed["window_identity_sha256"] != original["window_identity_sha256"]
     with pytest.raises(ValueError, match="lacks exact-window metadata"):
         batch_identity({"sample_id": ["incomplete_segment"]})
+
+
+def prepared_sigma_context():
+    # Mixed real lengths, including a one-frame tail. Slot 0 and the second
+    # sample's padded block must never be reported as history or conditions.
+    layouts = [JointChunkLayout(10, 1, 4), JointChunkLayout(6, 1, 4)]
+    video = torch.tensor([[0.99, 0.025, 0.070, 0.80], [0.98, 0.005, 0.60, 0.97]])
+    action = torch.tensor([[0.95, 0.025, 0.070, 0.40], [0.94, 0.005, 0.30, 0.93]])
+    vrows, arows = [], []
+    for index, layout in enumerate(layouts):
+        vr, vc, _ = layout.video_metadata()
+        ar, ac, _ = layout.action_metadata()
+        vrows.append(torch.where(vr == CONDITION_VIDEO, 0, video[index, vc]).reshape(-1, 1, 1))
+        arows.append(torch.where(ar == STATE, 0, action[index, ac]).reshape(-1, 1))
+    metadata = [dict(sample_index=0, n_chunks=3, prefix_length=3, prefix_chunks=[1, 2],
+                     shared_sigmas=video[0, 1:3].tolist(), distribution="uniform", sigma_hist_max=0.1),
+                dict(sample_index=1, n_chunks=2, prefix_length=2, prefix_chunks=[1],
+                     shared_sigmas=video[1, 1:2].tolist(), distribution="uniform", sigma_hist_max=0.1)]
+    return SimpleNamespace(video_chunk_sigmas=video, action_sigmas=action, prefix_low_noise=metadata,
+                           noised_video_sigmas=vrows, noised_action_sigmas=arows), layouts
+
+
+def test_sigma_snapshot_reads_actual_noised_rows_without_rng_or_tensor_mutation():
+    step, layouts = prepared_sigma_context()
+    tensors = [step.video_chunk_sigmas, step.action_sigmas, *step.noised_video_sigmas, *step.noised_action_sigmas]
+    copies = [value.clone() for value in tensors]
+    rng = torch.get_rng_state().clone()
+    receipt = module.actual_sigma_snapshot(step, layouts)
+    assert torch.equal(torch.get_rng_state(), rng)
+    for actual, original in zip(tensors, copies):
+        torch.testing.assert_close(actual, original, rtol=0, atol=0)
+    assert receipt["source"] == "official_RF_noised_data_at_net_pre_hook"
+    assert [sample["n_chunks"] for sample in receipt["samples"]] == [3, 2]
+    first, second = receipt["samples"]
+    assert [row["chunk_id"] for row in first["chunks"]] == [1, 2, 3]
+    assert [row["is_low_noise_prefix"] for row in first["chunks"]] == [True, True, False]
+    assert first["chunks"][-1]["video_future_frames"] == 1
+    assert first["chunks"][-1]["action_future_rows"] == 8
+    assert [row["chunk_id"] for row in second["chunks"]] == [1, 2]
+    for sample in receipt["samples"]:
+        for chunk in sample["chunks"]:
+            assert chunk["condition_video_sigmas"] == [0.0]
+            assert chunk["state_action_sigmas"] == [0.0]
+            if chunk["is_low_noise_prefix"]:
+                assert chunk["video_sigma"] == chunk["action_sigma"]
+    assert first["chunks"][-1]["video_sigma"] != first["chunks"][-1]["action_sigma"]
+
+
+@pytest.mark.parametrize("modality", ["video", "action"])
+def test_sigma_snapshot_rejects_noised_conditions_and_incorrect_chunk_routing(modality):
+    step, layouts = prepared_sigma_context()
+    name = "noised_video_sigmas" if modality == "video" else "noised_action_sigmas"
+    rows = getattr(step, name)
+    rows[0][0] = 0.1
+    with pytest.raises(RuntimeError, match="noised U/S"):
+        module.actual_sigma_snapshot(step, layouts)
+    rows[0][0] = 0
+    rows[0][1] = 0.2
+    with pytest.raises(RuntimeError, match="row sigmas differ"):
+        module.actual_sigma_snapshot(step, layouts)
+
+
+def test_pre_hook_retains_sigma_receipt_after_context_finally_clears_and_keeps_batch_identity(tmp_path, monkeypatch):
+    monitor, model, _, batch, packed = setup_monitor(tmp_path, monkeypatch)
+    step, packed.joint_layouts = prepared_sigma_context()
+    model._ar_step = step
+    model.config.prefix_low_noise_enabled = True
+    monitor.require_sigma_actual = True
+    original_identity = batch_identity(batch)
+    monitor.on_training_step_start(model, batch)
+    monitor.on_before_forward()
+    rng = torch.get_rng_state().clone()
+    action, video = model.net(packed_seq=packed)
+    assert torch.equal(torch.get_rng_state(), rng)
+    model._ar_step = None  # ARModel.training_step finally precedes on_after_forward.
+    monitor.on_after_forward()
+    assert monitor._step_model is None
+    loss = (action - 0.4).square().mean() + (video + 0.2).square().mean()
+    output = dict(flow_matching_loss_action=(action - 0.4).square().mean(),
+                  flow_matching_loss_vision=(video + 0.2).square().mean())
+    loss.backward()
+    gradients = [parameter.grad.clone() for parameter in model.net.parameters()]
+    monitor.on_after_backward(model)
+    for parameter, original in zip(model.net.parameters(), gradients):
+        torch.testing.assert_close(parameter.grad, original, rtol=0, atol=0)
+    monitor.on_training_step_batch_end(model, batch, output, loss)
+    monitor.on_training_step_end(model, batch, output, loss, iteration=1)
+    monitor.on_train_end(model)
+    row = json.loads(monitor.path.read_text().splitlines()[-1])
+    assert row["sigma_actual"]["samples"][0]["prefix_low_noise"]["prefix_length"] == 3
+    assert row["batch"] == original_identity == batch_identity(batch)
+    assert "sigma_actual" not in row["batch"]
+    assert row["sigma_diagnostic_seconds"] >= 0
+
+
+def test_prefix_monitor_refuses_missing_actual_sigma_receipt(tmp_path, monkeypatch):
+    monitor, model, _, batch, packed = setup_monitor(tmp_path, monkeypatch)
+    monitor.require_sigma_actual = True
+    monitor.on_training_step_start(model, batch)
+    monitor.on_before_forward()
+    with pytest.raises(RuntimeError, match="did not observe actual RF sigmas"):
+        model.net(packed)
+    monitor.on_train_end(model)
