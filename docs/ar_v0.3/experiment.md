@@ -333,4 +333,8 @@ W&B API在step495–504有界查询中核实第500步8个原始字段及base/act
 
 已按冻结计划绑定实际step500，并在Tdebug1 GPU0/1/2启动三σ首窗pilot（gt/generated共6份）。启动前检查quota120核、约1.74TiB可用内存、低负载及GPU空闲；实际全模型DCP加载成功，单任务DCP加载约141.6–141.8秒。评测包括初始化、采样和导出，因此加载时间单独记录。此阶段训练继续在Tdebug4/2推进，W&B持续online。
 
-截至本条记录，pilot仍在进行，尚未完成正式96份/9组指标汇总。首窗metadata、完整17块及跨σ首块/条件一致性验收通过后，再推进其余69jobs；正式整体光流/腕/手形/PSNR及V0.2参照表在实际完成后补入本节，不以pilot或训练loss代替完整评测。
+首窗pilot现已完成：三任务exit0、6/6 NPZ完整17块验收通过，墙钟495.114/495.163/496.089秒（含初始化、DCP加载、双history采样和导出），于UTC21:16:25正常释放GPU。独立6-worker CPU核查耗时6.234秒，15项检查全部通过：三σ×两history的首块action/RGB/U/S按dtype、shape、实际字节完全相同；gt全17块U/S及六份原始GT一致，checkpoint/snapshot/源/冻结清单hash和seed42/30步/17块匹配。generated后续条件按历史派生。完整证据见 [formal_step500_pilot_validation.json](formal_step500_pilot_validation.json)（SHA256 `0c349aee16151ae81568d4a6d5a01eac389358fefe87377293d779ba2689a403`）。
+
+通过后，于UTC21:22:35–21:22:55分别经MCP启动Tdebug1/3/5/6的remaining supervisor，每节点8张空闲H800，共32个worker，推进其余69jobs。启动时各节点quota120核、1.36–1.74TiB空闲内存、低负载及所有目标GPU无compute进程；同时核对cgroup实际memory.max/current。每进程BLAS/OpenMP线程1，共享atomic job claim分配窗口，输出和日志独立，未占训练节点或重复派发。四端启动/PID/资源/退出回执在评测根 `launches/`，逐任务状态在 `states/`，worker进度与真实吞吐在 `workers/`。
+
+UTC21:25检查为3/72 jobs成功（pilot共6/96 NPZ）、32 running、37 pending、0失败；训练持续到step592且stop_reason=null。完整96份/9组指标尚未汇总，后续完成后补入本节的整体光流/腕/手形/PSNR及V0.2参照表，不以pilot或训练loss代替完整评测。
