@@ -419,4 +419,8 @@ W&B API以995≤step<1005、use_cache=false有界查询确认1000步8字段及ba
 
 ### 9.2 三档评测执行与验收
 
-UTC23:16:05，经MCP在Tdebug1 GPU0/1/2启动三档heldout首窗pilot（共3jobs/6NPZ），先验收后推进其余69jobs。实际启动前quota120核/affinity200核、低负载、约1.72TiB cgroup可用内存；目标H800均4MiB/0%且无compute进程。launch请求、wrapper/supervisor PID和各任务日志记录在本步扫描根 `launches/Tdebug1_pilot/`。目前完整96份/9组评测尚未完成，最终结果将在验收及CPU汇总后补入第9.3节。
+UTC23:16:05，经MCP在Tdebug1 GPU0/1/2启动三档heldout首窗pilot（共3jobs/6NPZ），先验收后推进其余69jobs。实际启动前quota120核/affinity200核、低负载、约1.72TiB cgroup可用内存；目标H800均4MiB/0%且无compute进程。launch请求、wrapper/supervisor PID和各任务日志记录在本步扫描根 `launches/Tdebug1_pilot/`。三档首窗pilot均exit0，墙钟489.534/490.359/490.162秒（含初始化、153.36秒官方DCP加载、双history采样和导出），最后job于UTC23:24:16.881744完成。六份NPZ完整17块验收通过；独立CPU在鲜查资源后的Tdebug6以6workers/线程1耗时6.236秒，15项实际dtype/shape/字节检查全true：首块VA/U/S三档×两模式一致、gt全部17块U/S跨sigma一致、六份原始GT一致，真实checkpoint/snapshot/参数/清单hash/seed42/30步/17块和共同video/action小噪声refresh路由匹配。完整证明见 [formal_step1000_pilot_validation.json](formal_step1000_pilot_validation.json)（SHA256 `35c3aba5a5e7fcc6158ac348d43c761703323a53d5ced390c1649873870b8342`）。
+
+通过后于UTC23:27:40–23:28:04分别经MCP派发Tdebug1/3/5/6，每节点8张空闲H800，共32workers推进其余69jobs；每端启动时重新核查CPUquota120/affinity200、低负载、1.36–1.73TiB空闲内存、cgroupmemory.max/current和目标GPU无compute进程。共享原子claim及节点独占launch记录防重复；未使用训练节点或改seed/样本/配方。UTC23:28检查为3/72成功、6/96 NPZ、32running、37pending、0失败；完整指标仍待余下输出和CPU汇总。W&B实际API此时上传到1061，本地1062且stop_reason=null。
+
+目前完整96份/9组评测尚未完成，最终结果将在验收及CPU汇总后补入第9.3节。
