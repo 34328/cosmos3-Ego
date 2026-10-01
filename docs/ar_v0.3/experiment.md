@@ -423,4 +423,62 @@ UTC23:16:05，经MCP在Tdebug1 GPU0/1/2启动三档heldout首窗pilot（共3jobs
 
 通过后于UTC23:27:40–23:28:04分别经MCP派发Tdebug1/3/5/6，每节点8张空闲H800，共32workers推进其余69jobs；每端启动时重新核查CPUquota120/affinity200、低负载、1.36–1.73TiB空闲内存、cgroupmemory.max/current和目标GPU无compute进程。共享原子claim及节点独占launch记录防重复；未使用训练节点或改seed/样本/配方。UTC23:28检查为3/72成功、6/96 NPZ、32running、37pending、0失败；完整指标仍待余下输出和CPU汇总。W&B实际API此时上传到1061，本地1062且stop_reason=null。
 
-目前完整96份/9组评测尚未完成，最终结果将在验收及CPU汇总后补入第9.3节。
+完整GPU阶段已完成72/72 jobs、96/96 NPZ、0失败；全部输出为完整17块。CPU汇总在空闲Tdebug3执行，实际quota120核/affinity200、约1.37TiB可用内存、低负载、GPU无compute进程；CUDA为空，每worker的BLAS/OpenMP/OpenCV线程1。三个代表存档serial1与parallel3逐位一致，耗时48.070/18.505秒，完整pilot阶段67.575秒；复用这3份，24workers计算其余93份，计算段68.738秒（1.353份/秒），含来源核查与写出的完整aggregate阶段74.465秒。两阶段均exit0并核对真实节点hostname/PID birth tick，无失活或孤儿进程。总计96份/9组、1,632个完整块光流对、52,224个action样本、26,112个future RGB帧，控制器状态complete。
+
+独立GPU完成审核通过：72任务exit0、96份NPZ的metadata/NPY headers/ZIP payload长度/17块offset/57D padding及小数组有限值完整；CPU重算所得96个存档SHA与原生validation逐一匹配。5个supervisor和35个worker均正常退出。remaining的69jobs/90NPZ实际起止为UTC23:27:41.412089–23:40:22.300410，耗时760.888秒、7.097 NPZ/分钟；pilot耗时490.361秒，pilot后验收/派发间隔204.530秒。因此完整96份GPU扫描固定wall为1,455.780秒（24分15.78秒）、3.957 NPZ/分钟，含该间隔。完整17块sampler-only均值heldout gt88.551秒/generated86.979秒/train gt86.982秒，排除准备/GT VAE/RGB导出，与完整job wall分开保留。heldout双history任务完整wall均值438.361秒、train单history246.319秒。全部96份峰值allocated最大35.534GiB。详见 [formal_step1000_gpu_completion.json](formal_step1000_gpu_completion.json)（SHA256 `b7f9f9d5da92e1ea39c64f86b0f42e9f080f2e4503a80f5e92c8092babef514b`）。
+
+独立只读指标复核通过：9组的all/17块/第17块共171个scope均从保存的leaf累加量重合并，腕/手形、MSE后PSNR及pooled整体光流一致；5个基线与冻结旧report字典逐位一致，工具/plan/binding/snapshot/父清单/pilot/baseline及audit哈希均匹配。
+
+UTC23:55:14的真实W&B API查询确认本次run仍running，step1162的两路loss继续上传，本地1163无STOP；2000/3000评测继续等待各自官方保存，未提前绑定或启动。
+
+### 9.3 三档完整指标与 V0.2 同口径对照
+
+所有值来自冻结 heldout8 或 train16 的完整17块。光流按320×180整体点积/全局范数聚合；腕部末端相对原始GT，每块等权；手形对原始GT，按action数合并；PSNR先合并MSE再转dB。旧基线均为step1000、历史sigma0，本次为step1000、历史sigma {.02,.05,.1}。历史噪声及配方不同，以下为阶段诊断，不能据此归因单一改动。
+
+原始CPU报告的comparison_scope沿用模板中的训练长度不同文字；本次两边均为step1000。原报告与冻结工具保留原样，精简报告另记comparison_scope_correction明确校正，数值不变。
+
+| 模型 / step | 数据 / history | 历史sigma | 光流幅值 / GT | 整体余弦 | 左 / 右腕末端 mm | PSNR dB |
+|---|---|---:|---:|---:|---:|---:|
+| V0.2 lr2e-5 / 1000 | heldout8 / gt | 0 | 1.077061 | 0.103794 | 65.03 / 57.33 | 16.930 |
+| V0.2 lr2e-5 / 1000 | heldout8 / generated | 0 | 1.644089 | -0.016639 | 281.79 / 243.13 | 12.221 |
+| V0.2 lr1e-4 / 1000 | heldout8 / gt | 0 | 1.073728 | 0.035371 | 68.09 / 55.89 | 16.954 |
+| V0.2 lr1e-4 / 1000 | heldout8 / generated | 0 | 1.737592 | 0.015020 | 319.54 / 234.48 | 11.882 |
+| V0.2 lr1e-4 / 1000 | train16 / gt | 0 | 0.814540 | 0.182111 | 39.28 / 50.51 | 17.898 |
+| V0.3 prefix / 1000 | heldout8 / gt | 0.02 | 1.694253 | 0.029920 | 85.35 / 72.90 | 15.663 |
+| V0.3 prefix / 1000 | heldout8 / generated | 0.02 | 2.352637 | 0.009822 | 301.68 / 279.77 | 11.270 |
+| V0.3 prefix / 1000 | train16 / gt | 0.02 | 1.387490 | 0.079102 | 55.82 / 69.05 | 16.501 |
+| V0.3 prefix / 1000 | heldout8 / gt | 0.05 | 1.547646 | 0.018116 | 82.74 / 68.25 | 15.880 |
+| V0.3 prefix / 1000 | heldout8 / generated | 0.05 | 2.269018 | 0.009112 | 303.96 / 276.15 | 11.616 |
+| V0.3 prefix / 1000 | train16 / gt | 0.05 | 1.295572 | 0.077448 | 54.39 / 67.59 | 16.721 |
+| V0.3 prefix / 1000 | heldout8 / gt | 0.1 | 1.439880 | 0.037036 | 77.91 / 65.54 | 16.076 |
+| V0.3 prefix / 1000 | heldout8 / generated | 0.1 | 2.134931 | -0.000182 | 293.39 / 278.03 | 11.807 |
+| V0.3 prefix / 1000 | train16 / gt | 0.1 | 1.173213 | 0.091676 | 51.39 / 65.81 | 16.974 |
+
+| 模型 / step | 数据 / history | 历史sigma | 左 / 右腕旋转 degrees | 左 / 右局部手形 MPJPE mm | 第17块左 / 右腕末端 mm |
+|---|---|---:|---:|---:|---:|
+| V0.2 lr2e-5 / 1000 | heldout8 / gt | 0 | 未汇总 | 8.36 / 8.42 | 37.34 / 43.95 |
+| V0.2 lr2e-5 / 1000 | heldout8 / generated | 0 | 未汇总 | 18.08 / 18.93 | 436.31 / 341.19 |
+| V0.2 lr1e-4 / 1000 | heldout8 / gt | 0 | 未汇总 | 8.31 / 8.21 | 41.38 / 40.60 |
+| V0.2 lr1e-4 / 1000 | heldout8 / generated | 0 | 未汇总 | 18.35 / 18.39 | 472.79 / 320.32 |
+| V0.2 lr1e-4 / 1000 | train16 / gt | 0 | 未汇总 | 7.22 / 8.27 | 30.05 / 33.05 |
+| V0.3 prefix / 1000 | heldout8 / gt | 0.02 | 28.06 / 27.13 | 9.30 / 9.37 | 67.43 / 64.24 |
+| V0.3 prefix / 1000 | heldout8 / generated | 0.02 | 90.67 / 57.43 | 24.00 / 23.02 | 388.82 / 376.42 |
+| V0.3 prefix / 1000 | train16 / gt | 0.02 | 24.64 / 30.55 | 8.26 / 9.30 | 41.04 / 45.93 |
+| V0.3 prefix / 1000 | heldout8 / gt | 0.05 | 27.62 / 26.80 | 9.14 / 9.33 | 62.52 / 61.42 |
+| V0.3 prefix / 1000 | heldout8 / generated | 0.05 | 75.22 / 50.66 | 21.95 / 22.15 | 405.17 / 371.44 |
+| V0.3 prefix / 1000 | train16 / gt | 0.05 | 23.87 / 30.16 | 8.16 / 9.15 | 39.48 / 42.26 |
+| V0.3 prefix / 1000 | heldout8 / gt | 0.1 | 25.98 / 25.89 | 8.95 / 9.22 | 62.79 / 60.42 |
+| V0.3 prefix / 1000 | heldout8 / generated | 0.1 | 74.07 / 49.14 | 22.00 / 21.52 | 398.73 / 419.75 |
+| V0.3 prefix / 1000 | train16 / gt | 0.1 | 23.19 / 29.60 | 8.11 / 9.06 | 37.70 / 43.59 |
+
+旧汇总未记录腕旋转的组标记为“未汇总”，不编造数值。旧lr2e-5两组的shift/CFG/history sigma来自历史源码与启动审计，NPZ本身缺显式字段；保留旧审计限制。lr1e-4三组NPZ显式记录shift5/CFG1/history sigma0。
+
+![完整step1000三档与旧step1000的1–17块曲线](figures/formal_step1000_sigma_scan.png)
+
+完整逐窗原始报告为评测根 `metrics/comparison.json`（SHA256 `185a9ba86129178742baa90443a47cfa1530db1de483ff53fc21fe4e7fafe9be`，14,481,402 bytes）。[formal_step1000_metrics.json](formal_step1000_metrics.json) 保留全部9组与5个基线的1–17块指标、存档身份/SHA、source/配置/清单/tool hash、CPU资源和验收回执，省略逐窗重复metadata；原始逐窗结果未删除。
+
+同冻结窗口及sigma比较，step500→1000并非所有质量指标随训练loss下降而改善。heldout/gt三档PSNR从16.571–16.645降至15.663–16.076dB，左右腕末端误差均增大；train16/gt亦出现腕误差上升、PSNR下降。sigma=.1在本次gt两组的腕误差、PSNR和整体余弦优于.02/.05，但heldout腕77.91/65.54mm、train腕51.39/65.81mm仍高于旧lr1e-4/1000的68.09/55.89及39.28/50.51mm。
+
+generated三档的整体光流余弦从step500的-.076至-.060升至接近0（-.000182至.009822），同时幅值/GT升至2.135–2.353，PSNR降至11.270–11.807dB；方向接近0仍不能认为运动正确。默认.02的左右腕全程误差358.99/286.46→301.68/279.77mm、第17块577.95/500.75→388.82/376.42mm，部分漂移及局部手形改善；.1的右腕全程230.87→278.03mm、第17块352.56→419.75mm反而变差。相比旧lr1e-4/1000，本次.02左腕更低、右腕更高，局部手形24.00/23.02mm仍高于18.35/18.39mm，视频PSNR更低。
+
+本次质量出现混合变化，不能据loss下降宣称V0.3整体优于V0.2，也没有跨指标一致最优sigma。保留三档完整结果，不改变默认.02、训练配方或已验收停止规则；继续完成2000/3000里程碑。
