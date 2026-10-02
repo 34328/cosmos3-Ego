@@ -1,6 +1,6 @@
-"""CPU streaming correctness; native small MoT runs with dense CPU kernels.
+"""Streaming correctness with dense CPU references and an optional CUDA device check.
 
-No GPU is selected here. Full-prefix tensors exist only in these reference tests.
+Full-prefix tensors exist only in these reference tests.
 """
 
 import contextlib
@@ -556,3 +556,15 @@ def test_source_origin_and_reset_keep_rope_relative_and_metadata_absolute():
                 key = (phase, 0 if phase == "condition" else frames)
                 relative = index * 32 + sampler.workspace.sources[key]
                 torch.testing.assert_close(positions[0], sampler.workspace.offset + relative * sampler.workspace.time_scale)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
+def test_stream_resolves_unindexed_cuda_device():
+    model = PerfectModel()
+    model.tensor_kwargs["device"] = "cuda"
+    state, future = normalizers()
+    sampler = StreamingJointSampler(
+        model, text_ids=[3, 4, 5], latent_shape=(4, 2, 2), state_normalizer=state, future_normalizer=future
+    )
+    assert sampler.device == torch.device("cuda", torch.cuda.current_device())
+    sampler._check(torch.zeros_like(sampler._condition), sampler._condition.shape, "condition")

@@ -1,15 +1,11 @@
 """CPU-only followup tests; no formal checkpoint is bound or GPU launched."""
-import importlib.util
 import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts/ar_v03_eval_followup.py"
-spec = importlib.util.spec_from_file_location("ar_v03_followup_test", SCRIPT)
-followup = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(followup)
+from cosmos3_joint_video_hand_pose.scripts import ar_v03_eval_followup as followup
 
 
 @pytest.fixture

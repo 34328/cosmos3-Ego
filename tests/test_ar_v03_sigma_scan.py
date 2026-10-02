@@ -1,5 +1,4 @@
 """CPU-only scan planning/worker tests; no GPU, model or sampler process starts."""
-import importlib.util
 import io
 import json
 from pathlib import Path
@@ -7,10 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts/ar_v03_sigma_scan.py"
-spec = importlib.util.spec_from_file_location("ar_v03_sigma_scan_test_module", SCRIPT)
-scan = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(scan)
+from cosmos3_joint_video_hand_pose.scripts import ar_v03_sigma_scan as scan
 
 
 @pytest.mark.parametrize("scope,jobs,results,fragments", [

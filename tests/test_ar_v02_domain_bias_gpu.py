@@ -7,19 +7,6 @@ from cosmos_framework.model.generator.mot.domain_aware_linear import DomainAware
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
 
 
-def test_stream_resolves_unindexed_cuda_device():
-    from test_ar_v02_streaming import PerfectModel, normalizers
-    from cosmos3_joint_video_hand_pose.src.ar_v02_streaming import StreamingJointSampler
-
-    model = PerfectModel()
-    model.tensor_kwargs["device"] = "cuda"
-    state, future = normalizers()
-    sampler = StreamingJointSampler(
-        model, text_ids=[3, 4, 5], latent_shape=(4, 2, 2), state_normalizer=state, future_normalizer=future
-    )
-    assert sampler.device == torch.device("cuda", torch.cuda.current_device())
-    sampler._check(torch.zeros_like(sampler._condition), sampler._condition.shape, "condition")
-
 
 @pytest.mark.parametrize("count", [512, 4096])
 def test_domain_bias_gradient_matches_fp32_sum_with_zero_gradient_rows(count):
