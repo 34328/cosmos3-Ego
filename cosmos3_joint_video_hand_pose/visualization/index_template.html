@@ -88,6 +88,7 @@ footer { margin-top:34px; color:var(--muted); font-size:12px; }
 </section>
 </header>
 <div class="toolbar">
+<label class="filter" id="version-control" hidden>版本 <select id="version" aria-label="模型版本"></select></label>
 <div class="view-switch" role="group" aria-label="视频视图">
 <button type="button" data-view="short" aria-pressed="true">操作短片</button>
 <button type="button" data-view="full" aria-pressed="false">完整长片</button>
@@ -116,9 +117,25 @@ footer { margin-top:34px; color:var(--muted); font-size:12px; }
 <dialog id="viewer"><div class="dialog-top"><strong id="viewer-title"></strong><button type="button" id="close-viewer">关闭</button></div><video controls playsinline preload="metadata"></video></dialog>
 <script type="application/json" id="manifest">__MANIFEST_JSON__</script>
 <script>
-const data = JSON.parse(document.getElementById("manifest").textContent);
+const gallery = JSON.parse(document.getElementById("manifest").textContent);
+const versions = gallery.versions || [];
+const requestedVersion = new URLSearchParams(location.search).get("version");
+const selectedVersion = versions.find(version=>version.id===requestedVersion) || versions.find(version=>version.id===gallery.default_version) || versions[0];
+const data = selectedVersion || gallery;
 const experiment = data.experiment;
 const $ = (id) => document.getElementById(id);
+if (versions.length) {
+  $("version-control").hidden=false;
+  for (const version of versions) {
+    const option=document.createElement("option"); option.value=version.id; option.textContent=version.label;
+    $("version").append(option);
+  }
+  $("version").value=selectedVersion.id;
+  $("version").addEventListener("change",()=>{
+    const url=new URL(location.href); url.searchParams.set("version",$("version").value);
+    location.assign(url.href);
+  });
+}
 let view = "short";
 const seconds = (n) => Number(n).toFixed(1) + " 秒";
 const title = experiment.title || "Pick & Place · 模型可视化";

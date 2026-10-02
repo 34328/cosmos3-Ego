@@ -36,3 +36,22 @@ step1000诊断4个真实global batch、共204个clip、每batch4次ε，无参�
 2026-10-02 14:03北京时间，首次启动 formal_prefix_numerator_only_t273_20261002T054743Z（源1ab05f3）。16卡NCCL Socket通信、官方Nano加载及数据初始化成功；14:08首个step计算loss时，新增raw-MSE日志索引可选的 action_valid_mask=None，触发TypeError，两端退出码1。尚未执行backward或optimizer更新，没有checkpoint或训练loss上传，没有触发OOM或数值停止规则。W&B API确认 [4czrgihm](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/4czrgihm) 为failed，仅有运行时间，不作为实验结果。
 
 修复仅给日志分支的可选mask加空值处理，None沿用原生全有效语义；优化loss、分母、采样均未改。一个CPU定点检查确认None、[None]、全True mask的四组raw-MSE统计逐位一致；未另开GPU短训。上述正式失败输出与两端回执完整保留。修复后使用新名称与独立目录，从同一官方Nano起点开始，保持相同seed和数据顺序。
+
+## step1500 临时视频质量检查（2026-10-02）
+
+固定 Pick-and-Place 训练3窗、heldout3窗，V0.3.0/V0.3.1均使用真实 step1500；σ_small=.02、seed42、联合30步、273模型帧/完整17块。冻结清单SHA256为 `f3c7bef5df5d22b63db120159e25c8d88b6aed5c1bd6567fe247076a9163374a`。这是六窗临时检查，不替代 heldout8/train16 正式评测；未改变训练或派发完整扫描。
+
+24NPZ/12jobs全部通过原生验收，24长短MP4已渲染。Tdebug5/Tdebug6各6张空闲GPU；两版含权重读取的wall为677/514秒，单history纯采样平均86.61/88.04秒，峰值显存35.54GiB。CPU指标6workers、每进程1线程，24份一次聚合25.74秒。训练源、config与W&B沿用上文两次正式run。
+
+短动作统计只取冻结裁剪内完整块（train共11块、heldout共14块），光流沿用320×180逐块U到末帧、整体dot/norm归约；PSNR先合并SSE/count。数值为V0.3.0 → V0.3.1：
+
+| 范围 | PSNR | 方向余弦 | 幅值比 |
+| --- | --- | --- | --- |
+| train / gt | 15.060 → 15.023 | .039 → .032 | .910 → .812 |
+| heldout / gt | 15.141 → 15.174 | .043 → .153 | .804 → .959 |
+| train / generated | 11.187 → 11.717 | −.102 → .049 | .301 → .499 |
+| heldout / generated | 10.912 → 11.586 | −.038 → −.031 | .164 → .497 |
+
+结论：局部改善，但尚无稳定的短段运动提升。连续生成动得更多、PSNR略升，heldout方向仍近0；第一块heldout PSNR反而13.365→12.511、余弦.143→−.047。训练集目视仍有手停留在初始姿态、拿放过程不准确的问题，不能认定去除前缀监督解决了视频瓶颈。
+
+版本产物：`outputs/visualization/ar_v0.3.0/step1500/pick_place/` 与 `ar_v0.3.1/step1500/pick_place/`；统一服务器网页 [版本切换入口](http://127.0.0.1:18767/)，保持既有布局。完整指标与完成回执在 `outputs/visualization/ar_v03_vs_v031_step1500_pick_place_20261002T134314Z/metrics/comparison.json`、`inference_complete.json`；原路径符号链接仅兼容已有回执。
