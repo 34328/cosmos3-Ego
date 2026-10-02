@@ -55,8 +55,7 @@ h3 { font-size:16px; margin:0; font-weight:600; }
 video { display:block; width:100%; height:100%; object-fit:contain; background:#050607; }
 .media-error { position:absolute; inset:0; display:grid; align-content:center; justify-items:center; padding:18px; background:var(--surface); color:var(--muted); text-align:center; font-size:13px; }
 .media-error[hidden],[hidden] { display:none!important; }
-.sample-footer { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-top:9px; }
-.sample-id { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.sample-footer { display:flex; justify-content:flex-end; gap:12px; align-items:center; margin-top:9px; }
 .actions { display:flex; align-items:center; gap:12px; flex:none; }
 .actions a { font-size:13px; }
 .actions button { font-size:13px; padding:4px 10px; min-height:32px; }
@@ -67,7 +66,7 @@ dialog::backdrop { background:rgb(0 0 0/.75); }
 dialog video { max-height:80dvh; height:auto; }
 footer { margin-top:34px; color:var(--muted); font-size:12px; }
 @media (max-width:1023px) { .grid { grid-template-columns:minmax(0,1fr); gap:32px; } .legend { font-size:12px; } }
-@media (max-width:639px) { main { padding:20px 14px 32px; } .header-line { flex-direction:column; gap:14px; } .params { grid-template-columns:repeat(2,minmax(0,1fr)); } .toolbar { align-items:flex-start; } .sample-title,.sample-footer { align-items:flex-start; flex-direction:column; gap:5px; } .legend { gap:5px; font-size:11px; } .theme-label { align-self:flex-end; } }
+@media (max-width:639px) { main { padding:20px 14px 32px; } .header-line { flex-direction:column; gap:14px; } .params { grid-template-columns:repeat(2,minmax(0,1fr)); } .toolbar { align-items:flex-start; } .sample-title { align-items:flex-start; flex-direction:column; gap:5px; } .legend { gap:5px; font-size:11px; } .theme-label { align-self:flex-end; } }
 </style>
 </head>
 <body>
@@ -105,7 +104,7 @@ footer { margin-top:34px; color:var(--muted); font-size:12px; }
 <div class="sample-title"><h3></h3><span class="duration"></span></div>
 <p class="sample-description"></p>
 <div class="player"><video controls playsinline preload="metadata"></video><p class="media-error" hidden>视频无法加载。请确认视频文件与网页一起保存，也可使用下方下载链接打开。</p></div>
-<div class="sample-footer"><details class="sample-id"><summary>样本信息</summary><span></span></details><div class="actions"><a download>下载视频</a><button type="button">放大 / 全屏</button></div></div>
+<div class="sample-footer"><div class="actions"><a download>下载视频</a><button type="button">放大 / 全屏</button></div></div>
 </article>
 </template>
 <dialog id="viewer"><div class="dialog-top"><strong id="viewer-title"></strong><button type="button" id="close-viewer">关闭</button></div><video controls playsinline preload="metadata"></video></dialog>
@@ -120,14 +119,13 @@ const title = experiment.title || "Pick & Place · 模型可视化";
 $("title").textContent = title;
 document.title = title + " · RBS WAM";
 $("summary").textContent = experiment.version + " · Step " + experiment.step + " · σ " + experiment.sigma_small + " · 查看参数";
-const parameters = [["版本",experiment.version],["Checkpoint step",experiment.step],["σ_small",experiment.sigma_small],["Seed",experiment.seed],["联合采样步数",experiment.joint_steps],["块数",experiment.n_chunks ?? 17],["回放帧率",experiment.fps ?? 30],["短片来源","长推理动作区间裁剪"],["Checkpoint",experiment.checkpoint]];
+const parameters = [["版本",experiment.version],["Checkpoint step",experiment.step],["σ_small",experiment.sigma_small],["Seed",experiment.seed],["联合采样步数",experiment.joint_steps],["块数",experiment.n_chunks ?? 17],["回放帧率",experiment.fps ?? 30],["短片来源","长推理动作区间裁剪"]];
 for (const [label,value] of parameters) { const entry=document.createElement("div"); const term=document.createElement("dt"); const definition=document.createElement("dd"); term.textContent=label; definition.textContent=value; entry.append(term,definition); if(label==="Checkpoint") entry.className="checkpoint"; $("params").append(entry); }
 if(data.samples.some((sample)=>sample.reference_video)) $("reference-switch").hidden=false;
 const cards = data.samples.map((sample) => {
   const article = $("sample-card").content.firstElementChild.cloneNode(true);
   const video = article.querySelector("video");
   article.querySelector("h3").textContent=sample.title;
-  article.querySelector(".sample-id span").textContent=sample.sample_id + " · 起始帧 " + sample.start;
   const description=article.querySelector(".sample-description");
   description.textContent=sample.description || sample.selection_basis || "";
   description.hidden=!description.textContent;
