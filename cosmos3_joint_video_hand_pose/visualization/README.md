@@ -23,4 +23,14 @@ PYTHONPATH="$PWD:$PWD/packages/cosmos3" LD_LIBRARY_PATH="" \
 
 渲染前检查 CPU 配额、内存、负载和 GPU 占用；CPU 渲染每进程线程 1，不占训练 GPU。已有相同清单的 MP4 可复用；输出目录绑定其他清单时拒绝覆盖，选择新目录。短片边界小自检可通过同一入口的 `--self-check` 执行。
 
-网页与 MP4/JPEG、NPZ 保存在 `outputs/visualization/`，本地同步到 `eval_videos/`；这些实验产物不入 Git。只提交本目录中的代码、模板、说明和固定清单。
+网页与 MP4/JPEG、NPZ 保存在 `outputs/visualization/`；这些实验产物不入 Git。只提交本目录中的代码、模板、说明和固定清单。
+
+默认在服务器上部署，通过已有 Remote-SSH 连接转发到本地访问，后续更新直接重建服务器网页，不再以下载本地 HTML 作为交付入口。使用训练环境已有的 aiohttp 提供视频范围请求，便于拖动进度条；只允许访问网页和清单列出的 MP4/JPEG，不公开 NPZ、权重或日志。
+
+```bash
+PYTHONPATH="$PWD:$PWD/packages/cosmos3" \
+  /home/lzh/miniconda3/envs/cosmos3/bin/python -m cosmos3_joint_video_hand_pose.visualization.serve \
+  --directory outputs/visualization/ar_v0_3_step3000_pick_place_v1 --port 18766
+```
+
+服务仅监听服务器 `127.0.0.1:18766`。使用已有远程连接的 Ports 面板转发该端口，本地浏览器访问 `http://127.0.0.1:18766/`；本地端口被占用时按实际转发地址访问。启动与后续检查均经 MCP，不重复启动已有服务。
