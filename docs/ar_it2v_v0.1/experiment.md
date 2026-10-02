@@ -14,4 +14,10 @@
 - 原生DCP `iter_000000020` 已保存：官方latest marker，model/optim/trainer/scheduler metadata与分片、8 rank dataloader状态齐全。目录 `outputs/validation/ar_it2v_gate/smoke_native30fps/runs/rbs_wam_ar_it2v/ar_it2v_v0_1/ar_it2v_v0_1_smoke_native30fps/`。
 - 旧开发smoke01在optimizer更新前因packer同时设sample/token两个预算失败，已改固定4 samples；旧stride2 smoke02按用户新要求停止，不是本配方验收、不续训、不混入正式结果。正式仍从官方Nano起点。
 
-推理加载门槛与正式运行信息待本轮实际完成后追加。短测loss趋势只证明数值可用，不宣称运动质量已改善。
+真实step20 DCP已在Tdebug4单H800加载并完成97连续RGB/30fps/25latent/6未来块×35步推理，source indices严格连续，GT与生成视频均97×360×640×3，exit0，无OOM。回执 `outputs/validation/ar_it2v_inference_gate/validation_smoke20_native30fps.json`。正式运行信息待启动核实后追加。短测loss趋势只证明数值可用，不宣称运动质量已改善。
+
+## 分支隔离
+
+按用户要求，本分支删除旧联合工程 `cosmos3_joint_video_hand_pose/`、旧版本文档、根scripts及旧测试；原始内容保留在 `ar-video-action` 分支和Git历史。根README/AGENTS重新面向纯视频任务编写。通用packing恢复和W&B兼容逻辑已独立到新包，没有旧joint导入。保留上游 `packages/cosmos3`，不裁剪其官方实现。
+
+隔离后的根tests仅包含本项目测试，**39 passed**（含新独立packing恢复）；不存在旧joint目录或代码导入。未因纯目录隔离重复20步GPU短测，模型/数据/优化配方未变。

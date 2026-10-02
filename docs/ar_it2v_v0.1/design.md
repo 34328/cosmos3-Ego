@@ -48,7 +48,7 @@ train档位17/33/49/65/81/97数量673/1805/1930/1821/2008/24101；每epoch实际
 - 这是以 Cosmos3 优化器配方为基础的迁移，不是逐字照搬 CMD 的 optimizer/训练规模。
 - 正式 W&B online；run名 `ar_it2v_v0_1_ego100h_cmd_stage1`，project `rbs_wam_ar_it2v`，entity `alexlzh431564`。临时 smoke 可 disabled，不能用于证明正式上传。
 - 纯视频数值停止：非有限loss/原始梯度立即停止；10步均值loss超过首10步3倍、连续10步resident增长超2GiB停止。梯度裁剪是正常优化算法，只记录触发率，不沿用旧 joint 的“9/10 clip即停”经验规则；OOM不自动重试或改预算，不自动恢复。
-- 数据恢复复用已有 `RecoverablePackingDataLoader` + `EgoVerseDataLoaderStateCallback`，真实保存随机窗口/packing pending buffer/worker stream状态。
+- 数据恢复将已验证的通用恢复逻辑独立到 `cosmos3_ar_it2v/dataloader.py`，通过 `RecoverablePackingDataLoader` + `IT2VDataLoaderStateCallback`，真实保存随机窗口/packing pending buffer/worker stream状态。
 
 ## 验收与查看
 

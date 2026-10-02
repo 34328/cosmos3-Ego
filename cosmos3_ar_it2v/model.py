@@ -127,4 +127,3 @@ class ARIT2VModel(OmniMoTCausalModel):
             shift=cfg.sigma_shift,sigma_min=cfg.sigma_min,sigma_max=cfg.sigma_max,
             device=self.tensor_kwargs_fp32['device'],generator=generator)
         return sigmas*float(self.rectified_flow_video.noise_scheduler.config.num_train_timesteps),sigmas
-

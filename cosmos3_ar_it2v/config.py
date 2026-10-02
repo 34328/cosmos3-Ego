@@ -6,11 +6,11 @@ from cosmos_framework.configs.base.experiment.sft.models.nano_model_config impor
 from cosmos_framework.configs.base.defaults.callbacks import BASIC_CALLBACKS
 from cosmos_framework.data.generator.joint_dataloader import PackingDataLoader, RankPartitionedDataLoader
 from cosmos_framework.utils.lazy_config import LazyCall as L, LazyDict
-from cosmos3_joint_video_hand_pose.src.wandb_compat import ensure_wandb_generate_id
+from .wandb_compat import ensure_wandb_generate_id
 from .model import ARIT2VModel, ARIT2VModelConfig
 from .dataset import get_egoverse_it2v_dataset
 from .monitor import VideoTrainingMonitor
-from cosmos3_joint_video_hand_pose.src.dataloader_state import RecoverablePackingDataLoader, EgoVerseDataLoaderStateCallback
+from .dataloader import RecoverablePackingDataLoader, IT2VDataLoaderStateCallback
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_NAME = 'rbs_wam_ar_it2v_v0_1_ego100h_cmd_stage1'
@@ -19,7 +19,7 @@ callbacks = {k:copy.deepcopy(BASIC_CALLBACKS[k]) for k in (
     'wandb','wandb_2x','iter_speed','manual_gc','load_pretrained','param_count','sequence_packing_padding')}
 # Ordered before native optimization callbacks so nonfinite gradients cannot be sanitized.
 callbacks['ar_it2v_monitor'] = L(VideoTrainingMonitor)()
-callbacks['dataloader_state'] = L(EgoVerseDataLoaderStateCallback)()
+callbacks['dataloader_state'] = L(IT2VDataLoaderStateCallback)()
 ConfigStore.instance().store(group='callbacks',package='trainer.callbacks',name='ar_it2v_basic',node=callbacks)
 
 
