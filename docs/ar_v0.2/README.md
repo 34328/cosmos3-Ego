@@ -6,6 +6,7 @@
 |---|---|
 | [design.md](design.md) | 方案定义、公式、验收要求、代码导航（第 7 节） |
 | [experiment.md](experiment.md) | 当前结果、评测、负结果、已知问题 |
+| [共用问题清单](../problems.md) | 跨版本最新结论与视频生成排查顺序 |
 | [archive/](archive/) | 过程日志与历史 review，只读，不再更新 |
 
 **现状（2026-09-30）**：1000 步双节点正式训练已完成（W&B [bytyfmqa](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/bytyfmqa)）。给真实视频时动作明显优于不动基线；用模型自己生成的视频时不如不动基线。当前瓶颈是视频生成，详见 experiment 第 5、7 节。
@@ -20,5 +21,6 @@
 | [review_codex_2026-09-29.md](archive/review_codex_2026-09-29.md) | 动作表示、配方、双节点的逐轮 review 与用户决策 |
 | [review_codex_2026-09-28.md](archive/review_codex_2026-09-28.md) | KV cache 与 attention 修复复审 |
 | [code_map.md](archive/code_map.md) | 旧代码导航，已并入 design 第 7 节 |
+| [problems_2026-10-01.md](archive/problems_2026-10-01.md) | V0.2 原问题清单；新结论统一维护在共用清单 |
 
 本地 `data_audit/` 保存数据审计资料。
