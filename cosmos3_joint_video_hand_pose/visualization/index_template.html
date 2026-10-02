@@ -14,7 +14,7 @@ body { margin:0; background:var(--bg); color:var(--text); font:15px/1.55 -apple-
 main { max-width:1800px; margin:0 auto; padding:30px 28px 44px; }
 button,select,a { font:inherit; }
 button,select { min-height:40px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--text); padding:7px 12px; }
-button,a,summary,select { cursor:pointer; }
+button,a,select { cursor:pointer; }
 button { white-space:nowrap; }
 button:hover,a:hover { color:var(--accent); }
 button:active { background:var(--selected); }
@@ -26,13 +26,16 @@ h1 { margin:5px 0 8px; font-size:clamp(24px,2.3vw,34px); line-height:1.25; lette
 .intro { margin:0; color:var(--muted); max-width:76ch; }
 .header-line { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
 .theme-label { display:flex; align-items:center; gap:8px; flex:none; font-size:13px; color:var(--muted); }
-.experiment { margin:16px 0 18px; padding:11px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
-.experiment summary { font-size:14px; }
-.params { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:16px 0 4px; }
-.params div { min-width:0; }
-dt { color:var(--muted); font-size:12px; }
-dd { margin:2px 0 0; overflow-wrap:anywhere; font-size:13px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
-.checkpoint { grid-column:1/-1; }
+.experiment { margin:20px 0 24px; padding:16px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+.experiment h2 { margin:0 0 10px; }
+.table-wrap { overflow-x:auto; }
+.params { width:100%; min-width:560px; border-collapse:collapse; font-size:14px; }
+.params th,.params td { padding:10px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
+.params thead th { color:var(--muted); font-size:12px; font-weight:500; }
+.params tbody th { width:20%; font-weight:500; }
+.params td:nth-child(2) { width:23%; font-weight:600; font-variant-numeric:tabular-nums; }
+.params td:last-child { color:var(--muted); }
+.params tbody tr:last-child th,.params tbody tr:last-child td { border-bottom:0; }
 .toolbar { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:12px; margin-bottom:12px; }
 .view-switch { display:flex; gap:7px; flex-wrap:wrap; }
 .filter { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:14px; }
@@ -66,7 +69,7 @@ dialog::backdrop { background:rgb(0 0 0/.75); }
 dialog video { max-height:80dvh; height:auto; }
 footer { margin-top:34px; color:var(--muted); font-size:12px; }
 @media (max-width:1023px) { .grid { grid-template-columns:minmax(0,1fr); gap:32px; } .legend { font-size:12px; } }
-@media (max-width:639px) { main { padding:20px 14px 32px; } .header-line { flex-direction:column; gap:14px; } .params { grid-template-columns:repeat(2,minmax(0,1fr)); } .toolbar { align-items:flex-start; } .sample-title { align-items:flex-start; flex-direction:column; gap:5px; } .legend { gap:5px; font-size:11px; } .theme-label { align-self:flex-end; } }
+@media (max-width:639px) { main { padding:20px 14px 32px; } .header-line { flex-direction:column; gap:14px; } .experiment { padding:12px; } .params { font-size:12px; } .params th,.params td { padding:8px; } .toolbar { align-items:flex-start; } .sample-title { align-items:flex-start; flex-direction:column; gap:5px; } .legend { gap:5px; font-size:11px; } .theme-label { align-self:flex-end; } }
 </style>
 </head>
 <body>
@@ -76,10 +79,13 @@ footer { margin-top:34px; color:var(--muted); font-size:12px; }
 <div><div class="brand">RBS WAM</div><h1 id="title">Pick & Place · 模型可视化</h1><p class="intro">挑选手部移动明显的拿起、移动、放下动作。短片看完整操作，长片看连续生成与累计漂移。</p></div>
 <label class="theme-label">外观 <select id="theme" aria-label="页面外观"><option value="auto">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
 </div>
-<details class="experiment">
-<summary id="summary">实验参数</summary>
-<dl class="params" id="params"></dl>
-</details>
+<section class="experiment" aria-labelledby="settings-title">
+<h2 id="settings-title">本次实验设置</h2>
+<div class="table-wrap"><table class="params" aria-labelledby="settings-title">
+<thead><tr><th scope="col">项目</th><th scope="col">本次设定</th><th scope="col">含义</th></tr></thead>
+<tbody id="params"></tbody>
+</table></div>
+</section>
 </header>
 <div class="toolbar">
 <div class="view-switch" role="group" aria-label="视频视图">
@@ -118,9 +124,20 @@ const seconds = (n) => Number(n).toFixed(1) + " 秒";
 const title = experiment.title || "Pick & Place · 模型可视化";
 $("title").textContent = title;
 document.title = title + " · RBS WAM";
-$("summary").textContent = experiment.version + " · Step " + experiment.step + " · σ " + experiment.sigma_small + " · 查看参数";
-const parameters = [["版本",experiment.version],["Checkpoint step",experiment.step],["σ_small",experiment.sigma_small],["Seed",experiment.seed],["联合采样步数",experiment.joint_steps],["块数",experiment.n_chunks ?? 17],["回放帧率",experiment.fps ?? 30],["短片来源","长推理动作区间裁剪"]];
-for (const [label,value] of parameters) { const entry=document.createElement("div"); const term=document.createElement("dt"); const definition=document.createElement("dd"); term.textContent=label; definition.textContent=value; entry.append(term,definition); if(label==="Checkpoint") entry.className="checkpoint"; $("params").append(entry); }
+const chunks=experiment.n_chunks ?? 17;
+const fullDuration=data.samples[0].full_duration;
+const shortDurations=data.samples.map(sample=>sample.short_end_sec-sample.short_start_sec);
+const shortRange=Number(Math.min(...shortDurations)).toFixed(1)+"–"+Number(Math.max(...shortDurations)).toFixed(1)+" 秒";
+const parameters = [
+  ["模型与训练进度",experiment.version.replace(/^ar_v/i,"AR V")+" · 第 "+experiment.step+" 步","使用训练到此步保存的模型权重。"],
+  ["历史扰动强度（σ_small）",experiment.sigma_small,"每块结束后，视频和手部动作在写入历史缓存前加入少量噪声，供后续块参考。数值越小，历史越接近干净；只作用于缓存，不直接修改当前展示结果。"],
+  ["完整长片",chunks+" 个时间块 · "+seconds(fullDuration),"模型按时间分段顺序处理，后面的段参考前面的历史。这里的块数是本次完整推理的长度，不是模型的最大长度。"],
+  ["操作短片",shortRange,"从上述同一次长推理中截取完整动作，保留其历史，不单独重新推理。短片只展示其中一段，展示的时间块数随片段不同。"],
+  ["每块联合去噪",experiment.joint_steps+" 步","每个待生成的时间块中，视频和手部动作一起进行这些次数的去噪更新。"],
+  ["随机种子",experiment.seed,"固定随机初始化，方便复现和比较。"],
+  ["回放速度",(experiment.fps ?? 30)+" 帧/秒 · 原速","按原始时间轴回放；长片与短片采用同一速度。"]
+];
+for (const [label,value,explanation] of parameters) { const row=document.createElement("tr"); const term=document.createElement("th"); term.scope="row"; term.textContent=label; const setting=document.createElement("td"); setting.textContent=value; const meaning=document.createElement("td"); meaning.textContent=explanation; row.append(term,setting,meaning); $("params").append(row); }
 if(data.samples.some((sample)=>sample.reference_video)) $("reference-switch").hidden=false;
 const cards = data.samples.map((sample) => {
   const article = $("sample-card").content.firstElementChild.cloneNode(true);
@@ -133,7 +150,7 @@ const cards = data.samples.map((sample) => {
   video.poster=sample.poster;
   video.addEventListener("play",()=>document.querySelectorAll("video").forEach(other=>{ if(other!==video) other.pause(); }));
   video.addEventListener("error",()=>article.querySelector(".media-error").hidden=false);
-  video.addEventListener("loadedmetadata",()=>{ if(view!=="short") article.querySelector(".duration").textContent=seconds(video.duration); });
+  video.addEventListener("loadedmetadata",()=>{ if(view!=="short") article.querySelector(".duration").textContent=seconds(video.duration)+(view==="full" ? " · 完整 "+chunks+" 块" : ""); });
   article.querySelector("button").addEventListener("click",()=> {
     video.pause(); $("viewer-title").textContent=sample.title;
     const expanded=$("viewer").querySelector("video"); expanded.src=video.currentSrc || video.src; expanded.poster=sample.poster;
@@ -152,7 +169,7 @@ function refresh() {
     const src=view==="short" ? sample.short_video : view==="reference" ? sample.reference_video : sample.full_video;
     if(src && video.getAttribute("src")!==src) { article.querySelector(".media-error").hidden=true; video.src=src; }
     article.querySelector("a").href=src || sample.full_video;
-    article.querySelector(".duration").textContent=view==="short" ? seconds(sample.short_end_sec-sample.short_start_sec)+" · 长推理 "+Number(sample.short_start_sec).toFixed(1)+"–"+Number(sample.short_end_sec).toFixed(1)+" 秒" : "完整长片";
+    article.querySelector(".duration").textContent=view==="short" ? seconds(sample.short_end_sec-sample.short_start_sec)+" · 长片 "+Number(sample.short_start_sec).toFixed(1)+"–"+Number(sample.short_end_sec).toFixed(1)+" 秒" : view==="full" ? seconds(sample.full_duration)+" · 完整 "+chunks+" 块" : "历史版本对比";
     if(!article.hidden && (split==="all" || sample.split===split)) visible++;
   }
   for(const group of ["train","heldout"]) $(group+"-count").textContent=cards.filter(({sample,article})=>sample.split===group&&!article.hidden).length+" 个样本";
@@ -160,7 +177,7 @@ function refresh() {
   const labels=$("legend").children;
   labels[1].textContent=view==="reference" ? (experiment.reference_label || "参考版本 generated")+" + 红色预测骨架" : "gt-history RGB + 红色预测骨架";
   labels[2].textContent=view==="reference" ? experiment.version+" generated + 红色预测骨架" : "generated RGB + 红色预测骨架";
-  $("view-note").textContent=view==="short" ? "短片截自同一次长推理，保留此前历史；每条覆盖所选动作区间，时长单独标注。" : view==="full" ? "完整 17 块长推理，按原始时间轴回放。使用播放器可逐段查看。" : "复用已有参考版本视频，仅展示具备参考视频的样本；不重新运行参考模型。";
+  $("view-note").textContent=view==="short" ? "每条短片截自 "+chunks+" 块、"+seconds(fullDuration)+"的同一次长推理，只展示所选完整动作；保留此前历史，不单独重新推理。" : view==="full" ? "每条长片展示完整 "+chunks+" 个时间块、"+seconds(fullDuration)+"，按原速回放；块数是本次窗口设定。" : "复用已有参考版本视频，仅展示具备参考视频的样本；不重新运行参考模型。";
   $("empty").hidden=visible>0;
 }
 for(const button of document.querySelectorAll("[data-view]")) button.addEventListener("click",()=>{ view=button.dataset.view; refresh(); });
