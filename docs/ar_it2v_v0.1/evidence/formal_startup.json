@@ -1,0 +1,110 @@
+{
+  "source_commit": "aa81810b97fb76c9ac267ae557f44afccfb64e96",
+  "config_sha256": "2b278f6dde29b3685fed89dda1f5cae8aec710750f9b2c57c4800311e089e1b4",
+  "run_path": "/mnt/lzh/cosmos-ar-it2v/outputs/pretrain/20261002T174227Z/rbs_wam_ar_it2v/ar_it2v_v0_1/ar_it2v_v0_1_ego100h_cmd_stage1",
+  "preflight_path": "/mnt/lzh/cosmos-ar-it2v/outputs/maintenance/ar_it2v_v0_1_preflight_20261002T174227Z",
+  "nodes": {
+    "Tdebug5": {
+      "rank": 0,
+      "hostname": "nb-1678910729611554048-cr786mpgj9xc"
+    },
+    "Tdebug6": {
+      "rank": 1,
+      "hostname": "nb-1678910939769489408-cr789bmolaf4"
+    }
+  },
+  "master_addr": "10.3.12.50",
+  "master_port": 29883,
+  "wandb": {
+    "checked_utc": "2026-10-02T17:57:46.934668+00:00",
+    "id": "7oimekos",
+    "url": "https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7oimekos",
+    "name": "ar_it2v_v0_1_ego100h_cmd_stage1",
+    "state": "running",
+    "lastHistoryStep": 5,
+    "summary": {
+      "_step": 5,
+      "ar_it2v/global_batch": 64,
+      "ar_it2v/grad_clip_triggered": true,
+      "ar_it2v/peak_allocated_gib": 33.19154405593872,
+      "ar_it2v/peak_reserved_gib": 42.044921875,
+      "ar_it2v/preclip_norm": 1.5696179866790771,
+      "ar_it2v/resident_allocated_gib": 15.181002140045166,
+      "ar_it2v/step": 5,
+      "ar_it2v/train_step_seconds": 9.931766003370283,
+      "ar_it2v/video_loss": 0.3019654769450426
+    },
+    "history": [
+      {
+        "_step": 1,
+        "ar_it2v/video_loss": 0.3243743684142828,
+        "ar_it2v/step": 1
+      },
+      {
+        "_step": 2,
+        "ar_it2v/video_loss": 0.35687901079654694,
+        "ar_it2v/step": 2
+      },
+      {
+        "_step": 3,
+        "ar_it2v/video_loss": 0.36076287366449833,
+        "ar_it2v/step": 3
+      },
+      {
+        "_step": 4,
+        "ar_it2v/video_loss": 0.3132603168487549,
+        "ar_it2v/step": 4
+      },
+      {
+        "_step": 5,
+        "ar_it2v/video_loss": 0.3019654769450426,
+        "ar_it2v/step": 5
+      }
+    ]
+  },
+  "video_only_contract": {
+    "action_parameters": [],
+    "action_gen": false,
+    "frames_per_chunk": 4,
+    "local_attention_frames": 16
+  },
+  "learning_rate_receipt": {
+    "base_lr": 2e-05,
+    "scheduler": {
+      "warm_up_steps": [
+        100
+      ],
+      "cycle_lengths": [
+        3000
+      ],
+      "f_start": [
+        0.0
+      ],
+      "f_max": [
+        1.0
+      ],
+      "f_min": [
+        0.3
+      ]
+    },
+    "theoretical_lr": {
+      "0": 0.0,
+      "100": 2e-05,
+      "1500": 1.3378972360097924e-05,
+      "3000": 6e-06
+    },
+    "action_gen": false,
+    "frames_per_chunk": 4,
+    "local_attention_frames": 16,
+    "wandb_mode": "online",
+    "sigma_sampler": "uniform_shift_postclamp",
+    "sigma_min": 0.02,
+    "sigma_max": 0.98,
+    "sigma_shift": 5.0
+  },
+  "global_batch": 64,
+  "frame_stride": 1,
+  "source_fps": 30,
+  "max_iter": 3000,
+  "save_iter": 500
+}

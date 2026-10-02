@@ -4,7 +4,7 @@
 
 分支 `ar-it2v-pretrain`，worktree `/mnt/lzh/cosmos-ar-it2v`。官方 Cosmos3-Nano 起点，纯视频+文本+首帧，action 模态关闭。使用原100小时 train split 可用32338片段；原始30fps连续逐帧，stride1；97/81/65/49/33/17档。完整设计与hash见 `design.md`。
 
-正式计划：Tdebug5/6，H800 8×2、HSDP8×2/CP1、内网Socket/eth0；全局64 clips、GEN lr2e-5、warmup100/cycle3000/f_min.3、3000步、每500步保存。正式启动及W&B API核实后补实际回执。
+正式计划：Tdebug5/6，H800 8×2、HSDP8×2/CP1、内网Socket/eth0；全局64 clips、GEN lr2e-5、warmup100/cycle3000/f_min.3、3000步、每500步保存。正式已启动并经W&B API核实，见下方回执。
 
 ## 验证
 
@@ -14,10 +14,19 @@
 - 原生DCP `iter_000000020` 已保存：官方latest marker，model/optim/trainer/scheduler metadata与分片、8 rank dataloader状态齐全。目录 `outputs/validation/ar_it2v_gate/smoke_native30fps/runs/rbs_wam_ar_it2v/ar_it2v_v0_1/ar_it2v_v0_1_smoke_native30fps/`。
 - 旧开发smoke01在optimizer更新前因packer同时设sample/token两个预算失败，已改固定4 samples；旧stride2 smoke02按用户新要求停止，不是本配方验收、不续训、不混入正式结果。正式仍从官方Nano起点。
 
-真实step20 DCP已在Tdebug4单H800加载并完成97连续RGB/30fps/25latent/6未来块×35步推理，source indices严格连续，GT与生成视频均97×360×640×3，exit0，无OOM。回执 `outputs/validation/ar_it2v_inference_gate/validation_smoke20_native30fps.json`。正式运行信息待启动核实后追加。短测loss趋势只证明数值可用，不宣称运动质量已改善。
+真实step20 DCP已在Tdebug4单H800加载并完成97连续RGB/30fps/25latent/6未来块×35步推理，source indices严格连续，GT与生成视频均97×360×640×3，exit0，无OOM。回执 `outputs/validation/ar_it2v_inference_gate/validation_smoke20_native30fps.json`。正式运行信息见下节。短测loss趋势只证明数值可用，不宣称运动质量已改善。
 
 ## 分支隔离
 
 按用户要求，本分支删除旧联合工程 `cosmos3_joint_video_hand_pose/`、旧版本文档、根scripts及旧测试；原始内容保留在 `ar-video-action` 分支和Git历史。根README/AGENTS重新面向纯视频任务编写。通用packing恢复和W&B兼容逻辑已独立到新包，没有旧joint导入。保留上游 `packages/cosmos3`，不裁剪其官方实现。
 
 隔离后的根tests仅包含本项目测试，**39 passed**（含新独立packing恢复）；不存在旧joint目录或代码导入。未因纯目录隔离重复20步GPU短测，模型/数据/优化配方未变。
+
+## 正式训练已启动
+
+- 训练源提交 `aa81810b97fb76c9ac267ae557f44afccfb64e96`；配置SHA256 `2b278f6dde29b3685fed89dda1f5cae8aec710750f9b2c57c4800311e089e1b4`。分支隔离后模型/数据/优化配方不变，39项独立CPU测试通过。
+- Tdebug5 rank0 / Tdebug6 rank1，各8张H800，master `10.3.12.50:29883`，NCCL Socket/eth0。两端分别经MCP启动，存在launch claim，禁止重复启动或自动恢复。
+- 正式输出：`/mnt/lzh/cosmos-ar-it2v/outputs/pretrain/20261002T174227Z/rbs_wam_ar_it2v/ar_it2v_v0_1/ar_it2v_v0_1_ego100h_cmd_stage1`。两端启动/退出/console回执在 `/mnt/lzh/cosmos-ar-it2v/outputs/maintenance/ar_it2v_v0_1_preflight_20261002T174227Z`。
+- W&B：[ar_it2v_v0_1_ego100h_cmd_stage1](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7oimekos)，run `7oimekos`。API于北京时间2026-10-03 01:57核实running及连续step1–5的video loss上传，step5=0.3019655；同时上传gradient、step耗时和显存。
+- 实际全局64 clips，step5前后向9.9318s，allocated33.1915GiB/reserved42.0449GiB（各rank最大）；无action参数。首步初始化41.66s，不用于稳态估算。
+- 3000步、每500保存，从官方Nano起点重新训练。当前仅启动与数值验收，不宣称画质已改善。完整启动回执见 [evidence/formal_startup.json](evidence/formal_startup.json)。
