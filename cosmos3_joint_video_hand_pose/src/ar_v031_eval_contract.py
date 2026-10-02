@@ -5,6 +5,7 @@ import hashlib
 MODEL_TARGET = "cosmos3_joint_video_hand_pose.src.ar_v031_model.EgoVerseARV031Model"
 MODEL_VERSION = "ar_v0.3.1"
 MILESTONES = (500, 1000, 2000, 3000)
+SAVED_STEPS = tuple(range(500, 3001, 500))
 PREFIX_LOSS_DENOMINATOR = "v030_full_valid"
 PREFIX_LOSS_MASK_SCOPE = "numerator_only"
 GROUP_MSE_CALLBACK_TARGET = "cosmos3_joint_video_hand_pose.src.ar_v031_config.ARV031GroupMSECallback"
@@ -70,8 +71,8 @@ def validate_checkpoint_snapshot(snapshot, checkpoint):
     if (snapshot.name != "config.yaml" or not snapshot.is_file()
             or checkpoint.name != "model" or not match
             or checkpoint.parent.parent != snapshot.parent / "checkpoints"
-            or int(match.group(1)) not in MILESTONES):
-        raise ValueError("V0.3.1 requires this run's config.yaml and step500/1000/2000/3000 official model DCP")
+            or int(match.group(1)) not in SAVED_STEPS):
+        raise ValueError("V0.3.1 requires this run's config.yaml and an official model DCP saved every500 through3000")
     reference = repository() / REFERENCE_RELATIVE
     if not reference.is_file() or sha256(reference) != REFERENCE_SHA256:
         raise ValueError("immutable V0.3.0 recipe reference changed")
