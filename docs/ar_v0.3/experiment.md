@@ -540,3 +540,69 @@ UTC04:33:04.562109的W&B API有界查询1995≤step<2005、use_cache=false返回
 独立CPU在鲜查资源后的Tdebug3以6workers、每进程线程1完成六份实际dtype/shape/字节验收，10.748秒、15/15项通过。首块VA/U/S在三档sigma×两模式间一致；gt全部17块U/S跨sigma一致，六份原始GT一致；checkpoint/snapshot/冻结父清单/来源hash/seed42/联合30步/17块联合refresh报告匹配。[formal_step2000_pilot_validation.json](formal_step2000_pilot_validation.json) SHA256 `a2e166fdd6ce39e091c62cd6d809694bae987488d52339574c49235a924af33a`。NPZ不保存KV或timestep张量，路由验收依据已测试且hash匹配的源码和真实逐块报告；不声称直接重放KV数值。
 
 pilot通过后，UTC04:41:02–04:41:20分别经MCP启动Tdebug1/3/5/6，每节点8张空闲H800，共32workers执行其余69jobs/90NPZ。各端重新核查lzh、CPUquota120核/affinity200核、内存/负载、目标GPU无compute进程；独立operations启动回执和原生atomic claim防重复，排除训练节点Tdebug4/2。UTC04:43:51原生状态为3/72成功、6/96NPZ、32running、0失败；完整质量指标等待剩余输出及CPU汇总，不以pilot代替完整验收。
+
+
+完整GPU阶段于UTC04:54:43.796940完成72/72 jobs、96/96 NPZ，0失败、全部17块。69个remaining任务wall820.689秒（13分40.689秒）、90NPZ、6.580NPZ/分钟；含pilot511.522秒与其后593.874秒验收/准备间隔，完整扫描固定wall1926.085秒（32分06.085秒）、2.991NPZ/分钟。该固定完成计时取真实job起止，不使用完成后不断增加的progress elapsed。完整17块sampler-only均值heldout gt89.337秒/generated87.301秒/train gt87.059秒；官方DCP加载72任务均值98.372秒、中位46.850秒，完整双history/单history job均值486.686/249.551秒，口径分开。allocated峰值35.534GiB，驱动采样峰值39672MiB=38.742GiB；未记录reserved，不据驱动值虚构reserved。
+
+独立GPU完成审核通过：72个sampler exit0、96个唯一路径/native SHA、1632块metadata/NPY header完整，5个supervisor/35个worker原生正常退出证据齐全；四端真实hostname/PID/birth检查确认进程结束、32张GPU恢复4–5MiB/0%且computeapps为空。supervisor未另捕获OS waitpid退出回执，正常return0依据原生worker退出码/终态、源码路径、进程消失和锁释放推证，此限制明确保留。[formal_step2000_gpu_completion.json](formal_step2000_gpu_completion.json) SHA256 `3e0bea70d40cb81defecdb403538c551cc1c680c226e633d975042693d3a8311`。
+
+CPU指标在空闲Tdebug3执行，鲜查quota120核/affinity200、约1.37TiB可用内存、低负载、GPU无compute进程；CUDA为空，每进程BLAS/OpenMP/OpenCV线程1。3份代表产物串行1/并行3逐位一致，计算47.495/18.545秒，整个pilot阶段67.266秒、exit0。复用3份，24workers计算其余93份，计算段67.239秒（1.383NPZ/秒），整个aggregate阶段73.930秒、exit0。运行时通过控制器probe核对记录节点hostname及wrapper/child PID birth，未将静态running claim当作存活证明；96份/9组、1632块光流对、52224行action、26112帧future RGB完整，控制器状态complete。
+
+独立数学复核从leaf累加量重算9组all/17块/第17块共171个scope及5份冻结基线，通过22093项核对，最大相对误差3.28e-16；新报告原SHA及父清单/binding/snapshot/tool哈希匹配。时移±4的共同支持为首15/中16/末14帧、总269帧，完整future PSNR独立使用272帧；审计脚本初版对末块的错误假设已修正并保留失败回执，未改生产汇总或数值。审计为报告层复算，未声称重新解码像素或旧baseline NPZ。原审计保存在本步 `metrics_audit/metrics_math_validation.json`，SHA256 `209199e7faf791b8c4039802ec10912de99f1f2cba047b5000552bebe5de76d5`。
+
+冻结heldout8父清单SHA `8ac5c99d0a80f963b03858dd9260e12aa3cccead0e0bf4475427bd863ec1f03d`、train16父清单SHA `7e088380b461fce4ea34ec6aeea141d445d1aff6c3acf81f2cbfb401a6bb9ee4`不变，seed42、联合30步、273模型帧/完整17块、共同video/action历史sigma三档不变。UTC04:56:30再次通过真实W&B API核实上传step2304，本地2305、state=running，无STOP或两端退出回执，最后10步计算段14.902秒/clip率0。3000 checkpoint仍等待官方保存；不提前绑定、不重训。
+
+### 11.3 第2000步三档完整指标与 V0.2 同口径对照
+
+所有值来自冻结 heldout8 或 train16 的完整17块。光流按320×180整体点积/全局范数聚合；腕部末端相对原数据构造并解码的GT action pose，每块等权；手形直接对原始世界坐标GT关键点，在各自腕坐标系比较，按action数合并；PSNR先合并MSE再转dB。
+
+旧 V0.2 基线均为 step1000、历史 sigma0；本次 V0.3 为 step2000、历史 sigma {.02,.05,.1}。训练步数、配方和历史噪声均不同，以下对照不能归因于单一改动。
+
+| 模型 / step | 数据 / history | 历史sigma | 光流幅值 / GT | 整体余弦 | 左 / 右腕末端 mm | PSNR dB |
+|---|---|---:|---:|---:|---:|---:|
+| V0.2 lr2e-5 / 1000 | heldout8 / gt | 0 | 1.077061 | 0.103794 | 65.03 / 57.33 | 16.930 |
+| V0.2 lr2e-5 / 1000 | heldout8 / generated | 0 | 1.644089 | -0.016639 | 281.79 / 243.13 | 12.221 |
+| V0.2 lr1e-4 / 1000 | heldout8 / gt | 0 | 1.073728 | 0.035371 | 68.09 / 55.89 | 16.954 |
+| V0.2 lr1e-4 / 1000 | heldout8 / generated | 0 | 1.737592 | 0.015020 | 319.54 / 234.48 | 11.882 |
+| V0.2 lr1e-4 / 1000 | train16 / gt | 0 | 0.814540 | 0.182111 | 39.28 / 50.51 | 17.898 |
+| V0.3 prefix / 2000 | heldout8 / gt | 0.02 | 0.789993 | 0.135322 | 64.15 / 52.36 | 17.309 |
+| V0.3 prefix / 2000 | heldout8 / generated | 0.02 | 0.658195 | 0.018723 | 192.21 / 172.24 | 12.460 |
+| V0.3 prefix / 2000 | train16 / gt | 0.02 | 0.639114 | 0.171610 | 35.16 / 50.13 | 18.044 |
+| V0.3 prefix / 2000 | heldout8 / gt | 0.05 | 0.790706 | 0.126741 | 63.76 / 52.20 | 17.334 |
+| V0.3 prefix / 2000 | heldout8 / generated | 0.05 | 0.640237 | -0.020254 | 188.54 / 146.23 | 12.568 |
+| V0.3 prefix / 2000 | train16 / gt | 0.05 | 0.640253 | 0.177675 | 35.11 / 49.17 | 18.059 |
+| V0.3 prefix / 2000 | heldout8 / gt | 0.1 | 0.789554 | 0.141467 | 63.66 / 52.66 | 17.365 |
+| V0.3 prefix / 2000 | heldout8 / generated | 0.1 | 0.564498 | 0.030840 | 176.64 / 151.64 | 12.602 |
+| V0.3 prefix / 2000 | train16 / gt | 0.1 | 0.634262 | 0.175276 | 35.00 / 48.79 | 18.069 |
+
+| 模型 / step | 数据 / history | 历史sigma | 左 / 右腕旋转 degrees | 左 / 右局部手形 MPJPE mm | 第17块左 / 右腕末端 mm |
+|---|---|---:|---:|---:|---:|
+| V0.2 lr2e-5 / 1000 | heldout8 / gt | 0 | 未汇总 | 8.36 / 8.42 | 37.34 / 43.95 |
+| V0.2 lr2e-5 / 1000 | heldout8 / generated | 0 | 未汇总 | 18.08 / 18.93 | 436.31 / 341.19 |
+| V0.2 lr1e-4 / 1000 | heldout8 / gt | 0 | 未汇总 | 8.31 / 8.21 | 41.38 / 40.60 |
+| V0.2 lr1e-4 / 1000 | heldout8 / generated | 0 | 未汇总 | 18.35 / 18.39 | 472.79 / 320.32 |
+| V0.2 lr1e-4 / 1000 | train16 / gt | 0 | 未汇总 | 7.22 / 8.27 | 30.05 / 33.05 |
+| V0.3 prefix / 2000 | heldout8 / gt | 0.02 | 23.14 / 22.23 | 7.97 / 7.70 | 47.32 / 43.20 |
+| V0.3 prefix / 2000 | heldout8 / generated | 0.02 | 47.87 / 47.91 | 16.66 / 15.48 | 292.62 / 320.12 |
+| V0.3 prefix / 2000 | train16 / gt | 0.02 | 19.48 / 25.48 | 7.14 / 7.84 | 28.99 / 29.62 |
+| V0.3 prefix / 2000 | heldout8 / gt | 0.05 | 23.08 / 23.00 | 7.99 / 7.82 | 46.96 / 41.55 |
+| V0.3 prefix / 2000 | heldout8 / generated | 0.05 | 44.80 / 44.35 | 14.92 / 15.58 | 277.59 / 227.80 |
+| V0.3 prefix / 2000 | train16 / gt | 0.05 | 19.49 / 25.61 | 7.19 / 7.90 | 28.39 / 31.20 |
+| V0.3 prefix / 2000 | heldout8 / gt | 0.1 | 22.60 / 22.96 | 8.00 / 7.87 | 47.26 / 42.01 |
+| V0.3 prefix / 2000 | heldout8 / generated | 0.1 | 44.32 / 43.27 | 15.11 / 15.09 | 245.33 / 204.92 |
+| V0.3 prefix / 2000 | train16 / gt | 0.1 | 19.40 / 25.33 | 7.20 / 7.94 | 28.37 / 32.00 |
+
+旧汇总未记录腕旋转的组标记为“未汇总”。旧lr2e-5两组的shift/CFG/history sigma来自历史源码与启动审计，NPZ本身缺显式字段；保留旧审计限制。lr1e-4三组NPZ显式记录shift5/CFG1/history sigma0。
+
+![完整step2000三档与旧step1000的1–17块曲线](figures/formal_step2000_sigma_scan.png)
+
+完整逐窗原始报告为评测根 metrics/comparison.json（SHA256 052bded5ceb1dc9210e865c70f6b89d59171b7b366fd6fd040b2d0be026dd5ab，14,481,218 bytes）。[formal_step2000_metrics.json](formal_step2000_metrics.json) 保留全部9组与5个基线的1–17块指标、存档身份/SHA、source/配置/清单/tool hash、CPU资源和验收回执，省略逐窗重复metadata；原始逐窗结果保留。
+
+
+同冻结窗口、同sigma比较，step1000→2000三档的gt两组腕误差、PSNR和方向余弦均改善。默认.02下heldout/gt腕85.35/72.90→64.15/52.36mm、PSNR15.663→17.309dB、整体余弦.029920→.135322；train16/gt腕55.82/69.05→35.16/50.13mm、PSNR16.501→18.044dB、余弦.079102→.171610。heldout/gt第17块腕67.43/64.24→47.32/43.20mm，train第17块41.04/45.93→28.99/29.62mm。同.02与step500相比，gt腕误差及PSNR也更好，故第9节500→1000变差并非持续趋势。
+
+generated三档的左右腕全程误差、PSNR及第17块漂移均较step1000改善。默认.02下全程301.68/279.77→192.21/172.24mm，第17块388.82/376.42→292.62/320.12mm，PSNR11.270→12.460dB；.1全程176.64/151.64mm、第17块245.33/204.92mm。但generated整体方向仍接近0（-.020254至.030840），幅值/GT从此前约2.1–2.4降至.56–.66，出现运动偏弱；不能由腕漂移和PSNR改善推断运动方向已学好。三档没有跨指标一致最优值，默认.02保持不变。
+
+与旧V0.2 lr1e-4/step1000相比，本次heldout/gt三档腕误差、PSNR及方向余弦更好；generated三档腕误差/第17块漂移/手形/PSNR更好，但方向余弦没有一致改善；train16/gt腕及PSNR更好、方向余弦.171610–.177675仍略低于旧.182111。两边训练步数、LR调度、配方及历史sigma不同，此表不证明单遍DF的独立因果效果。
+
+这些2000步结果不支持“V0.3.0持续越训越差”的判断。前缀梯度诊断与生成质量结论仍需分开：V0.3.1可作为目标块监督取舍/学习效率的单因素对照，不作为已证实的修复；正式V0.3.0继续完成3000与最后三档扫描。
