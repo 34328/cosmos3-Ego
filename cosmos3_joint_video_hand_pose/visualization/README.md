@@ -34,3 +34,5 @@ PYTHONPATH="$PWD:$PWD/packages/cosmos3" \
 ```
 
 服务仅监听服务器 `127.0.0.1:18766`。使用已有远程连接的 Ports 面板转发该端口，本地浏览器访问 `http://127.0.0.1:18766/`；本地端口被占用时按实际转发地址访问。启动与后续检查均经 MCP，不重复启动已有服务。
+
+macOS 上也可复用 VS Code 已有 Remote-SSH 的 SOCKS 连接：确认该连接对应 HTTP 服务所在节点、读取其现有动态端口，在本地运行 `python3 forward.py --socks-port <现有SOCKS端口>`。这个小入口只用系统 `nc` 转发字节，不启动 SSH、不复制网页或视频；关闭已有远程连接后需重新建立转发。
