@@ -37,6 +37,24 @@ V0.3.0 已完成3000步；按用户决定，step3000仅做视频展示，未做�
 
 V1 首轮只形成一页简短结论：固定窗口中“哪一类错误、最早何时出现、gt与generated是否同样出现”。已有官方整段 image2video 结果可作视觉参考，但生成时域、解码方式和条件不同，不能据此判定“训练损伤了Nano”。官方双向起点的零样本AR也不是经过AR训练的上限。
 
+## V1 研究更新：因果视频能力与联合适配（2026-10-02）
+
+本轮仅阅读代码、现有实验及一手论文/仓库，没有启动新训练或评测。以下是下一轮方案依据，不是已批准的训练配方。
+
+- **当前优先假设**：可靠的短段因果视频能力尚未建立，因果转换、手部数据域适配及新联合接口被放进同一轮训练。官方 Nano 已有视频和机器人 action 预训练，但仓内原配置为 `causal_training_strategy=none`、`video_temporal_causal=False`；“有官方 AR 推理接口”不等于该起点已训练当前块因果分布。V0.2/V0.3 已经在做 AR 微调，不能称为完全没有 AR 训练。
+- **反证与规模**：V0.2 固定16窗300步已达到26.40dB（实验10.4），说明有限集合可以拟合，不能宣称整个链路完全失效。完整训练数据为744 episodes / 17.34小时；V0.3.0的3000条正式monitor记录累计121,356次clip采样，平均global batch40.452。trace覆盖全部4409个train segment，各26–29次，但每次重新随机选窗口，不能说某个精确展示窗已重复优化这么多次。重复与重叠片段不等于独立新数据。首块及gt-history差，使历史噪声和长rollout失配不足以单独解释问题。
+- **任务条件**：实际使用segment的`text_normalized`，并非没有动作文本；但随机窗口复用整段caption。例如“load glass cups into dishwasher”覆盖约49秒，不能唯一确定当前一秒的动作相位。同块未来action也是待生成量，gt-history不等于把未来真实action作为视频控制输入。唯一GT的PSNR/方向余弦与合理动作生成需分别解释。
+- **额外设计偏移**：当前逐块独立VAE编码并重复引入U/S边界；`speed_factor=.5`使模型内部RGB/action时间标度为7.5/15fps，原始数据为30Hz、RGB stride2。训练和推理使用相同配置，不能称为已证实的时间错配；这些改变增加适配负担，但尚未证明是主因。视频/action loss系数均1，也不能仅用loss标量大小推断梯度竞争。
+
+| 一手参照 | 已核实事实 | 对当前决策的意义 |
+| --- | --- | --- |
+| [LingBot-VA 1.0](https://arxiv.org/html/2601.21998v1)、[公开代码](https://github.com/Robbyant/lingbot-va) | Wan2.2-5B起点后有约16K小时、1.4T tokens联合预训练。远端已有`/mnt/lzh/refs/lingbot-va`，commit `7c6ffa9bfc4b83582cafc860fab4c82cc7deeeeb`。公开shared-backbone版video先于同块action；部署是闭环控制。 | 支持专门建立因果视觉动作能力，不证明video-only预训练是数学必需。其机器人接口和闭环成功率不能直接替代57D人手开环视频验收。 |
+| [Causal Forcing](https://github.com/thu-ml/Causal-Forcing)、[分阶段权重](https://huggingface.co/zhuhz22/Causal-Forcing/tree/main/framewise) | 提供AR diffusion、因果蒸馏及最终模型权重；frame-wise支持I2V，原生约5秒。 | 首选现成短段AR质量参照，可先用多步AR模型，不以少步速度为本轮目标；不能直接强推到18秒作公平比较。 |
+| [Causal-rCM](https://arxiv.org/html/2606.25473v1)、[训练配方](https://github.com/NVlabs/rcm/blob/main/Causal_rCM.md) | 明确研究Cosmos3双向GEN因果化；公开配方先TF/DF因果训练，再蒸馏与self-forcing。此次公开仓/权重核查未确认可下载的Cosmos3因果专用成品。 | 同底座的方法参考；其已知action控制视频与本项目联合预测不同。ODE蒸馏的理论限制不能直接用来判定本项目真实数据flow-matching不合法。 |
+| [MAGI-1](https://github.com/SandAI-org/MAGI-1) | 原生分块AR，有4.5B/24B权重和推理，公开仓不等于完整训练复现框架。 | 可作第二质量参照，但不优先承担当前联合模型迁移。 |
+
+建议顺序：复用原生Nano既有结果，并以固定动作短片检查一个成熟AR baseline；再决定是否开展保持现有结构的video-only因果适配，将短段视频能力独立验收后接回action联合训练。video-only不能仅把action loss置零而仍让随机未来action干扰视频。对照必须对齐可用首帧/历史和文本信息，保留各baseline原生采样与时域限制；若需要更明确的动作描述，双方同时提供。只有短段可靠后，才优先处理生成历史分布和self-forcing。新正式训练仍需单独确定配方。
+
 ## 共同评判口径
 
 - **画面与交互**：固定 train / heldout 各三窗的 pick-and-place 展示，短片看完整操作，长片看完整17块；复用 [统一可视化规范](../cosmos3_joint_video_hand_pose/visualization/README.md)。这六窗用于解释现象，不替代冻结 heldout8 / train16 的定量比较。
