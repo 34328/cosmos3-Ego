@@ -606,3 +606,6 @@ generated三档的左右腕全程误差、PSNR及第17块漂移均较step1000改
 与旧V0.2 lr1e-4/step1000相比，本次heldout/gt三档腕误差、PSNR及方向余弦更好；generated三档腕误差/第17块漂移/手形/PSNR更好，但方向余弦没有一致改善；train16/gt腕及PSNR更好、方向余弦.171610–.177675仍略低于旧.182111。两边训练步数、LR调度、配方及历史sigma不同，此表不证明单遍DF的独立因果效果。
 
 这些2000步结果不支持“V0.3.0持续越训越差”的判断。前缀梯度诊断与生成质量结论仍需分开：V0.3.1可作为目标块监督取舍/学习效率的单因素对照，不作为已证实的修复；正式V0.3.0继续完成3000与最后三档扫描。
+- 2026-10-02：`iter_000003000` 按用户最新要求取消完整 72 jobs 三档扫描，heartbeat 已暂停；本次只出可视化视频，不计算指标。
+- 固定 heldout / train16 各前三窗，`σ_small=0.02`、seed 42、联合 30 步、完整 17 块：6 条 GT / gt-history / generated 三栏预览，另 3 条 heldout 的 GT / V0.2 step1000 generated / V0.3.0 step3000 generated 对比；沿用 step1000 renderer，原始时间轴 30fps，V0.2 复用存档。
+- 9 条视频已完成：远端 `outputs/maintenance/ar_v03_step3000_video_preview_20261002T092034Z/`；本地入口 [step3000/index.html](../../eval_videos/ar_v0.3/step3000/index.html)。
