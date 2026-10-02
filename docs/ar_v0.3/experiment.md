@@ -500,3 +500,43 @@ GPU推理经MCP在Tdebug1 GPU0/1/2并行运行，启动前quota120核/affinity20
 三个视频均1920×368、30fps、545个源时间轴帧、18.1667秒，全部帧实际解码成功；按原生real-time replay映射恢复原始时间，不直接将带条件U的289输出帧作为源时间轴。左栏为原始GT RGB+绿色真实骨架，中栏为GT历史预测RGB+红色预测骨架，右栏为连续generated历史预测RGB+红色预测骨架。新旧GT/源索引/时间映射一致，首块action/RGB及第一块U/S逐位一致；原始世界系GT投影与原生逐块投影的最大误差分别0.000500/0.000197/0.000122像素。三段各5个代表帧目视检查栏序/标签/骨架/时间轴；这是预览完整性验证，未声称完整人工播放或新增全量指标。代表帧中generated中后段出现手与场景漂移，尤以00/01明显，不据三窗作总体质量结论。
 
 远端独立根为 `outputs/maintenance/ar_v03_train_preview_step1000_20261002T003702Z/`，保存preview_plan、三任务启动/退出/验证、原始NPZ、renderer、视频/时间轴/逐窗回执及visual_qa。preview_plan SHA256 `ac059b17e1a08174f2ae67e5d72aeef8a7a833ee380fd623914d3bd5f98f1380`；[完整导出回执](train_preview_step1000_render_receipt.json) SHA256 `fd478a416212043a294d8abb814be14fce6b9ce7a44336f89e3214138b1511f1`。本地已核对三份MP4 SHA并交付 `eval_videos/ar_v0.3/step1000_train_preview/index.html` 及 `videos/window00.mp4` 至 `window02.mp4`。
+
+
+## 11. 正式 step2000 checkpoint 与评测（2026-10-02）
+
+### 11.1 保存与训练统计
+
+用户随后要求监控改为每两三小时一次，当前 `ar-v0-3` 已恢复为ACTIVE、每3小时检查；第10节的暂停是此前状态。正式V0.3.0按用户指示继续到3000，不改变配方、停止条件或自动恢复；V0.3.1尚未启动，需用户查看实测诊断后确认。UTC04:18:53核实本地step2162、W&B API step2161持续上传且state=running，无STOP或两端退出回执。[本次正式run](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/b7fdsq94)。
+
+官方于北京时间11:35:29完成iter_000002000保存，耗时18.97秒；model/trainer/optim/scheduler全部metadata及引用storage范围完整。model为886键/8份shard，metadata SHA256 `18dedc2e95bb2a70defb8225d3f79932b731e2c57731534d250bc3cb797d4b22`。配置SHA256 `e7c5ab0150300247f139405470c16cbd668a8f22a8ce0cecf97795bda952ae66`，训练源仍为9eac1859d2a94c6a4c41d12dee1f2ea92957bbdf。扫描根 `outputs/maintenance/ar_v03_formal_eval_20261001T182754Z/step002000/`，plan SHA `883ea68f6917ac3e6143928351f8f983cab97ac7893c245799a36fb78712c848`，binding SHA `52e8e8edb99b1214aefc0a7da1278f4387e72e6d9e5ed45214701a8e762e4ce8`；绑定时HEAD511b608，冻结源码文件hash均匹配。
+
+以下为真实step1001–2000逐步等权均值；action为腕权3目标，8个字段继续记录未加权原值。
+
+| step段 | video均值 | action均值（腕权3） | total均值 | clip次数 |
+|---|---:|---:|---:|---:|
+| 1001–1100 | 0.411372 | 0.167805 | 0.579177 | 0 |
+| 1101–1200 | 0.417001 | 0.167138 | 0.584139 | 0 |
+| 1201–1300 | 0.408450 | 0.164015 | 0.572465 | 0 |
+| 1301–1400 | 0.408798 | 0.164506 | 0.573304 | 0 |
+| 1401–1500 | 0.404125 | 0.158552 | 0.562677 | 0 |
+| 1501–1600 | 0.409065 | 0.161136 | 0.570200 | 0 |
+| 1601–1700 | 0.405076 | 0.157644 | 0.562720 | 0 |
+| 1701–1800 | 0.402748 | 0.157470 | 0.560218 | 0 |
+| 1801–1900 | 0.407768 | 0.156328 | 0.564095 | 0 |
+| 1901–2000 | 0.406214 | 0.155092 | 0.561306 | 0 |
+
+1001–2000步video/action/total均值.408062/.160969/.569030；preclip norm均值.170922、中位.156691、p95 .278836、最大.508400，0/1000触clip，无非有限值或停止原因。峰值allocated36.232GiB/reserved45.490GiB；实际16rank最大值、驻留及全部raw8分段详见回执。FormalMonitor计算段均值14.814649秒（2.730clips/s），官方10步窗口wall均值15.8178秒；step-end日志的完整wall为15.818秒/iter、2.557clips/s，包含optimizer/save/callback等额外开销，保存18.97秒另列。单遍/两遍同节点实测对照沿用第6节，不把此处正式wall与短测混算。
+
+UTC04:33:04.562109的W&B API有界查询1995≤step<2005、use_cache=false返回实际1995–2004；step2000的两路loss、total、raw8及两路LR共13字段与本地loss_metrics逐位一致。step2000更新用schedule1999的4.8639212764e-5；保存scheduler last_epoch2000、_step_count2001，下一更新LR4.8605703341e-5。官方计数顺序与理论回执一致。
+
+恰好1–2000步原始行SHA：FormalMonitor `ede5149f7cbb267a38f5ce5ae05995686b6d98cb5606851678878a503132f1dc`，loss_metrics `716f54ae1b60b09664b3059747c40fa0ab6eeb4e2d05c942c71199af45f11973`；前1000字节与第9节快照一致。[formal_step2000_training.json](formal_step2000_training.json) SHA256 `4ebd6d92b2929e22d3df6c50d75f7496d695349607ff9a4b7d154c4401527a84`，含真实API、源码/快照/hash、10段100步统计、CPU资源和保存审计。p95沿用历史nearest-rank口径；初版插值p95及修订脚本保留在远端training_audit，最终版本经417项标量复核。训练loss下降不代表推理质量改善。
+
+![正式前2000步真实训练统计](figures/formal_step2000_training.png)
+
+### 11.2 三档评测执行与验收
+
+经MCP在Tdebug1 GPU0/1/2运行三档heldout首窗pilot，共3jobs/6NPZ；每次GPU启动前核查GPU、CPU配额/affinity、内存和负载。真实任务UTC04:22:37.712011–04:31:09.234135，wall510.715–511.519秒；官方DCP加载193.86–194.16秒，包含在任务wall中，完整17块sampler-only约86.94–88.04秒/份，加载、采样和任务耗时分开记录。3任务均exit0，六份NPZ的17块及native身份/hash验证通过。
+
+独立CPU在鲜查资源后的Tdebug3以6workers、每进程线程1完成六份实际dtype/shape/字节验收，10.748秒、15/15项通过。首块VA/U/S在三档sigma×两模式间一致；gt全部17块U/S跨sigma一致，六份原始GT一致；checkpoint/snapshot/冻结父清单/来源hash/seed42/联合30步/17块联合refresh报告匹配。[formal_step2000_pilot_validation.json](formal_step2000_pilot_validation.json) SHA256 `a2e166fdd6ce39e091c62cd6d809694bae987488d52339574c49235a924af33a`。NPZ不保存KV或timestep张量，路由验收依据已测试且hash匹配的源码和真实逐块报告；不声称直接重放KV数值。
+
+pilot通过后，UTC04:41:02–04:41:20分别经MCP启动Tdebug1/3/5/6，每节点8张空闲H800，共32workers执行其余69jobs/90NPZ。各端重新核查lzh、CPUquota120核/affinity200核、内存/负载、目标GPU无compute进程；独立operations启动回执和原生atomic claim防重复，排除训练节点Tdebug4/2。UTC04:43:51原生状态为3/72成功、6/96NPZ、32running、0失败；完整质量指标等待剩余输出及CPU汇总，不以pilot代替完整验收。
