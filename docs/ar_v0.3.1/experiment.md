@@ -18,7 +18,11 @@
 - Tdebug1 rank0 / Tdebug3 rank1，各8张H800；内网10.3.12.57:29861，eth0 Socket。
 - 启动回执：/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v031_formal_preflight_20261002T061300Z
 - 评测计划：/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v031_formal_eval_20261002T061300Z；500/1000/2000/3000各72jobs、96NPZ，仅使用空闲Tdebug5/6。
-- W&B：online，alexlzh431564/joint_video_hand_pose；实际run链接待启动后API核实。
+- W&B：online，[hkog66xl](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/hkog66xl)。启动后由空闲Tdebug5上的W&B API核实：state=running，iteration/_step=2，video=0.218733、action=0.219669、total=0.438402，四项diagnostic MSE和8个原始字段均在线。
+- 实际启动：2026-10-02 14:17北京时间；训练源89c79dd8910ae31b75cf1e72d434946a0e8d96de（实现1ab05f3及下述日志空值修复），实际config SHA256 af888957674e40dccaecc31298d0a59e5a4537570a528600c27564f23e94185f。
+- 首批运行回执：本地已完成step4，单步17.42s（启动阶段，非稳定吞吐结论），全rank峰值allocated35.67GiB/reserved45.16GiB，梯度有限，STOPPED.json不存在、两端无退出回执。首步包含初始化开销76.01s；不以初始总loss跨配方判断质量。
+- 四项raw-MSE日志保存在ar_v031_group_mse.jsonl，W&B API step2值：视频前缀0.932942/目标0.331257，action前缀1.114268/目标0.264290；各自按未加权有效坐标计数归约，与训练的固定分母目标不同。
+- 后续监控每3小时一次，500/1000先报告同步数质量对比，由用户决定明显劣化时是否提前停止；否则继续3000及2000/3000评测。
 - 参考：V0.3.0 formal_prefix_uniform_t273_20261001T182754Z，训练源9eac1859d2a94c6a4c41d12dee1f2ea92957bbdf，实际config SHA256 e7c5ab0150300247f139405470c16cbd668a8f22a8ce0cecf97795bda952ae66。
 
 ## 诊断动机与清理
