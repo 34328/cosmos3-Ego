@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import tomllib
 
 import torch
 
@@ -7,7 +8,27 @@ from cosmos3_joint_video_hand_pose.src import model as model_module
 
 
 CONFIG_DIR = experiment_config.COSMOS_REPO_ROOT / "cosmos3_joint_video_hand_pose/configs"
-CURRENT_NAMES = ("ar_v0_2", "ar_v0_2_c", "ar_v0_2_multitask")
+EXPECTED_EXPERIMENT_NAMES = {
+    "egoverse_joint_video_hand_pose_ar_v0_2",
+    "egoverse_joint_video_hand_pose_ar_v0_2_c",
+    "egoverse_joint_video_hand_pose_ar_v0_2_multitask",
+    "rbs_wam_ar_v0_2_fixed_camera_wrist_local_delta_latent_v1",
+    "rbs_wam_ar_v0_2_history_video_noise",
+    "rbs_wam_ar_v0_2_overfit16",
+    "rbs_wam_ar_v0_3_diffusion_forcing_wrist_weight_v1",
+    "rbs_wam_ar_v0_3_1_prefix_numerator_only_v1",
+}
+EXPECTED_TOML_EXPERIMENTS = {
+    # The V0.1 TOML is retained as history, without restoring its registration.
+    "ar_v0_1": "egoverse_joint_video_hand_pose_ar_v0_1",
+    "ar_v0_2": "egoverse_joint_video_hand_pose_ar_v0_2",
+    "ar_v0_2_fixed_camera": "rbs_wam_ar_v0_2_fixed_camera_wrist_local_delta_latent_v1",
+    "ar_v0_2_history_video_noise": "rbs_wam_ar_v0_2_history_video_noise",
+    "ar_v0_2_overfit16": "rbs_wam_ar_v0_2_overfit16",
+    "ar_v0_2_video_lr1e4": "rbs_wam_ar_v0_2_fixed_camera_wrist_local_delta_latent_v1",
+    "ar_v0_3": "rbs_wam_ar_v0_3_diffusion_forcing_wrist_weight_v1",
+    "ar_v0_3_1": "rbs_wam_ar_v0_3_1_prefix_numerator_only_v1",
+}
 NATIVE_CALLBACKS = (
     "wandb", "wandb_2x", "iter_speed", "manual_gc", "load_pretrained",
     "param_count", "sequence_packing_padding",
@@ -16,14 +37,26 @@ NATIVE_CALLBACKS = (
 
 def test_only_current_experiments_are_registered():
     from hydra.core.config_store import ConfigStore
+    from cosmos3_joint_video_hand_pose.src import ar_v03_config, ar_v031_config
+
+    assert ar_v03_config.AR_V03_CONFIG_NAME in EXPECTED_EXPERIMENT_NAMES
+    assert ar_v031_config.AR_V031_CONFIG_NAME in EXPECTED_EXPERIMENT_NAMES
 
     names = {
         name for name in ConfigStore.instance().list("experiment")
-        if name.startswith("egoverse_joint_video_hand_pose_")
+        if name.startswith(("egoverse_joint_video_hand_pose_", "rbs_wam_"))
     }
-    assert names == {"egoverse_joint_video_hand_pose_" + name + ".yaml" for name in CURRENT_NAMES}
-    assert not any("overfit" in name or "ar_v0_1" in name for name in vars(experiment_config))
-    assert {p.stem for p in CONFIG_DIR.glob("*.toml")} == {"ar_v0_1", "ar_v0_2", "ar_v0_2_fixed_camera"}
+    assert names == {name + ".yaml" for name in EXPECTED_EXPERIMENT_NAMES}
+    assert {name for name in vars(experiment_config) if "overfit" in name} == {"_overfit16_experiment"}
+    assert callable(experiment_config._overfit16_experiment)
+    assert not any("ar_v0_1" in name for name in vars(experiment_config))
+    tomls = {p.stem: p for p in CONFIG_DIR.glob("*.toml")}
+    assert set(tomls) == set(EXPECTED_TOML_EXPERIMENTS)
+    for stem, experiment_name in EXPECTED_TOML_EXPERIMENTS.items():
+        with tomls[stem].open("rb") as handle:
+            assert tomllib.load(handle)["job"]["experiment"] == experiment_name
+        if stem != "ar_v0_1":
+            assert experiment_name + ".yaml" in names
 
 
 def test_native_callbacks_are_copied_without_replacement():
