@@ -482,3 +482,21 @@ UTC23:55:14的真实W&B API查询确认本次run仍running，step1162的两路lo
 generated三档的整体光流余弦从step500的-.076至-.060升至接近0（-.000182至.009822），同时幅值/GT升至2.135–2.353，PSNR降至11.270–11.807dB；方向接近0仍不能认为运动正确。默认.02的左右腕全程误差358.99/286.46→301.68/279.77mm、第17块577.95/500.75→388.82/376.42mm，部分漂移及局部手形改善；.1的右腕全程230.87→278.03mm、第17块352.56→419.75mm反而变差。相比旧lr1e-4/1000，本次.02左腕更低、右腕更高，局部手形24.00/23.02mm仍高于18.35/18.39mm，视频PSNR更低。
 
 本次质量出现混合变化，不能据loss下降宣称V0.3整体优于V0.2，也没有跨指标一致最优sigma。保留三档完整结果，不改变默认.02、训练配方或已验收停止规则；继续完成2000/3000里程碑。
+
+## 10. 暂停自动监控与训练集视频预览（2026-10-02）
+
+按用户要求暂停 `ar-v0-3` heartbeat，状态已核实为PAUSED；正式训练及已验收的FormalMonitor停止规则继续生效。本次手动查询于UTC01:02:43（北京时间09:02:43）确认本地step1421、W&B API step1419且state=running，无STOP或两端退出回执；最近10步计算段均值14.905秒、clip率0。在线记录为 [本次正式run](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/b7fdsq94)。当时官方保存marker仍为iter_000001000，预览使用该最新完整checkpoint，不使用尚未保存的训练内存状态。自动监控保持暂停，后续里程碑不由本次手动预览派发。
+
+从冻结overfit16清单按原始顺序取前三窗，parent SHA256 `7e088380b461fce4ea34ec6aeea141d445d1aff6c3acf81f2cbfb401a6bb9ee4`；训练源9eac1859d2a94c6a4c41d12dee1f2ea92957bbdf、配置及checkpoint/binding与第9节一致。seed42、sigma_small=.02、联合30步、273模型帧/完整17块保持不变。复用已验收同窗GT-history NPZ，新增三份真实generated-history推理，不重复计算或覆盖正式扫描结果。
+
+| 窗口 | sample_id | start | MP4 SHA256 |
+|---|---|---:|---|
+| 00 | 696bd89a0f689873a4d2b412:2:1446:2340 | 1621 | d468c00618b59410aa65fd3a766f578fad29d0c8075ed3185c527a87184ad414 |
+| 01 | 69b563ede38bde62855cfb33:2:1156:1937 | 1274 | 1b446bcc3dcc22c3177fe5cffa672a562b1bfb7140533b54e191a5846dec50c2 |
+| 02 | 69b4aced699f525ceebed277:3:743:1500 | 849 | 12f0dcce76b75c75c7808320920367fe398f9a3bd00b39573df46304a1c0a56c |
+
+GPU推理经MCP在Tdebug1 GPU0/1/2并行运行，启动前quota120核/affinity200核、低负载、约1.73TiB空闲内存，目标H800均4MiB/0%且无compute进程。官方DCP加载216.15秒；三任务于UTC00:49:39–40全部exit0，三份NPZ均验收为完整17块，任务退出后GPU释放。CPU导出在空闲Tdebug3用3workers、每进程BLAS/OpenMP/OpenCV线程1，CUDA为空；启动前quota120核、约1.37TiB空闲内存且低负载。先通过代表小批量投影/时间轴验证，再导出全部三窗，计算段60.709秒、1,635帧、26.932帧/秒；含启动wrapper的wall65.490秒，exit0。
+
+三个视频均1920×368、30fps、545个源时间轴帧、18.1667秒，全部帧实际解码成功；按原生real-time replay映射恢复原始时间，不直接将带条件U的289输出帧作为源时间轴。左栏为原始GT RGB+绿色真实骨架，中栏为GT历史预测RGB+红色预测骨架，右栏为连续generated历史预测RGB+红色预测骨架。新旧GT/源索引/时间映射一致，首块action/RGB及第一块U/S逐位一致；原始世界系GT投影与原生逐块投影的最大误差分别0.000500/0.000197/0.000122像素。三段各5个代表帧目视检查栏序/标签/骨架/时间轴；这是预览完整性验证，未声称完整人工播放或新增全量指标。代表帧中generated中后段出现手与场景漂移，尤以00/01明显，不据三窗作总体质量结论。
+
+远端独立根为 `outputs/maintenance/ar_v03_train_preview_step1000_20261002T003702Z/`，保存preview_plan、三任务启动/退出/验证、原始NPZ、renderer、视频/时间轴/逐窗回执及visual_qa。preview_plan SHA256 `ac059b17e1a08174f2ae67e5d72aeef8a7a833ee380fd623914d3bd5f98f1380`；[完整导出回执](train_preview_step1000_render_receipt.json) SHA256 `fd478a416212043a294d8abb814be14fce6b9ce7a44336f89e3214138b1511f1`。本地已核对三份MP4 SHA并交付 `eval_videos/ar_v0.3/step1000_train_preview/index.html` 及 `videos/window00.mp4` 至 `window02.mp4`。
