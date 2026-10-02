@@ -13,10 +13,11 @@
 
 ## 启动
 
-- 名称：formal_prefix_numerator_only_t273_20261002T054743Z
-- 输出：/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3_1/formal_prefix_numerator_only_t273_20261002T054743Z
+- 名称：formal_prefix_numerator_only_t273_20261002T061300Z
+- 输出：/mnt/lzh/cosmos-EgoWAM/outputs/joint_video_hand_pose/ar_v0_3_1/formal_prefix_numerator_only_t273_20261002T061300Z
 - Tdebug1 rank0 / Tdebug3 rank1，各8张H800；内网10.3.12.57:29861，eth0 Socket。
-- 启动回执：/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v031_formal_preflight_20261002T054743Z
+- 启动回执：/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v031_formal_preflight_20261002T061300Z
+- 评测计划：/mnt/lzh/cosmos-EgoWAM/outputs/maintenance/ar_v031_formal_eval_20261002T061300Z；500/1000/2000/3000各72jobs、96NPZ，仅使用空闲Tdebug5/6。
 - W&B：online，alexlzh431564/joint_video_hand_pose；实际run链接待启动后API核实。
 - 参考：V0.3.0 formal_prefix_uniform_t273_20261001T182754Z，训练源9eac1859d2a94c6a4c41d12dee1f2ea92957bbdf，实际config SHA256 e7c5ab0150300247f139405470c16cbd668a8f22a8ce0cecf97795bda952ae66。
 
@@ -26,3 +27,8 @@ step1000诊断4个真实global batch、共204个clip、每batch4次ε，无参�
 
 上一轮过量临时准备、重复CPU/GPU测试套件、失败attempt与重复回执已按用户要求删除；只保留诊断最终报告与正式训练/评测产物。本次只做一次必要的固定分母数值验证，不另开短训。
 
+## 首次启动的日志问题
+
+2026-10-02 14:03北京时间，首次启动 formal_prefix_numerator_only_t273_20261002T054743Z（源1ab05f3）。16卡NCCL Socket通信、官方Nano加载及数据初始化成功；14:08首个step计算loss时，新增raw-MSE日志索引可选的 action_valid_mask=None，触发TypeError，两端退出码1。尚未执行backward或optimizer更新，没有checkpoint或训练loss上传，没有触发OOM或数值停止规则。W&B API确认 [4czrgihm](https://wandb.ai/alexlzh431564/joint_video_hand_pose/runs/4czrgihm) 为failed，仅有运行时间，不作为实验结果。
+
+修复仅给日志分支的可选mask加空值处理，None沿用原生全有效语义；优化loss、分母、采样均未改。一个CPU定点检查确认None、[None]、全True mask的四组raw-MSE统计逐位一致；未另开GPU短训。上述正式失败输出与两端回执完整保留。修复后使用新名称与独立目录，从同一官方Nano起点开始，保持相同seed和数据顺序。

@@ -53,7 +53,8 @@ def raw_group_moments(out_net, noised, packed, prefixes):
             else:
                 prediction, target = prediction[:, :57], target[:, :57]
                 keep = (~condition)[:, None].expand_as(prediction).clone()
-                valid = packed.action.action_valid_mask[i]
+                masks = packed.action.action_valid_mask
+                valid = None if masks is None else masks[i]
                 if valid is not None:
                     if valid.ndim == 1:
                         valid = valid[None]
