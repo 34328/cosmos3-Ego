@@ -1,0 +1,251 @@
+"""Pure RGB/text EgoVerse IT2V clips, using the native Cosmos video contract.
+
+One continuous VAE encode sees 1+16N RGB frames. By default every original
+frame is retained and FPS is the source FPS. No action data is read.
+"""
+from __future__ import annotations
+
+import csv
+import hashlib
+from io import BytesIO
+from pathlib import Path
+import random
+from collections import Counter
+
+import numpy as np
+from PIL import Image
+import torch
+import torch.nn.functional as F
+from torch.utils.data import Dataset, IterableDataset, get_worker_info
+
+
+DEFAULT_FRAME_TIERS = (97, 81, 65, 49, 33, 17)
+
+
+def select_clip_frames(source_frames, frame_stride=1, tiers=DEFAULT_FRAME_TIERS):
+    if frame_stride < 1 or any(t < 17 or (t - 1) % 16 for t in tiers):
+        raise ValueError("IT2V tiers require 1+16N RGB frames, N>=1, and positive stride")
+    return next((t for t in sorted(set(tiers), reverse=True)
+                 if 1 + frame_stride * (t - 1) <= source_frames), None)
+
+
+def _seed(seed, epoch, index):
+    return int.from_bytes(hashlib.sha256(f"{seed}:{epoch}:{index}".encode()).digest()[:8], "little")
+
+
+def decode_rgb_video(encoded_frames):
+    frames = []
+    for value in encoded_frames:
+        while isinstance(value, np.ndarray) and value.shape == ():
+            value = value.item()
+        if not isinstance(value, (bytes, bytearray, memoryview)):
+            raise TypeError("Expected JPEG bytes in images.front_1")
+        with Image.open(BytesIO(bytes(value))) as image:
+            frames.append(torch.from_numpy(np.asarray(image.convert("RGB"), dtype=np.uint8).copy()))
+    video = torch.stack(frames).permute(3, 0, 1, 2).contiguous()
+    if tuple(video.shape[-2:]) != (360, 640):
+        raise ValueError(f"Expected native 640x360 RGB, got {tuple(video.shape[-2:])}")
+    return F.pad(video, (0, 0, 0, 8), mode="reflect")
+
+
+class CosmosCaptionTokenizer:
+    """Same caption tokenizer as the official SFTDataset; no action formatter."""
+
+    def __init__(self, tokenizer_config):
+        from cosmos_framework.utils.lazy_config import instantiate
+        from cosmos_framework.data.generator.sequence_packing.modalities import add_special_tokens
+        self.tokenizer, _ = add_special_tokens(instantiate(tokenizer_config).tokenizer)
+
+    def __call__(self, caption):
+        from cosmos_framework.model.generator.reasoner.qwen3_vl.utils import tokenize_caption
+        ids = tokenize_caption(caption, self.tokenizer, is_video=True, use_system_prompt=False)
+        if len(ids) > 1024:
+            raise ValueError("Caption exceeds 1024 tokens; do not silently truncate labels")
+        return torch.tensor(ids, dtype=torch.long)
+
+
+class EgoVerseIT2VDataset(Dataset):
+    """One largest legal tier per caption segment, with reproducible random crops.
+
+    ``end_idx`` is exclusive. Manifest split is authoritative: missing episodes,
+    invalid bounds or blank text fail loudly, while genuinely short segments are
+    counted and excluded. No pose/visibility/quality/camera filter is applied.
+    """
+
+    def __init__(self, episodes_manifest, segments_manifest, *, split="train",
+                 frame_stride=1, clip_frame_tiers=DEFAULT_FRAME_TIERS, seed=42,
+                 random_window=True, tokenizer_config=None, caption_tokenizer=None,
+                 cfg_dropout_rate=0.1, append_video_metadata=True):
+        if split not in ("train", "test"):
+            raise ValueError("Use the original train or test split")
+        select_clip_frames(0, frame_stride, clip_frame_tiers)
+        if not 0 <= cfg_dropout_rate <= 1:
+            raise ValueError("cfg_dropout_rate must be in [0,1]")
+        self.seed, self.frame_stride = int(seed), int(frame_stride)
+        self.random_window = bool(random_window)
+        self.cfg_dropout_rate = float(cfg_dropout_rate)
+        self.append_video_metadata = bool(append_video_metadata)
+        self._tokenizer_config, self._caption_tokenizer = tokenizer_config, caption_tokenizer
+        self.epoch = 0
+        paths = [Path(episodes_manifest), Path(segments_manifest)]
+        with paths[0].open(newline="", encoding="utf-8") as f:
+            all_episodes = list(csv.DictReader(f))
+        if len({r["episode_hash"] for r in all_episodes}) != len(all_episodes):
+            raise ValueError("Duplicate episode hashes can leak train/test splits")
+        self.episodes = {r["episode_hash"]: r for r in all_episodes if r["split"] == split}
+        with paths[1].open(newline="", encoding="utf-8") as f:
+            segments = [r for r in csv.DictReader(f) if r["split"] == split]
+        self.rows, self.excluded = [], []
+        seen = set()
+        for row in segments:
+            if row["episode_hash"] not in self.episodes:
+                raise ValueError("Segment is missing its episode in the same split")
+            ep = self.episodes[row["episode_hash"]]
+            start, end = int(row["start_idx"]), int(row["end_idx"])
+            sid = f"{row['episode_hash']}:{row['span_index']}:{start}:{end}"
+            if sid in seen:
+                raise ValueError(f"Duplicate segment {sid}")
+            seen.add(sid)
+            if not (0 <= start < end <= int(ep["total_frames"])) or float(ep["fps"]) <= 0:
+                raise ValueError(f"Invalid segment bounds/fps: {sid}")
+            caption = row["text_normalized"].strip()
+            if not caption:
+                raise ValueError(f"Empty segment caption: {sid}")
+            frames = select_clip_frames(end - start, self.frame_stride, clip_frame_tiers)
+            item = dict(row, sample_id=sid, _clip_frames=frames)
+            if frames is None:
+                self.excluded.append(dict(item, reason="too_short_for_minimum_tier"))
+            else:
+                self.rows.append(item)
+        if not self.rows:
+            raise ValueError(f"No eligible {split} segments")
+        def hours(rows):
+            return sum((int(r["end_idx"])-int(r["start_idx"]))/float(self.episodes[r["episode_hash"]]["fps"])
+                       for r in rows) / 3600
+        self.manifest_summary = {
+            "split": split, "episodes": len(self.episodes), "segments_total": len(segments),
+            "segments_eligible": len(self.rows), "segments_excluded_short": len(self.excluded),
+            "episode_hours": sum(int(e["total_frames"])/float(e["fps"]) for e in self.episodes.values())/3600,
+            "caption_hours_total": hours(segments), "caption_hours_eligible": hours(self.rows),
+            "caption_hours_excluded_short": hours(self.excluded),
+            "clip_tier_counts": dict(sorted(Counter(r["_clip_frames"] for r in self.rows).items())),
+            "sampled_clip_hours_per_epoch": sum(r["_clip_frames"]*self.frame_stride/float(self.episodes[r["episode_hash"]]["fps"]) for r in self.rows)/3600,
+            "frame_stride": self.frame_stride, "speed_factor": 1.0,
+            "manifest_sha256": {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths},
+        }
+
+    def __len__(self):
+        return len(self.rows)
+
+    def set_epoch(self, epoch):
+        self.epoch = int(epoch)
+
+    def get_shuffle_blocks(self):
+        return [(i, 1) for i in range(len(self))]
+
+    def window_indices(self, index, *, epoch=None, window_start=None):
+        row = self.rows[index]
+        start, end = int(row["start_idx"]), int(row["end_idx"])
+        span = 1 + self.frame_stride * (row["_clip_frames"] - 1)
+        rng = random.Random(_seed(self.seed, self.epoch if epoch is None else epoch, index))
+        if window_start is None:
+            window_start = rng.randint(start, end-span) if self.random_window else start
+        if not start <= window_start <= end-span:
+            raise ValueError("Crop crosses the caption boundary")
+        return window_start + np.arange(row["_clip_frames"], dtype=np.int64) * self.frame_stride
+
+    def __getitem__(self, index):
+        return self.get_item_at_window(index, epoch=self.epoch)
+
+    def get_item_at_window(self, index, *, epoch=0, window_start=None, source_frame_indices=None):
+        import zarr
+        from cosmos_framework.data.generator.sequence_packing import SequencePlan
+        row = self.rows[index]
+        ep = self.episodes[row["episode_hash"]]
+        if source_frame_indices is not None:
+            saved_indices = np.asarray(torch.as_tensor(source_frame_indices).cpu(), dtype=np.int64).reshape(-1)
+            if saved_indices.size == 0:
+                raise ValueError("Empty checkpoint source window")
+            if window_start is not None and int(window_start) != int(saved_indices[0]):
+                raise ValueError("Checkpoint start and source indices disagree")
+            window_start = int(saved_indices[0])
+        indices = self.window_indices(index, epoch=epoch, window_start=window_start)
+        if source_frame_indices is not None and not np.array_equal(indices, saved_indices):
+            raise ValueError("Checkpoint source indices differ from the configured stride/tier")
+        group = zarr.open_group(ep["abs_zarr_path"], mode="r")
+        rgb = group["images.front_1"]
+        if rgb.shape[0] != int(ep["total_frames"]) or indices[-1] >= rgb.shape[0]:
+            raise ValueError("Zarr frame count differs from manifest")
+        video = decode_rgb_video(rgb[indices])
+        fps = float(ep["fps"]) / self.frame_stride
+        caption = row["text_normalized"].strip().rstrip(".") + "."
+        if self.append_video_metadata:
+            caption += f" The video is {len(indices)/fps:.1f} seconds long and is of {fps:.0f} FPS. This video is of 368x640 resolution."
+        # Separate stream from crop selection, deterministic across worker layouts.
+        rng = random.Random(_seed(self.seed + 1, epoch, index))
+        if rng.random() < self.cfg_dropout_rate:
+            caption = ""
+        if self._caption_tokenizer is None:
+            self._caption_tokenizer = CosmosCaptionTokenizer(self._tokenizer_config)
+        ids = torch.as_tensor(self._caption_tokenizer(caption), dtype=torch.long)
+        return {
+            "__key__": row["sample_id"], "__url__": ep["abs_zarr_path"],
+            "sample_id": row["sample_id"], "dataset_index": int(index),
+            "video": video, "ai_caption": caption, "text_token_ids": ids,
+            "conditioning_fps": fps, "fps": float(ep["fps"]), "num_multiplier": self.frame_stride,
+            "n_orig_video_frames": int(ep["total_frames"]), "num_frames": len(indices),
+            "frame_start": int(indices[0]), "frame_end": int(indices[-1]),
+            "window_start": int(indices[0]),
+            "source_frame_indices": torch.from_numpy(indices.copy()),
+            "padding_mask": torch.zeros((1,368,640), dtype=torch.float32),
+            "image_size": torch.tensor([368,640,368,640], dtype=torch.float32),
+            "sequence_plan": SequencePlan(has_text=True, has_vision=True,
+                                          condition_frame_indexes_vision=[0]),
+        }
+
+
+class IT2VIterableDataset(IterableDataset):
+    """RankPartitionedDataLoader-compatible disjoint stream with exact resume.
+
+    Crop/CFG decisions are keyed by epoch/index, so restoring needs only the
+    iterator position rather than capturing global Python/NumPy worker RNGs.
+    """
+    def __init__(self, dataset, seed=42):
+        self._dataset, self.seed = dataset, int(seed)
+        self.shard_world_size, self.shard_rank = 1, 0
+        self._state = {}
+
+    def __len__(self):
+        return len(self._dataset)
+
+    def state_dict(self):
+        return dict(self._state)
+
+    def load_state_dict(self, state):
+        self._state = dict(state)
+
+    def __iter__(self):
+        worker = get_worker_info()
+        nw, wid = (worker.num_workers, worker.id) if worker else (1, 0)
+        shard, nshards = self.shard_rank*nw + wid, self.shard_world_size*nw
+        if nshards > len(self):
+            raise ValueError("More rank/worker shards than eligible segments")
+        state = self._state
+        if state and (state["shard"], state["nshards"]) != (shard, nshards):
+            raise ValueError("Cannot resume with a different rank/worker topology")
+        epoch, offset = state.get("epoch", 0), state.get("offset", 0)
+        while True:
+            order = torch.randperm(len(self), generator=torch.Generator().manual_seed(self.seed+epoch)).tolist()[shard::nshards]
+            for pos in range(offset, len(order)):
+                sample = self._dataset.get_item_at_window(order[pos], epoch=epoch)
+                self._state = {"epoch": epoch + (pos+1 == len(order)),
+                               "offset": (pos+1) % len(order), "shard": shard, "nshards": nshards}
+                yield sample
+            epoch, offset = epoch+1, 0
+
+
+def get_egoverse_it2v_dataset(*, episodes_manifest, segments_manifest, tokenizer_config,
+                            split="train", seed=42, iterable_shuffle=True, **kwargs):
+    dataset = EgoVerseIT2VDataset(episodes_manifest, segments_manifest, split=split,
+                                 seed=seed, tokenizer_config=tokenizer_config, **kwargs)
+    return IT2VIterableDataset(dataset, seed=seed) if iterable_shuffle else dataset

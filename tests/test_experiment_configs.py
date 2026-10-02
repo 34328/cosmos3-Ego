@@ -9,6 +9,10 @@ from cosmos3_joint_video_hand_pose.src import model as model_module
 
 CONFIG_DIR = experiment_config.COSMOS_REPO_ROOT / "cosmos3_joint_video_hand_pose/configs"
 EXPECTED_EXPERIMENT_NAMES = {
+    # Separate pure-video CMD Stage1 package; explicitly imported below so this
+    # registry contract is independent of pytest collection order. Its TOMLs live
+    # outside the historical joint-video/action CONFIG_DIR checked below.
+    "rbs_wam_ar_it2v_v0_1_ego100h_cmd_stage1",
     "egoverse_joint_video_hand_pose_ar_v0_2",
     "egoverse_joint_video_hand_pose_ar_v0_2_c",
     "egoverse_joint_video_hand_pose_ar_v0_2_multitask",
@@ -38,6 +42,9 @@ NATIVE_CALLBACKS = (
 def test_only_current_experiments_are_registered():
     from hydra.core.config_store import ConfigStore
     from cosmos3_joint_video_hand_pose.src import ar_v03_config, ar_v031_config
+    from cosmos3_ar_it2v.config import CONFIG_NAME as IT2V_CONFIG_NAME
+
+    assert IT2V_CONFIG_NAME in EXPECTED_EXPERIMENT_NAMES
 
     assert ar_v03_config.AR_V03_CONFIG_NAME in EXPECTED_EXPERIMENT_NAMES
     assert ar_v031_config.AR_V031_CONFIG_NAME in EXPECTED_EXPERIMENT_NAMES
