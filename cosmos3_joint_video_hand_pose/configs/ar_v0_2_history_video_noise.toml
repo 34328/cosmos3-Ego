@@ -1,5 +1,5 @@
-# Current fixed-camera representation. Validated codecs + new statistics required.
-# Authorized 2026-09-30: two nodes, 273 mixed tiers, 1000 steps.
+# V0.2 fixed-camera diagnostic: augment historical video with p=0.5, sigma_max=0.2.
+# 1000 steps, save every 500; action history remains clean.
 [job]
 task = "vfm"
 experiment = "rbs_wam_ar_v0_2_history_video_noise"

@@ -359,7 +359,7 @@ loss 单测固定 `v_pred` 和 M，只扰动 M=0 位置的有限目标值，断�
 | 0. 先定位失败来源 | v0.1 已有回放、离线手部检测与诊断报告 | GT 视频上验证检测器；生成视频偏离 GT 与 action 不一致分开；覆盖率、相机投影限制、局部／累积误差分开报告 |
 | 1. 固定轴几何与新手形 codec | 新 action 表示、codec、数据准备与物理域测试 | 验证 `Δp` 加法、`ΔR` 左乘、腕局部 q 正确乘一次腕旋转、`Δz` 累加；codec 来源隔离与 held-out 重建达标；换块 z 不变、物理点一致；旧语义／统计／schema 显式拒绝 |
 | 2. 两套基础统计与 joint 单样本 | 归一化、dataset、attention、model、inference | state/future 各 57D train-only Piecewise-Asinh 分位数统计、分字段单位 floor 和 hash 合同；C=4/K=8 边界、RoPE、独立 σ、当前双向依赖及无未来泄漏 |
-| 3. 持久推理 KV cache | `src/ar_inference.py`、AR 角色 mask／位置 metadata、框架逐层 K/V 接口 | 逐块 U_k/S_k prefill、30 次只读历史及当前条件的联合去噪、一次 V/A clean refresh；保留前 15 个历史 chunk（当前块不计入）；固定 C=4 逐 chunk／逐步对照，覆盖首次淘汰和末尾不满块；阈值断言和有界缓存 |
+| 3. 持久推理 KV cache | `src/ar_v02_cache.py`、`src/ar_v02_inference.py`、AR 角色 mask／位置 metadata、框架逐层 K/V 接口 | 逐块 U_k/S_k prefill、30 次只读历史及当前条件的联合去噪、一次 V/A clean refresh；保留前 15 个历史 chunk（当前块不计入）；固定 C=4 逐 chunk／逐步对照，覆盖首次淘汰和末尾不满块；阈值断言和有界缓存 |
 | 4. 多样本 packing | DataLoader 配置、AR metadata／attention、官方 replay/KV | 混合长度 pack 与逐样本前向／loss／梯度一致；扰动另一条样本的文本和 V/A 不影响本样本；调换样本顺序等价；变长 pack 的分布式与累积梯度缩放正确 |
 | 5. 整体 loss 与 checkpoint 合同 | action、normalization、loss、model、contract | 三类 mask、padding 清零、整体 masked MSE；representation、codec、两套 normalizer、数据清单及字段切片缺失／不匹配均失败；额外二次校准保持关闭 |
 | 6. 回放与延迟验收（延迟暂缓） | overlay、evaluation、benchmark、新配置 | 投影使用 `p_wrist+R_wrist·q_local`，腕旋转恰好一次；两路固定 30 步；延迟方案保留但暂不作为训练门槛 |
@@ -460,9 +460,12 @@ loss 单测固定 `v_pred` 和 M，只扰动 M=0 位置的有限目标值，断�
 | 训练准入 | `ar_v02_dataloader.py`、`dataloader_state.py` | 动态多样本 packing、恢复数据进度 |
 | 布局与位置 | `ar_v02_layout.py`、`ar_v02_packing.py` | 显式 U/S/V/A 角色、源帧索引、RoPE、loss 范围 |
 | 联合训练 | `ar_v02_model.py`、`ar_v02_attention.py`、`ar_v02_compact.py`、`loss.py` | 双路去噪、可见性、紧凑 query、整体 action loss |
+| 历史视频加噪 | `ar_v02_history_noise.py` | V0.2 teacher-forcing 条件 pass 的视频扰动，不改 GT 和监督目标 |
 | 模型接入 | `model.py`、`config.py`、`ar_v02_contract.py` | 框架适配、配置注册、续训合同检查 |
 | 缓存与采样 | `ar_v02_cache.py`、`ar_v02_inference.py`、`ar_v02_streaming.py` | 15 chunk 历史、离线采样、逐块 API |
+| 视频 CFG | `ar_v02_guidance.py` | 独立条件／无条件 KV cache，仅引导视频，action 保持条件分支 |
 | 评测与投影 | `ar_v02_eval.py`、`ar_v02_evaluation.py`、`ar_v02_overlay.py` | CLI、指标与坐标系语义、双栏回放 |
+| 视频诊断 | `ar_v02_video_diagnostics.py`、`ar_v02_noise_grid_metrics.py`、`ar_v02_endpoint_video_metrics.py` | 时间偏移、历史噪声网格和 320×180 整体光流余弦；各自统计口径保留 |
 
 `ar_v02_eval.py` 是命令入口，`ar_v02_evaluation.py` 是指标实现，二者不是重复文件。公共 V0.1 模块仍保留，不能因名称相似而删除。
 
@@ -472,6 +475,9 @@ loss 单测固定 `v_pred` 和 M，只扰动 M=0 位置的有限目标值，断�
 - `configs/ar_v0_2.toml`：旧动作表示的多任务回归配置，仅用于旧 checkpoint／生命周期验证。
 - 重复的 `_c`、`_multitask` TOML 已合并；旧配置注册名仍保留以解析历史快照，语义不变。不可运行的 `_c_no_chunk_state` 和老版 V0.5 配方已删除；AR V0.1 配方保留为历史入口。
 - `tests/test_ar_v02_*.py`：按模块组织的回归；`*_gpu.py` 需要 GPU。状态和整体损失另见 `test_ar_chunk_state.py`、`test_whole_action_loss.py`。
+- 原 `tests/test_ar_v02_training_contract.py` 已拆为 `tests/test_ar_v02_checkpoint_resume.py`、`tests/test_ar_v02_optimizer_gradient_audit.py`、`tests/test_ar_v02_loss_window.py`；checkpoint／恢复、优化器／梯度审计、loss／window 分开阅读。
+- 三个视频诊断模块的用例统一在 `tests/test_ar_v02_video_metrics.py`；CUDA stream 设备解析检查位于 `tests/test_ar_v02_streaming.py`。
+- V0.3 操作回归已移至根目录 `tests/test_ar_v03_sigma_scan.py`、`tests/test_ar_v03_eval_followup.py`；V0.3.1 loss 屏蔽与历史回传见 `tests/test_ar_v031_model.py`。
 - [scripts/README.md](../../scripts/README.md)：Nano 对照、流式 smoke、梯度和恢复验证的入口及使用边界。
 - [packages/cosmos3/UPSTREAM.md](../../packages/cosmos3/UPSTREAM.md)：框架补丁清单；不把项目逻辑继续堆入上游目录。
 - `outputs/`：结果、日志及诊断快照，不进入 Git；数据和模型权重不随代码整理移动或删除。

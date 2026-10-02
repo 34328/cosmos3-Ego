@@ -1,5 +1,5 @@
-# Current fixed-camera representation. Validated codecs + new statistics required.
-# Authorized 2026-09-30: two nodes, 273 mixed tiers, 1000 steps.
+# V0.2 fixed-camera diagnostic: train on the frozen 16-window manifest.
+# 300 steps, save every 100; clean history, otherwise the V0.2 recipe.
 [job]
 task = "vfm"
 experiment = "rbs_wam_ar_v0_2_overfit16"
