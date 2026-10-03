@@ -1,6 +1,6 @@
 # AR IT2V V0.1：纯视频因果适配预训练
 
-用户已授权：新分支、无 action 模态、在原 100 小时 ego 清单上做小规模预训练；真实检查及短测通过后直接正式训练。工程目录 `cosmos3_ar_it2v/`；分支 `ar-it2v-pretrain`；独立 worktree `/mnt/lzh/cosmos-ar-it2v`。旧联合模型不改。
+历史版本设计：本轮实际为最长97帧的随机短窗口训练，已由用户停止，配置保留供复现。本轮后续只授权完整segment/动态packing修改与必要短测；新的正式配方须用户确认后启动。工程目录 `cosmos3_ar_it2v/`；分支 `ar-it2v-pretrain`；独立 worktree `/mnt/lzh/cosmos-ar-it2v`。旧联合模型不改。
 
 ## 方法与边界
 
@@ -43,7 +43,7 @@ train档位17/33/49/65/81/97数量673/1805/1930/1821/2008/24101；每epoch实际
 
 - 两节点各8卡，HSDP shard8×replicate2，CP1，bf16/full activation checkpointing。
 - 每rank固定4 clips、grad_accum1，即全局64；25 latent档约6k视觉token/clip。45056为模型安全token上限，packer采用固定样本数模式，不同时设token预算。
-- seed42，GEN lr2e-5，保留官方 vision-SFT AdamW betas(.9,.95)/eps1e-6/wd0；无额外模态学习率倍率。
+- seed42，GEN lr2e-5，AdamW betas(.9,.95)/eps1e-6/wd0；无额外模态学习率倍率。wd0是项目覆盖值，官方默认AdamW的weight_decay为0.1，官方确实实现weight decay；不能把项目值描述为官方限制。
 - warmup100，cycle3000，f_min .3，max_iter3000，每500保存；clip_norm1.0，EMA关闭。
 - 这是以 Cosmos3 优化器配方为基础的迁移，不是逐字照搬 CMD 的 optimizer/训练规模。
 - 正式 W&B online；run名 `ar_it2v_v0_1_ego100h_cmd_stage1`，project `rbs_wam_ar_it2v`，entity `alexlzh431564`。临时 smoke 可 disabled，不能用于证明正式上传。
