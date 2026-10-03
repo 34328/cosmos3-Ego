@@ -85,3 +85,10 @@ W&B online，[本次run 7aa7je4o](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v
 前4步峰值allocated62.46GiB/reserved74.08GiB，loss/梯度均有限，无STOPPED或节点退出。API step1到2时间差36.86秒。排除首步初始化，初期36–39秒/步；含保存与数据波动暂估1500步16–20小时，第500步约5–6小时。此为启动阶段估计，不以4步loss下降宣称收敛，不保证后续所有长pack均不会OOM；既有停止规则照常执行。
 
 输出：`/mnt/lzh/cosmos-ar-it2v/outputs/pretrain/20261003T032429Z/rbs_wam_ar_it2v/ar_it2v_v0_2/ar_it2v_v0_2_full_segments_75k_lr1e4_4nodes`。启动计划/四端日志/API回执：`outputs/maintenance/ar_it2v_v0_2_full_segments_preflight_20261003T032429Z/`。
+
+
+## Step1000 完整 segment 视频预览
+
+使用本次完整segment正式run的 `iter_000001000/model`，train/test各3条完整动作段（train420/186/390帧，test722/309/373帧），原始30fps、对应整段文本、seed42、35步去噪、CFG1、历史刷新噪声0.02；长短是不同完整segment，无窗口截取，仅去除VAE对齐补帧。
+Tdebug6空闲GPU0–5并行，6/6正常退出，18个MP4已核对帧数与帧率；每段41.53–151.53秒，峰值allocated32.22–34.37GiB。预览实现提交1749434，不修改训练源或配方，不计算质量指标。
+产物及selection/完整checkpoint校验/media_validation回执位于 `outputs/visualization/ar_it2v_v0.2/step1000/full_segments/`；服务器回环18768通过原连接转发，GT/生成双栏，完整文本与实际时长可见，页面不发布样本身份或训练文件。
