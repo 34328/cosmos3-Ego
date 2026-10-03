@@ -1,5 +1,6 @@
 # Complete native-frame segments; token-budget validation recipe.
-# Full-manifest oversize preflight is mandatory. Formal launch needs user approval.
+# 75008 tokens; approved 90..50% retention for oversized segments only.
+# Full-manifest policy preflight is mandatory. Formal launch needs user approval.
 [job]
 task = "vfm"
 experiment = "rbs_wam_ar_it2v_v0_2_ego100h_full_segments"
@@ -11,23 +12,23 @@ wandb_mode = "online"
 precision = "bfloat16"
 [model.parallelism]
 data_parallel_shard_degree = 8
-data_parallel_replicate_degree = 2
+data_parallel_replicate_degree = 4
 context_parallel_shard_degree = 1
 [model.activation_checkpointing]
 mode = "full"
 [model.compile]
 enabled = false
 [optimizer]
-lr = 2.0e-5
-weight_decay = 0.0
+lr = 1.0e-4
+weight_decay = 0.01
 [scheduler]
 warm_up_steps = [100]
-cycle_lengths = [3000]
+cycle_lengths = [1500]
 f_start = [0.0]
 f_max = [1.0]
 f_min = [0.3]
 [trainer]
-max_iter = 3000
+max_iter = 1500
 logging_iter = 1
 [checkpoint]
 load_path = "${oc.env:BASE_CHECKPOINT_PATH,/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp}"

@@ -235,3 +235,59 @@ def test_preflight_resolves_native_instantiated_tokenizer(tmp_path):
     assert tokenizer_source_path(config)==tokenizer_source_path(processor)==str(tmp_path.resolve())
     with pytest.raises(ValueError,match='Cannot verify'):
         tokenizer_source_path(SimpleNamespace(tokenizer=SimpleNamespace()))
+
+
+def test_uniform_retention_ladder_keeps_endpoints_and_original_time():
+    from cosmos3_ar_it2v.dataset import choose_retention_plan,uniform_retention_indices
+    plan=choose_retention_plan(1670,30,'pick up cup',lambda caption:48,75008)
+    assert plan['retention_ratio']==.7 and plan['true_frames']==1169
+    ids=uniform_retention_indices(100,1770,plan['true_frames'])
+    assert ids[0]==100 and ids[-1]==1769 and len(set(ids))==len(ids)
+    assert np.diff(ids).max()-np.diff(ids).min()<=1
+    assert (len(ids)-1)/plan['effective_fps']==pytest.approx(1669/30)
+    untouched=choose_retention_plan(97,30,'pick up cup',lambda caption:48,75008)
+    assert untouched['retention_ratio']==1 and untouched['true_frames']==97
+    excluded=choose_retention_plan(3000,30,'pick up cup',lambda caption:48,75008)
+    assert excluded['excluded'] and excluded['exclusion_reason']=='exceeds_token_budget_at_50_percent'
+
+
+@pytest.mark.parametrize('budget,excluded,ratio',[(12000,0,.9),(5000,1,1.)])
+def test_retention_dataset_verified_mapping_metadata_and_replay(manifests,tmp_path,monkeypatch,budget,excluded,ratio):
+    import hashlib,json,zarr
+    import cosmos3_ar_it2v.dataset as module
+    records=[]
+    base=dataset(manifests,sample_mode='full_segment')
+    for i,row in enumerate(base.rows):
+        t=int(row['end_idx'])-int(row['start_idx'])
+        plan=module.choose_retention_plan(t,30,row['text_normalized'],lambda caption:3,budget)
+        records.append(dict(plan,split='train',sample_id=row['sample_id'],duration_seconds=t/30))
+    data=tmp_path/'records.jsonl'; data.write_text('\n'.join(json.dumps(r) for r in records))
+    tokenpath=tmp_path/'tokenizer'; tokenpath.mkdir()
+    receipt=dict(token_formula=module.FULL_SEGMENT_TOKEN_FORMULA,frame_stride=1,
+        long_segment_policy='uniform_retention',policy_token_budget=budget,
+        retention_percentages=list(module.RETENTION_PERCENTAGES),records=str(data),
+        records_sha256=hashlib.sha256(data.read_bytes()).hexdigest(),tokenizer_files_sha256={},
+        manifest_summaries={'train':dict(segments_total=4,manifest_sha256={str(p.resolve()):hashlib.sha256(p.read_bytes()).hexdigest() for p in manifests})})
+    path=tmp_path/'summary.json'; path.write_text(json.dumps(receipt))
+    ds=dataset(manifests,sample_mode='full_segment',long_segment_policy='uniform_retention',
+        max_sequence_length=budget,segment_statistics_path=path,
+        tokenizer_config={'pretrained_model_name':str(tokenpath)},cfg_dropout_rate=0)
+    assert len(ds)==4-excluded and len(ds.excluded)==excluded
+    assert ds.rows[0]['_retention_plan']['retention_ratio']==ratio
+    if excluded: assert ds.excluded[0]['reason']=='exceeds_token_budget_at_50_percent'
+    class RGB:
+        shape=(300,)
+        def __getitem__(self,indices): return indices
+    monkeypatch.setattr(zarr,'open_group',lambda *a,**kw:{'images.front_1':RGB()})
+    monkeypatch.setattr(module,'decode_rgb_video',lambda ids:torch.tensor(ids).reshape(1,-1,1,1))
+    sample=ds[0]; ids=sample['source_frame_indices']
+    assert sample['orig_true_frames']==(65 if excluded else 200)
+    assert sample['retention_ratio']==ratio
+    assert sample['frame_end']-sample['frame_start']+1==sample['orig_true_frames']
+    assert (len(ids)-1)/sample['effective_fps']==pytest.approx((sample['orig_true_frames']-1)/30)
+    assert ('2.2 seconds' if excluded else '6.7 seconds') in sample['ai_caption']
+    replay=ds.get_item_at_window(0,source_frame_indices=ids)
+    assert torch.equal(sample['video'],replay['video'])
+    assert ds.dataset_contract!=base.dataset_contract
+    with pytest.raises(ValueError,match='budget/ratio ladder'):
+        module.validate_full_segment_budget(path,'train',manifests,budget+128,long_segment_policy='uniform_retention')

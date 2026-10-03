@@ -39,11 +39,16 @@ def test_full_segment_recipe_uses_exclusive_token_budget():
     old=experiment()
     c=full_segment_experiment()
     assert c.dataloader_train.max_samples_per_batch is None
-    assert c.dataloader_train.max_sequence_length==65536
+    assert c.dataloader_train.max_sequence_length==75008
     d=c.dataloader_train.dataloader.datasets.video.dataset
     assert d.sample_mode=='full_segment' and not d.random_window
-    assert d.max_sequence_length==65536 and d.frame_stride==1
-    assert c.optimizer==old.optimizer and c.scheduler==old.scheduler
+    assert d.max_sequence_length==75008 and d.frame_stride==1
+    assert c.optimizer.lr==1e-4 and c.optimizer.weight_decay==.01
+    assert c.optimizer.betas==old.optimizer.betas
+    assert c.optimizer.lr_multipliers==old.optimizer.lr_multipliers
+    assert c.scheduler.cycle_lengths==[1500]
+    assert c.trainer.max_iter==1500 and c.checkpoint.save_iter==500
+    assert c.model.config.parallelism.data_parallel_replicate_degree==4
     assert c.model.config.frames_per_chunk==old.model.config.frames_per_chunk
     assert c.model.config.local_attention_frames==old.model.config.local_attention_frames
     assert c.model.config.sigma_min==old.model.config.sigma_min

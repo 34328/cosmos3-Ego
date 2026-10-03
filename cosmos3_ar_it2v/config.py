@@ -75,24 +75,28 @@ def experiment():
 ConfigStore.instance().store(group='experiment',package='_global_',name=CONFIG_NAME,node=experiment())
 
 
-def full_segment_experiment(token_budget=65536):
-    """Complete segments, native packing; optimizer remains unchanged.
+def full_segment_experiment(token_budget=75008):
+    """Complete segments with the user-confirmed optimizer and native packing.
 
-    65536 is a validation budget, not permission to omit oversized segments.
-    Dataset preflight must reject the full manifest until all samples fit an
-    approved resource policy. V0.1 remains reproducible above.
+    75008 aligns the requested 75k ceiling to 128. Oversized segments use only
+    the explicitly approved 90..50% retention ladder, recorded before launch.
+    Formal training still requires user recipe confirmation.
     """
     if token_budget < 128 or token_budget % 128:
         raise ValueError('Token budget must be a positive multiple of 128')
     c=experiment()
     c.job.update(group='ar_it2v_v0_2',name='ar_it2v_v0_2_full_segments')
+    c.optimizer.update(lr=1e-4,weight_decay=.01)
+    c.model.config.parallelism.data_parallel_replicate_degree=4
+    c.trainer.max_iter=1500
+    c.scheduler.cycle_lengths=[1500]
     c.model.config.max_num_tokens_after_packing=int(token_budget)
     c.dataloader_train.max_samples_per_batch=None
     c.dataloader_train.max_sequence_length=int(token_budget)
     data=c.dataloader_train.dataloader.datasets.video.dataset
-    data.update(sample_mode='full_segment',random_window=False,
+    data.update(sample_mode='full_segment',random_window=False,long_segment_policy='uniform_retention',
         max_sequence_length=int(token_budget),
-        segment_statistics_path=str(ROOT/'outputs/maintenance/full_segment_audit_20261003/summary.json'))
+        segment_statistics_path=str(ROOT/'outputs/maintenance/full_segment_retention_75008_20261003/summary.json'))
     return c
 
 

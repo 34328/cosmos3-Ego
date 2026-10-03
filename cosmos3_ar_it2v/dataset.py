@@ -22,6 +22,7 @@ from torch.utils.data import Dataset, IterableDataset, get_worker_info
 
 DEFAULT_FRAME_TIERS = (97, 81, 65, 49, 33, 17)
 FULL_SEGMENT_TOKEN_FORMULA = 'caption_tokens + 3 + 240 * (1 + ceil((true_frames - 1) / 4))'
+RETENTION_PERCENTAGES = (100, 90, 80, 70, 60, 50)
 
 
 def full_segment_geometry(true_frames):
@@ -33,11 +34,39 @@ def full_segment_geometry(true_frames):
     return padded_frames, latent_frames, padded_frames - int(true_frames)
 
 
-def format_video_caption(text, true_frames, fps, append_video_metadata=True):
+def format_video_caption(text, true_frames, fps, append_video_metadata=True, duration_seconds=None):
     caption = text.strip().rstrip('.') + '.'
     if append_video_metadata:
-        caption += f" The video is {true_frames/fps:.1f} seconds long and is of {fps:.0f} FPS. This video is of 368x640 resolution."
+        duration = true_frames/fps if duration_seconds is None else duration_seconds
+        caption += f" The video is {duration:.1f} seconds long and is of {fps:.0f} FPS. This video is of 368x640 resolution."
     return caption
+
+
+def uniform_retention_indices(start, end, retained_frames):
+    """Deterministic nearest-grid samples, including both original endpoints."""
+    total = int(end) - int(start)
+    count = int(retained_frames)
+    if not 2 <= count <= total:
+        raise ValueError('Uniform retention needs 2 <= retained_frames <= segment frames')
+    return int(start) + (np.arange(count, dtype=np.int64)*(total-1)+(count-1)//2)//(count-1)
+
+
+def choose_retention_plan(true_frames, fps, text, count_caption_tokens, budget):
+    """Choose the largest approved ratio fitting the strict native packing budget."""
+    for percentage in RETENTION_PERCENTAGES:
+        count = max(2, int(true_frames)*percentage//100)
+        effective_fps = (count-1)/(true_frames-1)*fps
+        caption = format_video_caption(text,count,effective_fps,duration_seconds=true_frames/fps)
+        text_tokens = int(count_caption_tokens(caption))
+        padded,latent,padding = full_segment_geometry(count)
+        cost = video_packing_tokens(text_tokens,padded)
+        plan = dict(orig_true_frames=int(true_frames),true_frames=count,
+            retention_ratio=percentage/100,actual_retention_ratio=count/true_frames,
+            effective_fps=effective_fps,text_tokens=text_tokens,padded_frames=padded,
+            latent_frames=latent,temporal_padding=padding,packing_tokens=cost)
+        if cost < budget:
+            return dict(plan,excluded=False)
+    return dict(plan,excluded=True,exclusion_reason='exceeds_token_budget_at_50_percent')
 
 
 def video_packing_tokens(text_tokens, padded_frames):
@@ -58,11 +87,18 @@ def tokenizer_source_path(config_or_processor):
     return str(Path(path).resolve())
 
 
-def validate_full_segment_budget(receipt_path, split, manifest_paths, budget, tokenizer_path=None):
+def validate_full_segment_budget(receipt_path, split, manifest_paths, budget, tokenizer_path=None,
+                                 long_segment_policy='error', return_records=False):
     """Fail before iteration if the verified complete manifest exceeds the budget."""
     receipt = json.loads(Path(receipt_path).read_text())
     if receipt.get('token_formula') != FULL_SEGMENT_TOKEN_FORMULA or receipt.get('frame_stride') != 1:
         raise ValueError('Full-segment statistics use a different token contract')
+    if receipt.get('long_segment_policy','error') != long_segment_policy:
+        raise ValueError('Full-segment statistics long-segment policy differs')
+    if long_segment_policy == 'uniform_retention' and (
+            receipt.get('policy_token_budget') != int(budget) or
+            receipt.get('retention_percentages') != list(RETENTION_PERCENTAGES)):
+        raise ValueError('Uniform-retention statistics budget/ratio ladder differs')
     expected = {str(p):hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in manifest_paths}
     if receipt['manifest_summaries'][split]['manifest_sha256'] != expected:
         raise ValueError('Full-segment statistics manifest hashes differ')
@@ -78,14 +114,17 @@ def validate_full_segment_budget(receipt_path, split, manifest_paths, budget, to
     rows = [r for r in rows if r['split'] == split]
     if len(rows) != receipt['manifest_summaries'][split]['segments_total']:
         raise ValueError('Full-segment statistics do not cover every segment')
-    oversized = [r for r in rows if r['packing_tokens'] >= int(budget)]
+    included = [r for r in rows if not r.get('excluded',False)]
+    oversized = [r for r in included if r['packing_tokens'] >= int(budget)]
     if oversized:
         hours = sum(r['duration_seconds'] for r in oversized) / 3600
         maximum = max(r['packing_tokens'] for r in rows)
         raise ValueError(f'Full {split} manifest exceeds strict token budget {budget}: '
                          f'{len(oversized)} segments / {hours:.6f} hours; max={maximum}. '
                          'No segments may be dropped; choose an explicit supported budget.')
-    return {'segments':len(rows), 'max_tokens':max(r['packing_tokens'] for r in rows), 'budget':int(budget)}
+    result = {'segments':len(included), 'segments_total':len(rows), 'excluded':len(rows)-len(included),
+              'max_tokens':max(r['packing_tokens'] for r in included), 'budget':int(budget)}
+    return (result,rows,receipt['records_sha256']) if return_records else result
 
 
 def select_clip_frames(source_frames, frame_stride=1, tiers=DEFAULT_FRAME_TIERS):
@@ -142,13 +181,20 @@ class EgoVerseIT2VDataset(Dataset):
                  frame_stride=1, clip_frame_tiers=DEFAULT_FRAME_TIERS, seed=42,
                  random_window=True, tokenizer_config=None, caption_tokenizer=None,
                  cfg_dropout_rate=0.1, append_video_metadata=True,
-                 sample_mode="window", max_sequence_length=None, segment_statistics_path=None):
+                 sample_mode="window", max_sequence_length=None, segment_statistics_path=None,
+                 long_segment_policy='error'):
         if split not in ("train", "test"):
             raise ValueError("Use the original train or test split")
         if sample_mode not in ("window", "full_segment"):
             raise ValueError("sample_mode must be window or full_segment")
         if sample_mode == "full_segment" and frame_stride != 1:
             raise ValueError("Full segments require every original frame: frame_stride=1")
+        if long_segment_policy not in ('error','uniform_retention'):
+            raise ValueError('Unknown long_segment_policy')
+        if long_segment_policy == 'uniform_retention' and (
+                sample_mode != 'full_segment' or segment_statistics_path is None or max_sequence_length is None):
+            raise ValueError('Uniform retention requires full_segment, token budget and verified statistics receipt')
+        self.long_segment_policy = long_segment_policy
         select_clip_frames(0, frame_stride, clip_frame_tiers)
         self.sample_mode, self.max_sequence_length = sample_mode, max_sequence_length
         if not 0 <= cfg_dropout_rate <= 1:
@@ -159,7 +205,7 @@ class EgoVerseIT2VDataset(Dataset):
         self.append_video_metadata = bool(append_video_metadata)
         self._tokenizer_config, self._caption_tokenizer = tokenizer_config, caption_tokenizer
         self.epoch = 0
-        paths = [Path(episodes_manifest), Path(segments_manifest)]
+        paths = [Path(episodes_manifest).resolve(), Path(segments_manifest).resolve()]
         with paths[0].open(newline="", encoding="utf-8") as f:
             all_episodes = list(csv.DictReader(f))
         if len({r["episode_hash"] for r in all_episodes}) != len(all_episodes):
@@ -211,18 +257,47 @@ class EgoVerseIT2VDataset(Dataset):
             "manifest_sha256": {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths},
         }
         contract = dict(sample_mode=sample_mode, frame_stride=self.frame_stride,
+                        long_segment_policy=long_segment_policy,
                         manifest_sha256=self.manifest_summary['manifest_sha256'], seed=self.seed,
                         cfg_dropout_rate=self.cfg_dropout_rate,
                         append_video_metadata=self.append_video_metadata)
         if sample_mode == 'window':
             contract.update(clip_frame_tiers=list(clip_frame_tiers), random_window=self.random_window)
-        self.dataset_contract = hashlib.sha256(json.dumps(contract, sort_keys=True).encode()).hexdigest()
         if segment_statistics_path is not None:
             if sample_mode != 'full_segment' or max_sequence_length is None:
                 raise ValueError('Statistics receipt requires full_segment and an explicit token budget')
             tokenizer_path = tokenizer_source_path(tokenizer_config)
-            self.manifest_summary['budget_preflight'] = validate_full_segment_budget(
-                segment_statistics_path, split, paths, max_sequence_length, tokenizer_path)
+            preflight, records, records_sha = validate_full_segment_budget(
+                segment_statistics_path, split, paths, max_sequence_length, tokenizer_path,
+                long_segment_policy=long_segment_policy, return_records=True)
+            self.manifest_summary['budget_preflight'] = preflight
+            if long_segment_policy == 'uniform_retention':
+                contract.update(retention_percentages=RETENTION_PERCENTAGES,
+                                policy_token_budget=int(max_sequence_length),records_sha256=records_sha)
+                plans = {r['sample_id']:r for r in records}
+                if set(plans) != {r['sample_id'] for r in self.rows}:
+                    raise ValueError('Retention records must map each original segment exactly once')
+                retained = []
+                for original_index,row in enumerate(self.rows):
+                    plan = plans[row['sample_id']]
+                    if plan['orig_true_frames'] != int(row['end_idx'])-int(row['start_idx']):
+                        raise ValueError('Retention plan has wrong original segment length')
+                    row.update(_manifest_row_index=original_index, _retention_plan=plan)
+                    if plan['excluded']:
+                        self.excluded.append(dict(row,reason=plan['exclusion_reason']))
+                    else:
+                        row['_clip_frames'] = plan['true_frames']
+                        retained.append(row)
+                self.rows = retained
+                if not self.rows:
+                    raise ValueError('Uniform-retention policy excludes every segment')
+                self.manifest_summary.update(long_segment_policy=long_segment_policy,
+                    retention_ratio_counts=dict(Counter(r['_retention_plan']['retention_ratio'] for r in self.rows)),
+                    segments_eligible=len(self.rows),segments_excluded_budget=len(self.excluded),
+                    caption_hours_eligible=hours(self.rows),caption_hours_excluded_budget=hours(self.excluded),
+                    sampled_clip_hours_per_epoch=hours(self.rows),
+                    clip_tier_counts=dict(sorted(Counter(r['_clip_frames'] for r in self.rows).items())))
+        self.dataset_contract = hashlib.sha256(json.dumps(contract, sort_keys=True).encode()).hexdigest()
 
     def __len__(self):
         return len(self.rows)
@@ -239,6 +314,8 @@ class EgoVerseIT2VDataset(Dataset):
         if self.sample_mode == "full_segment":
             if window_start is not None and int(window_start) != start:
                 raise ValueError("Full segment cannot be cropped or shifted")
+            if self.long_segment_policy == 'uniform_retention':
+                return uniform_retention_indices(start,end,row['_clip_frames'])
             return np.arange(start, end, dtype=np.int64)
         span = 1 + self.frame_stride * (row["_clip_frames"] - 1)
         rng = random.Random(_seed(self.seed, self.epoch if epoch is None else epoch, index))
@@ -271,7 +348,13 @@ class EgoVerseIT2VDataset(Dataset):
         if rgb.shape[0] != int(ep["total_frames"]) or indices[-1] >= rgb.shape[0]:
             raise ValueError("Zarr frame count differs from manifest")
         fps = float(ep["fps"]) / self.frame_stride
-        caption = format_video_caption(row["text_normalized"], len(indices), fps, self.append_video_metadata)
+        original_frames = int(row['end_idx'])-int(row['start_idx'])
+        original_duration = None
+        if self.long_segment_policy == 'uniform_retention':
+            fps = row['_retention_plan']['effective_fps']
+            original_duration = original_frames/float(ep['fps'])
+        caption = format_video_caption(row["text_normalized"], len(indices), fps, self.append_video_metadata,
+                                       duration_seconds=original_duration)
         # Separate stream from crop selection, deterministic across worker layouts.
         rng = random.Random(_seed(self.seed + 1, epoch, index))
         if rng.random() < self.cfg_dropout_rate:
@@ -305,6 +388,12 @@ class EgoVerseIT2VDataset(Dataset):
         if self.sample_mode == "full_segment":
             result.update(sample_mode="full_segment", video_true_num_frames=len(indices),
                           video_temporal_padding=temporal_padding)
+        if self.long_segment_policy == 'uniform_retention':
+            plan = row['_retention_plan']
+            result.update(orig_true_frames=original_frames,retention_ratio=plan['retention_ratio'],
+                          actual_retention_ratio=plan['actual_retention_ratio'],effective_fps=fps,
+                          original_duration_seconds=original_duration,
+                          manifest_row_index=row['_manifest_row_index'],long_segment_policy=self.long_segment_policy)
         return result
 
 

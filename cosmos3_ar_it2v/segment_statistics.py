@@ -13,13 +13,23 @@ import numpy as np
 
 from cosmos3_ar_it2v.dataset import (
     EgoVerseIT2VDataset, FULL_SEGMENT_TOKEN_FORMULA, format_video_caption, full_segment_geometry, video_packing_tokens,
+    choose_retention_plan, RETENTION_PERCENTAGES,
 )
 
 _tokenizer = None
+_policy = 'error'
+_policy_budget = None
 
 
 def count_row(row):
     from cosmos_framework.model.generator.reasoner.qwen3_vl.utils import tokenize_caption
+    def count(caption):
+        ids = tokenize_caption(caption, _tokenizer, is_video=True, use_system_prompt=False)
+        if len(ids)>1024:
+            raise ValueError(f"Caption exceeds dataset token limit: {row['sample_id']}")
+        return len(ids)
+    if _policy == 'uniform_retention':
+        return dict(row,**choose_retention_plan(row['true_frames'],row['fps'],row['caption'],count,_policy_budget))
     caption = format_video_caption(row['caption'], row['true_frames'], row['fps'])
     ids = tokenize_caption(caption, _tokenizer, is_video=True, use_system_prompt=False)
     if len(ids) > 1024:
@@ -32,7 +42,24 @@ def count_row(row):
 def summarize(rows, budgets):
     duration = sum(r['duration_seconds'] for r in rows)
     result = {'segments': len(rows), 'hours': duration / 3600, 'excluded': 0}
+    if any('retention_ratio' in r for r in rows):
+        result['retention_groups'] = {}
+        for label in [str(p/100) for p in RETENTION_PERCENTAGES] + ['excluded']:
+            group = [r for r in rows if ('excluded' if r['excluded'] else str(r['retention_ratio'])) == label]
+            hours = sum(r['duration_seconds'] for r in group)/3600
+            result['retention_groups'][label] = dict(segments=len(group),original_hours=hours,
+                original_duration_fraction=hours*3600/duration)
+        result['excluded'] = result['retention_groups']['excluded']['segments']
+        result['included_segments'] = len(rows)-result['excluded']
     result['minimum_128_aligned_strict_budget'] = (max(r['packing_tokens'] for r in rows)//128 + 1)*128
+    if any('retention_ratio' in r for r in rows):
+        included = [r for r in rows if not r['excluded']]
+        result['packing_tokens_population'] = 'all segments; excluded rows show their failed 50-percent attempt'
+        result['minimum_128_aligned_strict_budget_including_excluded_attempts'] = result.pop('minimum_128_aligned_strict_budget')
+        result['included_max_packing_tokens'] = max(r['packing_tokens'] for r in included)
+        result['included_packing_tokens'] = {str(q):float(np.quantile([r['packing_tokens'] for r in included],q))
+                                            for q in (0,.25,.5,.75,.9,.95,.99,1)}
+        result['included_minimum_128_aligned_strict_budget'] = (result['included_max_packing_tokens']//128+1)*128
     for key in ('true_frames', 'duration_seconds', 'text_tokens', 'packing_tokens'):
         result[key] = {str(q): float(np.quantile([r[key] for r in rows], q))
                        for q in (0, .25, .5, .75, .9, .95, .99, 1)}
@@ -51,7 +78,7 @@ def summarize(rows, budgets):
 
 
 def main():
-    global _tokenizer
+    global _tokenizer, _policy, _policy_budget
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--episodes-manifest', required=True)
     parser.add_argument('--segments-manifest', required=True)
@@ -59,8 +86,13 @@ def main():
     parser.add_argument('--workers', type=int, default=16)
     parser.add_argument('--output', required=True)
     parser.add_argument('--splits', nargs='+', choices=['train','test'], default=['train','test'])
+    parser.add_argument('--long-segment-policy', choices=['error','uniform_retention'], default='error')
+    parser.add_argument('--policy-token-budget', type=int)
     parser.add_argument('--budgets', nargs='+', type=int, default=[45056,49152,65536,98304,131072,179456,215424])
     args = parser.parse_args()
+    _policy,_policy_budget=args.long_segment_policy,args.policy_token_budget
+    if _policy=='uniform_retention' and not _policy_budget:
+        parser.error('--policy-token-budget is required for uniform_retention')
     start = time.monotonic()
     from cosmos_framework.model.generator.tokenizers.tokenization_qwen2 import Qwen2Tokenizer
     from cosmos_framework.data.generator.sequence_packing.modalities import add_special_tokens
@@ -92,6 +124,8 @@ def main():
         for row in counted:
             f.write(json.dumps(row, ensure_ascii=False) + '\n')
     summary = dict(mode='full_segment', frame_stride=1, resolution=[368,640],
+        long_segment_policy=_policy,policy_token_budget=_policy_budget,
+        retention_percentages=list(RETENTION_PERCENTAGES),
         token_formula=FULL_SEGMENT_TOKEN_FORMULA,
         budget_rule='packing_tokens < max_sequence_length', cfg='full captions; dropout only reduces cost',
         temporal_padding='repeat last RGB frame at most 3 times; real frame count retained',

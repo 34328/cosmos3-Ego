@@ -37,7 +37,8 @@ class VideoTrainingMonitor(Callback):
         scheduler = LambdaWarmUpCosineScheduler(**params,verbosity_interval=0)
         row = dict(base_lr=float(cfg.optimizer.lr),scheduler=params,
             weight_decay=float(cfg.optimizer.weight_decay),
-            theoretical_lr={str(i):float(cfg.optimizer.lr)*scheduler(i) for i in (0,100,1500,3000)},
+            theoretical_lr={str(i):float(cfg.optimizer.lr)*scheduler(i)
+                for i in (0,100,int(cfg.trainer.max_iter)//2,int(cfg.trainer.max_iter))},
             action_gen=bool(cfg.model.config.action_gen),frames_per_chunk=int(cfg.model.config.frames_per_chunk),
             local_attention_frames=int(cfg.model.config.local_attention_frames),wandb_mode=str(cfg.job.wandb_mode),sigma_sampler='uniform_shift_postclamp',
             sigma_min=float(cfg.model.config.sigma_min),sigma_max=float(cfg.model.config.sigma_max),sigma_shift=float(cfg.model.config.sigma_shift))

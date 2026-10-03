@@ -32,13 +32,14 @@ def main():
             env.pop(k,None)
     env.update(PATH='/home/lzh/miniconda3/envs/cosmos3/bin:'+env.get('PATH',''),LD_LIBRARY_PATH='',
         PYTHONPATH=str(repo)+':'+str(repo/'packages/cosmos3'),CUDA_VISIBLE_DEVICES='0,1,2,3,4,5,6,7',
-        OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',NNODES='2',NPROC_PER_NODE='8',
+        OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',NNODES=str(len(plan['nodes'])),NPROC_PER_NODE='8',
         NODE_RANK=str(rank),MASTER_ADDR=plan['master_addr'],MASTER_PORT=str(plan['master_port']),
         NCCL_IB_DISABLE='1',NCCL_NET='Socket',NCCL_SOCKET_IFNAME='eth0',GLOO_SOCKET_IFNAME='eth0',
         TORCH_NCCL_ASYNC_ERROR_HANDLING='1',NCCL_DEBUG='INFO',WANDB_MODE='online',WANDB_ENTITY=plan['entity'],
         WANDB_PROJECT=plan['project'],OUTPUT_ROOT=str(node_dir),IMAGINAIRE_OUTPUT_ROOT=plan['output_root'],
         LOG_FILENAME='formal_sft.log',BASE_CHECKPOINT_PATH='/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp',
         WAN_VAE_PATH='/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth',TEXT_TOKENIZER_PATH='/mnt/checkpoints/Cosmos3-Nano/text_tokenizer',
+        TOML_FILE=plan['toml_file'],
         EXTRA_TAIL_OVERRIDES='job.name='+plan['run_name']+' job.wandb_mode=online')
     command=['bash',str(repo/'cosmos3_ar_it2v/launch.sh')]
     receipt=dict(node=node,rank=rank,hostname=socket.gethostname(),started_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
