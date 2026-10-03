@@ -1,5 +1,12 @@
 # Cosmos3 AR IT2V 协作指南
 
+## AR 视频边界与旧联合格式
+
+- 2026-10-03 已核实旧联合 V0.3/V0.3.1 将 AR 分块与 VAE 时间上下文重置绑定：训练逐块独立编码，推理末帧反复 decode→encode，输出逐块解码拼接。这是画面跳变的重要嫌疑，尚未证明是唯一原因；纯视频 V0.1 的连续性观察不能直接归功于正在训练的完整 segment V0.2。
+- 保持本分支连续编码、同一 latent 序列和连续解码语义。旧联合修正版在 `/mnt/lzh/cosmos-EgoWAM` 的独立 V0.4 文件/配置实施，action 策略保持，检查时间对齐和历史 KV，不改本分支训练源文件或配方。
+- 旧联合 checkpoint/NPZ 的分块 latent 格式不可直接按连续 latent 解码；新入口必须校验格式。公共问题证据维护在旧联合仓库及本地的 `docs/problems.md`。用户授权清理旧联合 V0.3* 产物，不包括纯视频 IT2V、官方权重、共享数据和活跃任务产物。
+
+
 ## 项目与当前授权
 
 本分支 `ar-it2v-pretrain` 在 Cosmos3-Nano 上迁移 CMD Stage 1 的核心方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。项目扩展统一放在 `cosmos3_ar_it2v/`；旧短窗口记录放在 `docs/ar_it2v_v0.1/`，完整segment设计和实验记录放在 `docs/ar_it2v_v0.2/`。交流与文档默认中文，代码标识符保留英文。
