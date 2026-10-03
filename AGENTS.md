@@ -32,6 +32,8 @@
 ## 训练、验证与记录
 
 - 复用官方 Cosmos3 CLI、Trainer、优化器、调度器、DCP checkpoint 和 W&B。扩展点足够时不另写训练主循环，不全局劫持官方日志。
+- 实现新功能前先查官方现有代码、接口和配置，能复用就直接复用，尤其是复杂计算和功能组件（注意力 mask、RoPE、VAE、packing、分布式 loss 归约、KV cache、状态恢复等）。不得未经核实就另造一套实现。
+- 官方能力确实不满足需求时，先说明缺口与采用的扩展点，只写必要的最小适配；保留官方计算语义和生命周期。Review 同样检查已有自定义实现是否可以直接换回官方组件，不能只凭小型测试通过就认定复杂组件适合真实规模。
 - 运行环境：`/home/lzh/miniconda3/envs/cosmos3/bin/python`；测试与启动脚本都使用 `PYTHONPATH=<repo>:<repo>/packages/cosmos3`。官方框架的额外导航与规则见 `packages/cosmos3/AGENTS.md`。
 - 验证聚焦真实 noising、timestep、mask、loss、历史梯度、cache 等价性及正式训练生命周期。必要检查通过后推进工作，不重复已通过的同一套测试。
 - CPU 回归显式关闭 CUDA；原生配置的运行期验证可能初始化 CUDA，放在实际 GPU 短测中验证。
