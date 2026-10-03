@@ -1,0 +1,249 @@
+{
+  "mode": "full_segment",
+  "resolution": [
+    368,
+    640
+  ],
+  "long_segment_policy": "uniform_retention",
+  "policy_token_budget": 75008,
+  "retention_percentages": [
+    100,
+    90,
+    80,
+    70,
+    60,
+    50
+  ],
+  "token_formula": "caption_tokens + 3 + 240 * (1 + ceil((true_frames - 1) / 4))",
+  "budget_rule": "packing_tokens < max_sequence_length",
+  "workers": 16,
+  "elapsed_seconds": 3.911329958587885,
+  "segments_per_second": 8573.810022437281,
+  "serial_parallel_equal": true,
+  "records": "/mnt/lzh/cosmos-ar-it2v/outputs/maintenance/full_segment_retention_75008_20261003/summary.jsonl",
+  "records_sha256": "631670eccc7aad65bd03f17207f621c68d0c07a04449c55e3d767ae3cf6e3b1d",
+  "manifest_summaries": {
+    "train": {
+      "split": "train",
+      "episodes": 4142,
+      "segments_total": 32355,
+      "segments_eligible": 32355,
+      "segments_excluded_short": 0,
+      "episode_hours": 96.40973148148147,
+      "caption_hours_total": 95.51009259259258,
+      "caption_hours_eligible": 95.51009259259258,
+      "caption_hours_excluded_short": 0.0,
+      "sampled_clip_hours_per_epoch": 95.51009259259258,
+      "frame_stride": 1,
+      "speed_factor": 1.0,
+      "sample_mode": "full_segment",
+      "manifest_sha256": {
+        "/mnt/lzh/cosmos-EgoWAM/training_manifests/mecka_100h_v1_episodes.csv": "98d8abdff990cc3cf0b39a0d1ac0b0338b8d3be9e7b2ea7ed8757acfdacec41d",
+        "/mnt/lzh/cosmos-EgoWAM/training_manifests/mecka_100h_v1_segments.csv": "64655579936e40bf2774c0aca50993f1ef6b53c5fc37a44d70cb752950f9be60"
+      }
+    },
+    "test": {
+      "split": "test",
+      "episodes": 153,
+      "segments_total": 1180,
+      "segments_eligible": 1180,
+      "segments_excluded_short": 0,
+      "episode_hours": 3.5965185185185184,
+      "caption_hours_total": 3.568898148148148,
+      "caption_hours_eligible": 3.568898148148148,
+      "caption_hours_excluded_short": 0.0,
+      "sampled_clip_hours_per_epoch": 3.568898148148148,
+      "frame_stride": 1,
+      "speed_factor": 1.0,
+      "sample_mode": "full_segment",
+      "manifest_sha256": {
+        "/mnt/lzh/cosmos-EgoWAM/training_manifests/mecka_100h_v1_episodes.csv": "98d8abdff990cc3cf0b39a0d1ac0b0338b8d3be9e7b2ea7ed8757acfdacec41d",
+        "/mnt/lzh/cosmos-EgoWAM/training_manifests/mecka_100h_v1_segments.csv": "64655579936e40bf2774c0aca50993f1ef6b53c5fc37a44d70cb752950f9be60"
+      }
+    }
+  },
+  "tokenizer_files_sha256": {
+    "special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+    "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+    "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+    "added_tokens.json": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680",
+    "tokenizer_config.json": "355f2b4e5bad7b01f11ef6cb68ebc176f61b95c3276092ea225b1bea0e01e95c",
+    "chat_template.jinja": "3636d0f0bd6bef02654cdffdc447b79cb2cef8ab02cc75267345946291a489e4",
+    "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+  },
+  "splits": {
+    "train": {
+      "segments": 32355,
+      "hours": 95.51009259259258,
+      "excluded": 22,
+      "retention_groups": {
+        "1.0": {
+          "segments": 31266,
+          "original_hours": 79.74781481481482,
+          "original_duration_fraction": 0.8349674118209343
+        },
+        "0.9": {
+          "segments": 345,
+          "original_hours": 4.20962037037037,
+          "original_duration_fraction": 0.044075136523287727
+        },
+        "0.8": {
+          "segments": 301,
+          "original_hours": 4.1084907407407405,
+          "original_duration_fraction": 0.0430162994215271
+        },
+        "0.7": {
+          "segments": 234,
+          "original_hours": 3.6119814814814815,
+          "original_duration_fraction": 0.03781779897218541
+        },
+        "0.6": {
+          "segments": 154,
+          "original_hours": 2.602305555555555,
+          "original_duration_fraction": 0.027246393390653885
+        },
+        "0.5": {
+          "segments": 33,
+          "original_hours": 0.6795185185185186,
+          "original_duration_fraction": 0.00711462527229525
+        },
+        "excluded": {
+          "segments": 22,
+          "original_hours": 0.5503611111111111,
+          "original_duration_fraction": 0.0057623345991164405
+        }
+      },
+      "included_segments": 32333,
+      "packing_tokens_population": "all segments; excluded rows show their failed 50-percent attempt",
+      "minimum_128_aligned_strict_budget_including_excluded_attempts": 89856,
+      "included_max_packing_tokens": 74935,
+      "included_packing_tokens": {
+        "0": 1006.0,
+        "0.25": 6049.0,
+        "0.5": 11569.0,
+        "0.75": 24536.0,
+        "0.9": 46132.8,
+        "0.95": 63410.0,
+        "0.99": 73008.68,
+        "1": 74935.0
+      },
+      "included_minimum_128_aligned_strict_budget": 75008,
+      "duration_seconds": {
+        "0": 0.3333333333333333,
+        "0.25": 3.2,
+        "0.5": 6.233333333333333,
+        "0.75": 13.516666666666666,
+        "0.9": 25.6,
+        "0.95": 35.3,
+        "0.99": 55.681999999999974,
+        "1": 99.43333333333334
+      },
+      "text_tokens": {
+        "0": 42.0,
+        "0.25": 45.0,
+        "0.5": 48.0,
+        "0.75": 50.0,
+        "0.9": 54.0,
+        "0.95": 56.0,
+        "0.99": 62.0,
+        "1": 74.0
+      },
+      "strict_budget_coverage": {
+        "75008": {
+          "oversized": 22,
+          "oversized_segment_fraction": 0.0006799567300262711,
+          "oversized_hours": 0.5503611111111111,
+          "oversized_duration_fraction": 0.0057623345991164405,
+          "covered_segments": 32333
+        }
+      }
+    },
+    "test": {
+      "segments": 1180,
+      "hours": 3.568898148148148,
+      "excluded": 2,
+      "retention_groups": {
+        "1.0": {
+          "segments": 1133,
+          "original_hours": 2.860287037037037,
+          "original_duration_fraction": 0.8014482112696885
+        },
+        "0.9": {
+          "segments": 13,
+          "original_hours": 0.15763888888888888,
+          "original_duration_fraction": 0.04417018428241936
+        },
+        "0.8": {
+          "segments": 11,
+          "original_hours": 0.14981481481481482,
+          "original_duration_fraction": 0.041977890260766246
+        },
+        "0.7": {
+          "segments": 13,
+          "original_hours": 0.20124074074074075,
+          "original_duration_fraction": 0.05638735889539515
+        },
+        "0.6": {
+          "segments": 7,
+          "original_hours": 0.11805555555555555,
+          "original_duration_fraction": 0.03307899263441098
+        },
+        "0.5": {
+          "segments": 1,
+          "original_hours": 0.020787037037037034,
+          "original_duration_fraction": 0.005824497134451187
+        },
+        "excluded": {
+          "segments": 2,
+          "original_hours": 0.06107407407407408,
+          "original_duration_fraction": 0.01711286552286861
+        }
+      },
+      "included_segments": 1178,
+      "packing_tokens_population": "all segments; excluded rows show their failed 50-percent attempt",
+      "minimum_128_aligned_strict_budget_including_excluded_attempts": 107904,
+      "included_max_packing_tokens": 74928,
+      "included_packing_tokens": {
+        "0": 1007.0,
+        "0.25": 6531.0,
+        "0.5": 11569.5,
+        "0.75": 23998.0,
+        "0.9": 47090.0,
+        "0.95": 64886.399999999965,
+        "0.99": 72293.23,
+        "1": 74928.0
+      },
+      "included_minimum_128_aligned_strict_budget": 75008,
+      "duration_seconds": {
+        "0": 0.43333333333333335,
+        "0.25": 3.4583333333333335,
+        "0.5": 6.2,
+        "0.75": 13.325000000000001,
+        "0.9": 26.010000000000012,
+        "0.95": 36.86833333333333,
+        "0.99": 58.296333333333344,
+        "1": 119.43333333333334
+      },
+      "text_tokens": {
+        "0": 42.0,
+        "0.25": 45.0,
+        "0.5": 48.0,
+        "0.75": 51.0,
+        "0.9": 53.0,
+        "0.95": 56.049999999999955,
+        "0.99": 62.0,
+        "1": 69.0
+      },
+      "strict_budget_coverage": {
+        "75008": {
+          "oversized": 2,
+          "oversized_segment_fraction": 0.001694915254237288,
+          "oversized_hours": 0.06107407407407408,
+          "oversized_duration_fraction": 0.01711286552286861,
+          "covered_segments": 1178
+        }
+      }
+    }
+  },
+  "source_summary": "/mnt/lzh/cosmos-ar-it2v/outputs/maintenance/full_segment_retention_75008_20261003/summary.json"
+}

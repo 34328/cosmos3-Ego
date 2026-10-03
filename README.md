@@ -4,8 +4,8 @@
 
 ## 当前配方
 
-- 原始 30fps 连续视频，stride 1，不抽帧、不倍速。
-- 复用原始 train/test 与文本动作段，窗口不跨标注边界；最长 97 帧，支持短段。
+- 完整文本segment为一个样本，原始30fps连续源帧、不随机裁剪、不跨段。
+- 官方token-budget Packer预算75008；仅超预算单段按用户批准的90%→50%阶梯均匀保留帧，保持原时间跨度，50%仍超限则明确排除并记录。旧最长97帧随机短窗口训练已停止并保留。
 - 完整 clip 连续 VAE 编码；latent 分块 `[1,4,4,…]`，local16 总窗口，无永久首帧 sink。
 - 单遍 Diffusion Forcing：首帧干净且不计 loss，未来块分别采样 σ、块内共享，所有未来块计算 flow MSE。
 - 官方 Nano 起点，GEN-only 参数训练，保留官方 Trainer、optimizer、scheduler、DCP 和 W&B。
@@ -17,7 +17,8 @@
 |---|---|
 | 设计与验收口径 | [docs/ar_it2v_v0.1/design.md](docs/ar_it2v_v0.1/design.md) |
 | 训练状态与实验回执 | [docs/ar_it2v_v0.1/experiment.md](docs/ar_it2v_v0.1/experiment.md) |
-| 配置 | [cosmos3_ar_it2v/configs/ego100h.toml](cosmos3_ar_it2v/configs/ego100h.toml) |
+| 新完整segment设计与配置 | [design.md](docs/ar_it2v_v0.2/design.md)、[ego100h_full_segments.toml](cosmos3_ar_it2v/configs/ego100h_full_segments.toml) |
+| 完整segment覆盖与短测 | [experiment.md](docs/ar_it2v_v0.2/experiment.md) |
 | 模型与块因果注意力 | [model.py](cosmos3_ar_it2v/model.py)、[attention.py](cosmos3_ar_it2v/attention.py) |
 | 数据 | [dataset.py](cosmos3_ar_it2v/dataset.py) |
 | 官方训练启动入口 | [launch.sh](cosmos3_ar_it2v/launch.sh) |

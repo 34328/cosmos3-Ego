@@ -2,7 +2,7 @@
 
 ## 项目与当前授权
 
-本分支 `ar-it2v-pretrain` 在 Cosmos3-Nano 上迁移 CMD Stage 1 的核心方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。项目扩展统一放在 `cosmos3_ar_it2v/`；设计和实验记录放在 `docs/ar_it2v_v0.1/`。交流与文档默认中文，代码标识符保留英文。
+本分支 `ar-it2v-pretrain` 在 Cosmos3-Nano 上迁移 CMD Stage 1 的核心方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。项目扩展统一放在 `cosmos3_ar_it2v/`；旧短窗口记录放在 `docs/ar_it2v_v0.1/`，完整segment设计和实验记录放在 `docs/ar_it2v_v0.2/`。交流与文档默认中文，代码标识符保留英文。
 
 用户已停止最长97帧的随机短窗口实验。本轮只授权完整segment接入、官方token-budget packing、必要CPU/GPU短测和记录；新的正式训练配方须由用户确认后启动，不自动恢复旧run或自动重训。具体配方以本分支设计、配置和实际运行回执为准。
 
@@ -11,12 +11,13 @@
 - 输入只有首帧图像和文本；生成模态只有视频。没有 action、state、audio 或 LiDAR 输入、token、投影头和监督。
 - 从官方 Cosmos3-Nano 权重起步。复用其视频 VAE、文本路径、位置编码及 flow 参数化；训练 GEN 相关参数，冻结 UND 路径。
 - 数据使用 `training_manifests` 原始 train/test 划分与动作段文本。实际清单位于 `/mnt/lzh/cosmos-EgoWAM/training_manifests/`；不复制共享原始数据，不混入 test。
-- 原始视频为 30fps：连续读取源帧，`frame_stride=1`，不抽帧、不倍速。VAE 的原生时间压缩不属于数据抽帧。
+- 原始视频为30fps，正常segment连续读取全部源帧。仅单条完整segment超过75008 token预算时，按用户批准的90%→80%→70%→60%→50%阶梯均匀保留帧，保持原首尾、文本和时间跨度；50%仍超预算则明确排除并记录原因。effective_fps、实际源索引及真实/对齐长度必须保存，不把抽帧段当30fps倍速播放。VAE原生时间压缩不属于数据抽帧。
 - 连续编码完整segment，不在每个AR块重置VAE；原始边界和文本配对不变，不随机裁短窗口、不跨segment。末尾VAE对齐必须保留真实长度、排除补帧计数，支持部分末AR块。旧97/81/65/49/33/17随机窗口配置仅保留作历史复现，不再作为新训练默认。
 - 单遍 Diffusion Forcing，latent 分块为 `[1,4,4,…]`。首个 latent 是干净图像条件，其余块内共享噪声、块间独立；首帧从 loss 分子和分母排除，所有未来块参与 flow loss。
 - 当前注意力为 C4、local16 latent 总窗口，当前块内双向、块间因果，历史最多 12 latent；不额外保留永久首帧 sink。各 packed 样本必须隔离。
 - σ 采样为 uniform 经 shift5 后截断到 `[0.02,0.98]`，首帧为 0；不引入低噪声前缀或前缀 loss 屏蔽。推理按整个块去噪、按整个块刷新 KV，保留绝对时间位置。
 - 当前只迁移 Stage 1，不把少步蒸馏或长视频蒸馏混入同一次实验。
+- 完整segment使用官方token-budget Packer，`max_samples_per_batch=None`、`max_sequence_length=75008`；禁止静默丢弃或随机裁剪。新配方为4个空闲节点、HSDP8×4、1500步、每500步保存，LambdaCosine warmup100/cycle1500、峰值lr1e-4/终点3e-5、weight_decay0.01。短测结果交付后仍须用户确认正式启动。
 
 ## 远端入口与资源
 
@@ -42,7 +43,7 @@
 ## 可视化
 
 - 纯视频预览入口为 `cosmos3_ar_it2v/visualization/`，先读其中 README，复用现有 sampler、固定清单和页面。产物按 `outputs/visualization/<version>/step<step>/<purpose>/` 隔离；保留原始30fps，GT／生成RGB双栏，不引入联合任务骨架或旧17块规则。
-- 默认 train/test 各三个按真实GT选择的明显操作窗口；短片为同次长生成的动作区间裁剪。超过训练最大97帧的长生成必须注明外推长度。真实checkpoint、seed、去噪次数、CFG与历史刷新噪声均展示。
+- 默认 train/test 各三个按真实GT选择的明显操作窗口；短片为同次长生成的动作区间裁剪。旧V0.1超过97帧的生成注明外推；新版本依据各自真实训练长度和有效帧率标注。真实checkpoint、seed、去噪次数、CFG与历史刷新噪声均展示。
 - 网页服务仅监听服务器回环地址，经已有远程连接转发，不自动下载视频副本。只发布页面及选定MP4，不公开日志、样本身份、清单、权重或训练目录。
 
 ## 协作与提交
