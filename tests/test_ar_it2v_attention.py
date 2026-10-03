@@ -1,6 +1,7 @@
 """Pure-video chunk causality, locality, packing isolation and history gradients."""
 import torch
 import torch.nn.functional as F
+import pytest
 from cosmos3_ar_it2v.attention import chunk_ids, causal_video_visibility, ChunkCausalAttention
 
 
@@ -50,3 +51,45 @@ def test_partial_tail_nominal_window_and_packed_isolation():
     assert mask[17,128:].nonzero().flatten().tolist()==list(range(5,19))
     assert torch.equal(mask[17],mask[18])
     assert not mask[:19,147:].any() and not mask[19:21,128:147].any()
+
+
+@pytest.mark.parametrize('shapes,text_lengths', [
+    ([(19,1,17),(6,1,31),(2,1,65)], [129,7,131]),
+    ([(21,2,8),(4,1,33)], [3,125]),
+])
+def test_metadata_block_mask_matches_original_dense_builder(shapes, text_lengths):
+    from torch.nn.attention.flex_attention import create_block_mask
+    a=ChunkCausalAttention(shapes,text_lengths,device='cpu')
+    text_pad=((sum(text_lengths)+127)//128)*128
+    old=create_block_mask(a.mask_mod(text_pad),B=None,H=None,
+        Q_LEN=a.gen_pad,KV_LEN=text_pad+a.gen_pad,device='cpu',BLOCK_SIZE=128,_compile=False)
+    new=a.block_mask(text_pad)
+    assert torch.equal(new.to_dense(),old.to_dense())
+    # Preserve the existing ascending, all-partial traversal, including full tiles.
+    dense=old.to_dense()
+    assert torch.equal(new.kv_num_blocks,dense.sum(-1).to(torch.int32))
+    assert torch.equal(new.kv_indices,torch.argsort(dense.to(torch.int32),dim=-1,
+        descending=True,stable=True).to(torch.int32))
+    assert new.full_kv_num_blocks is None
+    q=torch.arange(a.gen_pad)[:,None]
+    k=torch.arange(text_pad+a.gen_pad)[None,:]
+    assert torch.equal(new.mask_mod(0,0,q,k),old.mask_mod(0,0,q,k))
+
+
+def test_large_layout_constructs_only_metadata_pair_matrix(monkeypatch):
+    a=ChunkCausalAttention([(301,15,16),(7,15,16)],[511,257],device='cpu')
+    original=a.mask_mod
+    evaluated_pairs=[]
+    def tracked_mask_mod(text_pad):
+        predicate=original(text_pad)
+        def tracked(b,h,q,k):
+            evaluated_pairs.append(q.numel()*k.numel())
+            assert evaluated_pairs[-1] < 1_000_000
+            return predicate(b,h,q,k)
+        return tracked
+    monkeypatch.setattr(a,'mask_mod',tracked_mask_mod)
+    mask=a.block_mask(768)
+    assert a.flat_gen_tokens==73920
+    assert mask.shape[-2:]==(a.gen_pad,768+a.gen_pad)
+    assert len(evaluated_pairs)==1
+    assert a.block_mask(768) is mask  # Build once per layout, reused by all layers.

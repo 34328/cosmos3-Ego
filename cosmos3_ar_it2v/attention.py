@@ -58,10 +58,29 @@ class ChunkCausalAttention:
 
     def block_mask(self, text_pad):
         if text_pad not in self._masks:
-            from torch.nn.attention.flex_attention import create_block_mask, BlockMask
-            mask = create_block_mask(self.mask_mod(text_pad), B=None, H=None,
-                                     Q_LEN=self.gen_pad, KV_LEN=text_pad+self.gen_pad,
-                                     device=str(self.device), BLOCK_SIZE=128, _compile=False)
+            from torch.nn.attention.flex_attention import BlockMask
+            from cosmos_framework.model.generator.mot.flex_attention_utils import (
+                metadata_run_groups, build_block_mask_from_metadata_runs,
+            )
+            # The predicate is constant within each sample/frame metadata run.
+            # Reuse the native run-level builder: create_block_mask materializes
+            # token-pair masks (and a large int64 reduction temporary at 75k).
+            text_samples = F.pad(self.text_samples, (0, text_pad-len(self.text_samples)), value=-2)
+            q_groups, q_representatives = metadata_run_groups(
+                (self.samples, self.frames), device=self.device)
+            kv_groups, kv_representatives = metadata_run_groups((
+                torch.cat((torch.zeros(text_pad, device=self.device, dtype=torch.long),
+                           torch.ones(self.gen_pad, device=self.device, dtype=torch.long))),
+                torch.cat((text_samples, self.samples)),
+                torch.cat((torch.full((text_pad,), -2, device=self.device, dtype=torch.long), self.frames)),
+            ), device=self.device)
+            mask_mod = self.mask_mod(text_pad)
+            mask = build_block_mask_from_metadata_runs(
+                q_group_id=q_groups, kv_group_id=kv_groups,
+                q_representatives=q_representatives, kv_representatives=kv_representatives,
+                pair_allowed=mask_mod, mask_mod=mask_mod,
+                q_len=self.gen_pad, kv_len=text_pad+self.gen_pad,
+                device=self.device, block_size=(128, 128))
             # Ordered masked tiles keep traversal identical between layouts and caches.
             dense = mask.to_dense()
             counts = dense.sum(-1).to(torch.int32)

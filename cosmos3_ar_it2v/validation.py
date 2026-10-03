@@ -115,6 +115,7 @@ mode = "full"
 enabled = false
 [optimizer]
 lr = 2.0e-5
+weight_decay = 0.0
 [trainer]
 max_iter = {steps}
 logging_iter = 1
