@@ -17,6 +17,7 @@ EXPECTED_EXPERIMENT_NAMES = {
     "rbs_wam_ar_v0_2_overfit16",
     "rbs_wam_ar_v0_3_diffusion_forcing_wrist_weight_v1",
     "rbs_wam_ar_v0_3_1_prefix_numerator_only_v1",
+    "rbs_wam_ar_v0_4_continuous_video_v1",
 }
 EXPECTED_TOML_EXPERIMENTS = {
     # The V0.1 TOML is retained as history, without restoring its registration.
@@ -28,6 +29,8 @@ EXPECTED_TOML_EXPERIMENTS = {
     "ar_v0_2_video_lr1e4": "rbs_wam_ar_v0_2_fixed_camera_wrist_local_delta_latent_v1",
     "ar_v0_3": "rbs_wam_ar_v0_3_diffusion_forcing_wrist_weight_v1",
     "ar_v0_3_1": "rbs_wam_ar_v0_3_1_prefix_numerator_only_v1",
+    # New V0.4 continuous-VAE recipe has a separate model/format identity.
+    "ar_v0_4": "rbs_wam_ar_v0_4_continuous_video_v1",
 }
 NATIVE_CALLBACKS = (
     "wandb", "wandb_2x", "iter_speed", "manual_gc", "load_pretrained",
@@ -37,10 +40,11 @@ NATIVE_CALLBACKS = (
 
 def test_only_current_experiments_are_registered():
     from hydra.core.config_store import ConfigStore
-    from cosmos3_joint_video_hand_pose.src import ar_v03_config, ar_v031_config
+    from cosmos3_joint_video_hand_pose.src import ar_v03_config, ar_v031_config, ar_v04_config
 
     assert ar_v03_config.AR_V03_CONFIG_NAME in EXPECTED_EXPERIMENT_NAMES
     assert ar_v031_config.AR_V031_CONFIG_NAME in EXPECTED_EXPERIMENT_NAMES
+    assert ar_v04_config.AR_V04_CONFIG_NAME in EXPECTED_EXPERIMENT_NAMES
 
     names = {
         name for name in ConfigStore.instance().list("experiment")
