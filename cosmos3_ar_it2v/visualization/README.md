@@ -1,6 +1,18 @@
 # 纯视频 AR 预览网页
 
-本目录集中管理纯视频预览：`preview.py` 复用现成 sampler 批量推理，并渲染长片与同次 rollout 的短片；`build_page.py` 将完成的产物组成网页；`serve.py` 提供只监听回环地址的轻量服务。不计算指标，不依赖历史联合模型。
+本目录集中管理纯视频预览：`preview.py` 复用现成 sampler 批量推理；`build_page.py` 将完成的产物组成网页；`serve.py` 提供只监听回环地址的轻量服务。不计算指标，不依赖历史联合模型。
+
+## 完整动作段（当前默认）
+
+新预览使用 `selection.preview_mode="full_segment"`。每个样本的 `length_group` 为 `short` 或 `long`，代表不同的完整短/长 segment；从原始起点到终点读取连续帧，使用该 segment 的完整对应文本。不得从长片中截出短片，也不随机裁窗口。VAE 对齐补帧在输出时去除，保留所有真实帧及原始回放速度。
+
+每个样本只需要 `preview.mp4`（左 GT、右生成）、`generated.mp4`、`gt.mp4` 和 `manifest.json`。manifest 的 `frames` / `fps` 是实际展示的真实长度/帧率，不需要 `short_start_seconds` 或 `short_duration_seconds`。页面的长短按钮筛选不同完整动作段，不切换同一视频的裁剪版。默认 train/test 各三个明显操作片段；只展示标题、完整文本、实际时长及生成设置，不展示内部样本身份。
+
+例如本轮输出到 `outputs/visualization/ar_it2v_v0.2/step1000/full_segments/`。完成三个非空 MP4 后构建页面，服务只开放这三个 MP4 与 index；URL 包含版本、checkpoint 和模式以防切换预览时命中旧媒体缓存。
+
+## 历史裁剪模式（仅兼容已有产物）
+
+未指定 `preview_mode` 的旧预览继续使用以下四视频格式；不作为新预览选样标准。
 
 ## 产物约定
 

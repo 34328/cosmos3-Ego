@@ -7,7 +7,7 @@ from pathlib import Path
 
 from aiohttp import web
 
-from .build_page import MEDIA, load_gallery, relative_path
+from .build_page import media_names, load_gallery, relative_path
 
 
 def create_app(root):
@@ -21,7 +21,7 @@ def create_app(root):
     allowed = {'index.html': index}
     for sample in selection['windows']:
         directory = relative_path(root, sample['output_dir'])
-        for filename in MEDIA:
+        for filename in media_names(selection):
             path = directory / filename
             allowed[path.relative_to(root).as_posix()] = path
 
@@ -31,7 +31,7 @@ def create_app(root):
         if path is None:
             raise web.HTTPNotFound()
         # FileResponse implements byte ranges and HEAD; never serve a broad directory.
-        headers = {'Cache-Control': 'no-cache' if name == 'index.html' else 'private, max-age=3600',
+        headers = {'Cache-Control': 'no-cache',
                    'X-Content-Type-Options': 'nosniff'}
         return web.FileResponse(path, headers=headers)
 

@@ -24,21 +24,32 @@
 <script>
 'use strict';
 const data=JSON.parse(document.querySelector('#gallery-data').textContent);
+const fullSegment=data.preview_mode==='full_segment';
+if(fullSegment){
+document.querySelector('.intro p').textContent='每条视频对应一个完整动作段及其原始文本，从第一帧到最后一帧连续生成。短片和长片是不同的完整 segment，不从长片中裁剪，也不改变原始动作速度。';
+document.querySelector('.endnote').textContent='只提供视频观察，不计算指标。每条片段均保留完整动作与对应文本；长短筛选切换样本，不裁剪视频。';
+document.querySelector('[data-length="short"]').textContent='短片 · 完整动作段';
+document.querySelector('[data-length="long"]').textContent='长片 · 完整动作段';
+const all=document.createElement('button');all.className='switch';all.dataset.length='all';all.textContent='全部时长';all.setAttribute('aria-pressed','true');
+document.querySelector('[data-length="short"]').before(all);
+document.querySelector('[data-length="short"]').setAttribute('aria-pressed','false');
+}
 const fmt=value=>Number(value).toFixed(2).replace(/\.00$/,'');
 const text=(tag,value,cls)=>{const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;};
 document.title=`AR IT2V · Step ${data.checkpoint_step} 视频预览`;
 document.querySelector('#checkpoint-title').textContent=`训练第 ${data.checkpoint_step} 步`;
 document.querySelector('#version').textContent=data.version.replace('ar_it2v_','AR IT2V ');
 const durations=[...new Set(data.samples.map(s=>`${s.frames} 帧 / ${fmt(s.duration)} 秒`))];
-const parameters=[['模型','Cosmos3-Nano · 纯视频 AR'],['长片时长',durations.join('；')],['回放速度',`${fmt(data.fps)} fps · 原始时间轴`],['随机种子',data.seed],['每块去噪次数',`${data.denoise_steps} 次`],['文本引导强度',`${fmt(data.guidance)}（CFG）`],['历史刷新噪声',fmt(data.context_sigma)],['对照方式','左：真实视频　右：模型生成']];
+const parameters=[['模型','Cosmos3-Nano · 纯视频 AR'],[fullSegment?'生成范围':'长片时长',fullSegment?'完整动作段 · 各段时长见下方':durations.join('；')],['回放速度',`${fmt(data.fps)} fps · 原始时间轴`],['随机种子',data.seed],['每块去噪次数',`${data.denoise_steps} 次`],['文本引导强度',`${fmt(data.guidance)}（CFG）`],['历史刷新噪声',fmt(data.context_sigma)],['对照方式','左：真实视频　右：模型生成']];
 for(const [label,value] of parameters){const item=text('div','','param');item.append(text('dt',label),text('dd',value));document.querySelector('#params').append(item);}
 document.querySelector('#noise-note').textContent=`“历史刷新噪声 ${fmt(data.context_sigma)}”指每块生成后，加入少量噪声再写入模型的历史记忆，供后续块使用；不是给展示视频添加噪点。每块去噪次数与回放帧率是两项不同设置。`;
-let lengthMode='short';
+let lengthMode=fullSegment?'all':'short', splitMode='all';
 const cards=[];
-function changeLength(card){const s=card.sample;card.video.pause();card.video.src=s.media[lengthMode==='short'?'short_preview.mp4':'preview.mp4'];card.error.classList.remove('visible');card.video.load();const end=s.short_start+s.short_duration;card.note.textContent=lengthMode==='short'?`${fmt(s.short_duration)} 秒 · 长片 ${fmt(s.short_start)}–${fmt(end)} 秒`:`${fmt(s.duration)} 秒 · ${s.frames} 帧`;card.description.textContent=lengthMode==='short'?'来自下方“长片”同一次生成的动作区间裁剪。':'从首帧与文本出发，逐块连续生成完整视频。';}
+function changeLength(card){const s=card.sample;card.video.pause();card.video.src=s.media[!fullSegment&&lengthMode==='short'?'short_preview.mp4':'preview.mp4'];card.error.classList.remove('visible');card.video.load();const end=s.short_start+s.short_duration;card.note.textContent=fullSegment?`${s.length_group==='short'?'完整短片':'完整长片'} · ${fmt(s.duration)} 秒 · ${s.frames} 帧`:lengthMode==='short'?`${fmt(s.short_duration)} 秒 · 长片 ${fmt(s.short_start)}–${fmt(end)} 秒`:`${fmt(s.duration)} 秒 · ${s.frames} 帧`;card.description.textContent=fullSegment?'原始动作段完整起止，使用上方对应文本；无片中截取。':lengthMode==='short'?'来自下方“长片”同一次生成的动作区间裁剪。':'从首帧与文本出发，逐块连续生成完整视频。';}
+function applyFilters(){for(const card of cards){const visible=(splitMode==='all'||card.sample.split===splitMode)&&(!fullSegment||lengthMode==='all'||card.sample.length_group===lengthMode);card.video.closest('.sample').hidden=!visible;if(!visible)card.video.pause();}document.querySelectorAll('section[data-split]').forEach(section=>section.hidden=![...section.querySelectorAll('.sample')].some(sample=>!sample.hidden));}
 for(const split of ['train','test']){const samples=data.samples.filter(s=>s.split===split);if(!samples.length)continue;const section=text('section','','section');section.dataset.split=split;const header=text('div','','section-heading');header.append(text('h2',split==='train'?'训练集':'验证集'),text('p',`${samples.length} 个片段 · ${split==='train'?'观察训练数据上的生成':'观察未参与训练的数据'}`));section.append(header);for(const s of samples){const article=text('article','','sample');const head=text('div','','sample-head');const copy=text('div','');copy.append(text('h3',s.title),text('p',s.caption||'未提供文本描述','caption'));const note=text('span','','clip-note');head.append(copy,note);const frame=text('div','','video-frame');const labels=text('div','','video-labels');labels.append(text('span','真实视频 · GT'),text('span','模型生成 · AR'));const video=document.createElement('video');video.controls=true;video.playsInline=true;video.preload='metadata';video.setAttribute('aria-label',`${split==='train'?'训练集':'验证集'}，${s.title}，真实视频与生成视频对照`);const error=text('p','视频暂时无法加载，请刷新或使用下方的单独视频链接。','media-error');video.addEventListener('error',()=>error.classList.add('visible'));video.addEventListener('play',()=>cards.forEach(c=>{if(c.video!==video)c.video.pause();}));frame.append(labels,video,error);const footer=text('div','','sample-footer');const description=text('span','');const links=text('div','','source-links');for(const [label,filename] of [['真实视频','gt.mp4'],['生成视频','generated.mp4']]){const a=text('a',label);a.href=s.media[filename];a.target='_blank';a.rel='noopener';links.append(a);}footer.append(description,links);article.append(head,frame,footer);section.append(article);const card={sample:s,video,note,error,description};cards.push(card);changeLength(card);}document.querySelector('#gallery').append(section);}
-for(const button of document.querySelectorAll('[data-length]'))button.addEventListener('click',()=>{lengthMode=button.dataset.length;document.querySelectorAll('[data-length]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));cards.forEach(changeLength);});
-for(const button of document.querySelectorAll('button[data-split]'))button.addEventListener('click',()=>{const selected=button.dataset.split;document.querySelectorAll('button[data-split]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));document.querySelectorAll('section[data-split]').forEach(s=>s.hidden=selected!=='all'&&s.dataset.split!==selected);cards.forEach(c=>{if(selected!=='all'&&c.sample.split!==selected)c.video.pause();});});
+for(const button of document.querySelectorAll('[data-length]'))button.addEventListener('click',()=>{lengthMode=button.dataset.length;document.querySelectorAll('[data-length]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));if(!fullSegment)cards.forEach(changeLength);applyFilters();});
+for(const button of document.querySelectorAll('button[data-split]'))button.addEventListener('click',()=>{splitMode=button.dataset.split;document.querySelectorAll('button[data-split]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));applyFilters();});
 </script>
 </body>
 </html>

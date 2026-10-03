@@ -37,6 +37,7 @@ def main():
     if len(set(args.ids)) != len(args.ids) or any(i not in windows for i in args.ids):
         raise ValueError('IDs must be unique existing selection windows')
     selected = [windows[i] for i in args.ids]
+    full_segment = selection.get('preview_mode') == 'full_segment'
     worker_name = '_'.join(args.ids)
     worker_dir = root / 'workers' / worker_name
     worker_dir.mkdir(parents=True, exist_ok=False)
@@ -54,20 +55,36 @@ def main():
         model, config = load_model(args.toml, args.checkpoint)
         datasets = {}
         ds_cfg = next(iter(config.dataloader_train.dataloader.datasets.values())).dataset
-        tiers = tuple(sorted({17, 33, 49, 65, 81, 97,
+        tiers = (17, 33, 49, 65, 81, 97) if full_segment else tuple(sorted({17, 33, 49, 65, 81, 97,
                               *(int(w['num_frames']) for w in selected)}, reverse=True))
         # Retain minimum tier17 so dataset row numbering matches the training dataset.
         for split in {w['split'] for w in selected}:
+            # Full previews retain the entire caption segment; legacy windows
+            # remain available only for reproducing earlier galleries.
             datasets[split] = instantiate(ds_cfg, split=split, iterable_shuffle=False,
-                random_window=False, cfg_dropout_rate=0., clip_frame_tiers=tiers)
+                random_window=False, cfg_dropout_rate=0., clip_frame_tiers=tiers,
+                sample_mode='full_segment' if full_segment else 'window', long_segment_policy='error',
+                max_sequence_length=None, segment_statistics_path=None)
         for window in selected:
             output = root / window['output_dir']
             output.mkdir(parents=False, exist_ok=False)
             write_json(output / 'started.json', {**claim, 'window': window})
             job_start = time.monotonic()
             print(json.dumps(dict(event='window_started', id=window['id']), ensure_ascii=False), flush=True)
-            sample = datasets[window['split']].get_item_at_window(
-                int(window['row_index']), window_start=int(window['start_frame']))
+            dataset = datasets[window['split']]
+            if full_segment:
+                matches = [i for i, row in enumerate(dataset.rows) if row['sample_id'] == window['sample_id']]
+                if len(matches) != 1:
+                    raise ValueError('Complete segment identity must match exactly once')
+                row = dataset.rows[matches[0]]
+                if (int(row['start_idx']) != int(window['segment_start_frame']) or
+                    int(row['end_idx']) != int(window['segment_end_frame_exclusive']) or
+                    row['text_normalized'].strip() != window['caption'].strip()):
+                    raise ValueError('Complete segment bounds or caption changed')
+                sample = dataset[matches[0]]
+            else:
+                sample = dataset.get_item_at_window(
+                    int(window['row_index']), window_start=int(window['start_frame']))
             if sample['sample_id'] != window['sample_id']:
                 raise ValueError('Fixed sample identity changed')
             indices = sample['source_frame_indices'].numpy()
@@ -85,15 +102,18 @@ def main():
             gt = sample['video'].permute(1, 2, 3, 0).cpu().numpy()
             if pred.shape != gt.shape:
                 raise ValueError(f'Generated/GT shape mismatch: {pred.shape}, {gt.shape}')
-            pred, gt = pred[:, :360], gt[:, :360]
+            true_frames = int(sample.get('video_true_num_frames', len(pred)))
+            pred, gt = pred[:true_frames, :360], gt[:true_frames, :360]
             fps = float(sample['conditioning_fps'])
-            short_first = round(window['short_start_seconds'] * fps)
-            short_count = round(window['short_duration_seconds'] * fps)
-            if not 0 <= short_first < short_first + short_count <= len(pred):
-                raise ValueError('Short preview crop is outside the long rollout')
             preview = np.concatenate((gt, pred), axis=2)
-            videos = dict(generated=pred, gt=gt, preview=preview,
-                          short_preview=preview[short_first:short_first + short_count])
+            videos = dict(generated=pred, gt=gt, preview=preview)
+            short_first = short_count = None
+            if not full_segment:
+                short_first = round(window['short_start_seconds'] * fps)
+                short_count = round(window['short_duration_seconds'] * fps)
+                if not 0 <= short_first < short_first + short_count <= len(pred):
+                    raise ValueError('Short preview crop is outside the long rollout')
+                videos['short_preview'] = preview[short_first:short_first + short_count]
             for name, frames in videos.items():
                 imageio.mimwrite(str(output / (name + '.mp4')), frames, fps=fps,
                     codec='libx264', macro_block_size=1, ffmpeg_params=['-threads', '1', '-movflags', '+faststart'])
@@ -102,7 +122,10 @@ def main():
                 checkpoint_step=selection['checkpoint_step'], checkpoint=str(Path(args.checkpoint).resolve()),
                 seed=selection['seed'], denoise_steps=selection['denoise_steps'],
                 guidance=selection['guidance'], context_sigma=selection['context_sigma'],
-                caption=sample['ai_caption'], frames=len(pred), fps=fps, latent_frames=latent.shape[2],
+                caption=window['caption'], conditioning_caption=sample['ai_caption'],
+                preview_mode=selection.get('preview_mode', 'window'),
+                video_temporal_padding=int(sample.get('video_temporal_padding', 0)),
+                frames=len(pred), fps=fps, latent_frames=latent.shape[2],
                 frames_per_chunk=model.config.frames_per_chunk,
                 local_attention_frames=model.config.local_attention_frames,
                 history='generated', modalities=['text','video'], frame_stride=1,

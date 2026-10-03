@@ -11,6 +11,10 @@ PARAMETERS = ('checkpoint_step', 'seed', 'denoise_steps', 'guidance', 'context_s
 MEDIA = ('preview.mp4', 'short_preview.mp4', 'generated.mp4', 'gt.mp4')
 
 
+def media_names(selection):
+    return tuple(name for name in MEDIA if name != 'short_preview.mp4') if selection.get('preview_mode') == 'full_segment' else MEDIA
+
+
 def inline_json(value):
     return json.dumps(value, ensure_ascii=False).replace('&', '\\u0026').replace('<', '\\u003c').replace('>', '\\u003e')
 
@@ -37,6 +41,7 @@ def finite_number(value, key, *, minimum=0, integer=False):
 def load_gallery(selection_path):
     root = selection_path.parent
     selection = json.loads(selection_path.read_text(encoding='utf-8'))
+    full_segment = selection.get('preview_mode') == 'full_segment'
     for key in PARAMETERS:
         if key not in selection:
             raise ValueError(f'Missing selection.{key}')
@@ -69,25 +74,33 @@ def load_gallery(selection_path):
         frames = finite_number(manifest['frames'], 'frames', minimum=1, integer=True)
         fps = finite_number(manifest['fps'], 'fps', minimum=1)
         duration = frames / fps
-        start = finite_number(manifest['short_start_seconds'], 'short_start_seconds')
-        short = finite_number(manifest['short_duration_seconds'], 'short_duration_seconds', minimum=1/fps)
-        if start + short > duration + 1/fps:
-            raise ValueError(f'{sample_id}: short clip extends outside the full rollout')
+        start, short = None, None
+        if full_segment:
+            if window.get('length_group') not in ('short', 'long'):
+                raise ValueError(f'{sample_id}: full segments require short/long length_group')
+        else:
+            start = finite_number(manifest['short_start_seconds'], 'short_start_seconds')
+            short = finite_number(manifest['short_duration_seconds'], 'short_duration_seconds', minimum=1/fps)
+            if start + short > duration + 1/fps:
+                raise ValueError(f'{sample_id}: short clip extends outside the full rollout')
         media = {}
-        for filename in MEDIA:
+        for filename in media_names(selection):
             path = directory / filename
             path.resolve().relative_to(root.resolve())
             if not path.is_file() or path.stat().st_size == 0:
                 raise FileNotFoundError(f'Incomplete preview media: {path}')
-            media[filename] = quote(path.relative_to(root).as_posix(), safe='/')
+            revision = quote(f"{selection['version']}-{selection['checkpoint_step']}-{selection.get('preview_mode', 'window')}", safe='')
+            media[filename] = quote(path.relative_to(root).as_posix(), safe='/') + '?v=' + revision
         caption = window.get('caption', manifest.get('caption', ''))
         if not isinstance(caption, str):
             raise ValueError('Caption must be text')
         samples.append(dict(split=window['split'], title=window.get('title') or f'片段 {index+1:02d}',
                             caption=caption, frames=frames, fps=fps, duration=duration,
-                            short_start=start, short_duration=short, media=media))
+                            short_start=start, short_duration=short,
+                            length_group=window.get('length_group'), media=media))
     # Internal IDs, source hashes, checkpoint paths and raw manifest fields are not published.
-    return dict(version=selection['version'], **{k: selection[k] for k in PARAMETERS}, samples=samples)
+    return dict(version=selection['version'], preview_mode='full_segment' if full_segment else 'window',
+                **{k: selection[k] for k in PARAMETERS}, samples=samples)
 
 
 def build_page(selection_path):
