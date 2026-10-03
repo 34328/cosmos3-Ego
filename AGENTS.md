@@ -4,7 +4,7 @@
 
 本分支 `ar-it2v-pretrain` 在 Cosmos3-Nano 上迁移 CMD Stage 1 的核心方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。项目扩展统一放在 `cosmos3_ar_it2v/`；旧短窗口记录放在 `docs/ar_it2v_v0.1/`，完整segment设计和实验记录放在 `docs/ar_it2v_v0.2/`。交流与文档默认中文，代码标识符保留英文。
 
-用户已停止最长97帧的随机短窗口实验。本轮只授权完整segment接入、官方token-budget packing、必要CPU/GPU短测和记录；新的正式训练配方须由用户确认后启动，不自动恢复旧run或自动重训。具体配方以本分支设计、配置和实际运行回执为准。
+用户已停止最长97帧的随机短窗口实验。2026-10-03用户在短测和独立review交付后明确批准按下述完整segment配方启动正式训练；不恢复旧run或自动重训。具体配方以本分支设计、配置和实际运行回执为准。
 
 ## 核心约定
 
@@ -17,7 +17,7 @@
 - 当前注意力为 C4、local16 latent 总窗口，当前块内双向、块间因果，历史最多 12 latent；不额外保留永久首帧 sink。各 packed 样本必须隔离。
 - σ 采样为 uniform 经 shift5 后截断到 `[0.02,0.98]`，首帧为 0；不引入低噪声前缀或前缀 loss 屏蔽。推理按整个块去噪、按整个块刷新 KV，保留绝对时间位置。
 - 当前只迁移 Stage 1，不把少步蒸馏或长视频蒸馏混入同一次实验。
-- 完整segment使用官方token-budget Packer，`max_samples_per_batch=None`、`max_sequence_length=75008`；禁止静默丢弃或随机裁剪。新配方为4个空闲节点、HSDP8×4、1500步、每500步保存，LambdaCosine warmup100/cycle1500、峰值lr1e-4/终点3e-5、weight_decay0.01。短测结果交付后仍须用户确认正式启动。
+- 完整segment使用官方token-budget Packer，`max_samples_per_batch=None`、`max_sequence_length=75008`；禁止静默丢弃或随机裁剪。已批准配方为4个空闲节点、HSDP8×4、1500步、每500步保存，LambdaCosine warmup100/cycle1500、峰值lr1e-4/终点3e-5、weight_decay0.01。新run从官方Nano起点开始；启动后不得重复派发。
 
 ## 远端入口与资源
 
