@@ -1,11 +1,34 @@
 """Cosmos3 pure-video IT2V causal adaptation (CMD Stage 1 core recipe)."""
 from __future__ import annotations
+import copy
 from itertools import accumulate
 import attrs
 import torch
 from cosmos_framework.model.generator.omni_mot_causal_model import OmniMoTCausalModel, OmniMoTCausalModelConfig
 from cosmos_framework.model.generator.utils.kv_cache import DualKVCache, TeacherForcingMemoryState
 from .attention import ChunkCausalAttention, chunk_ids
+
+
+def latent_valid_weights(true_frames, latent_frames, *, device='cpu'):
+    """Real-frame coverage of causal 4x VAE latents, including a partial tail.
+
+    The final latent mixes real and alignment pixels. Its weight is the real
+    fraction of its four source frames, not an exact separation inside the VAE.
+    """
+    if true_frames < 2 or latent_frames != 1 + (true_frames - 1 + 3) // 4:
+        raise ValueError('True video length must include future frames and match the padded VAE length')
+    weights = torch.ones(latent_frames, device=device, dtype=torch.float32)
+    weights[0] = 0
+    weights[-1] = ((true_frames - 2) % 4 + 1) / 4
+    return weights
+
+
+def _metadata_ints(value):
+    if isinstance(value, torch.Tensor):
+        return [int(n) for n in value.detach().cpu().reshape(-1).tolist()]
+    if isinstance(value, (tuple, list)):
+        return [n for item in value for n in _metadata_ints(item)]
+    return [int(value)]
 
 
 @attrs.define(slots=False)
@@ -87,7 +110,22 @@ class ARIT2VModel(OmniMoTCausalModel):
                 raise ValueError(f"Pure-video data unexpectedly contains {name}")
         if gen_data_clean.is_image_batch:
             raise ValueError("AR IT2V training requires video clips")
-        return super().memory_init_training(gen_data_clean,data_batch,input_text_indexes)
+        gen_data_clean, memory = super().memory_init_training(gen_data_clean,data_batch,input_text_indexes)
+        true = data_batch.get('video_true_num_frames')
+        padding = data_batch.get('video_temporal_padding')
+        if (true is None) != (padding is None):
+            raise ValueError('Full-segment true length and alignment padding must be provided together')
+        if true is not None:
+            true, padding = _metadata_ints(true), _metadata_ints(padding)
+            latents = gen_data_clean.x0_tokens_vision
+            if len(true) != len(latents) or len(padding) != len(latents):
+                raise ValueError('Full-segment metadata must match every packed video')
+            for frames, pad, latent in zip(true, padding, latents, strict=True):
+                latent_valid_weights(frames, latent.shape[2])
+                if pad != (1 + 4 * (latent.shape[2] - 1) - frames) or not 0 <= pad <= 3:
+                    raise ValueError('Invalid full-segment VAE alignment padding')
+            memory['it2v_true_num_frames'] = true
+        return gen_data_clean, memory
 
     def pre_noise_memory_hook(self, packed_sequence, gen_data_clean, memory_info):
         if any(getattr(packed_sequence,name,None) is not None for name in ('action','sound','lidar')):
@@ -99,7 +137,29 @@ class ARIT2VModel(OmniMoTCausalModel):
                 raise ValueError("IT2V requires exactly latent frame zero as the clean condition")
         if '_tf_memory_state' in memory_info:
             raise ValueError("DF has no teacher-forcing replay pass")
+        # Metadata only: retain the binary condition mask for noising/attention.
+        packed_sequence.it2v_true_num_frames = memory_info.get('it2v_true_num_frames')
         return memory_info
+
+    def _compute_losses(self, out_net, data_batch_packed, gen_data_noised, timesteps,
+                        is_image_batch, **kwargs):
+        true = getattr(data_batch_packed, 'it2v_true_num_frames', None)
+        loss_pack = data_batch_packed
+        if true is not None:
+            if len(true) != len(data_batch_packed.vision.condition_mask):
+                raise ValueError('Loss metadata does not match packed video count')
+            loss_pack = copy.copy(data_batch_packed)
+            loss_pack.vision = copy.copy(data_batch_packed.vision)
+            loss_pack.vision.condition_mask = []
+            for frames, mask in zip(true, data_batch_packed.vision.condition_mask, strict=True):
+                weights = latent_valid_weights(frames, mask.shape[0], device=mask.device)
+                weights = weights.reshape(-1, *([1] * (mask.ndim - 1)))
+                loss_pack.vision.condition_mask.append(1 - (1 - mask.float()) * weights)
+        # Native Cosmos loss owns all arithmetic and per-sample reduction. Only
+        # its loss mask sees fractional tail coverage; noising and KV do not.
+        return super()._compute_losses(out_net=out_net, data_batch_packed=loss_pack,
+            gen_data_noised=gen_data_noised, timesteps=timesteps,
+            is_image_batch=is_image_batch, **kwargs)
 
     def build_memory_state(self, packed_seq, memory_info):
         if memory_info.get('dual_kv_cache') is not None:

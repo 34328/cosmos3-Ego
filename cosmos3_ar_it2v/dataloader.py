@@ -34,6 +34,33 @@ class RecoverablePackingDataLoader(PackingDataLoader):
         self._restored_buffer_metadata: list[dict[str, Any]] | None = None
         self._state_was_restored = False
 
+    def _compute_sample_cost(self, data_batch: dict) -> tuple[int, float]:
+        # Keep the official token accounting and greedy/lookahead packer. Its
+        # empty-batch branch silently discards oversized samples; a full segment
+        # must instead fail explicitly before reaching that branch. The native
+        # ceiling is exclusive (>= fails), not an inclusive maximum.
+        num_tokens, seconds = super()._compute_sample_cost(data_batch)
+        if self.max_sequence_length is not None and num_tokens >= self.max_sequence_length:
+            raise ValueError(
+                "Full IT2V sample exceeds the exclusive packing token budget: "
+                f"sample_id={data_batch.get('sample_id')!r}, tokens={num_tokens}, "
+                f"max_sequence_length={self.max_sequence_length}. "
+                "Increase the budget after resource validation; no sample was truncated or discarded."
+            )
+        return num_tokens, seconds
+
+    def _packing_policy(self) -> dict[str, Any]:
+        # A different budget/lookahead can change the next batch even when the
+        # worker cursor and every buffered sample were restored correctly.
+        return {
+            "max_sequence_length": self.max_sequence_length,
+            "max_samples_per_batch": self.max_samples_per_batch,
+            "lookahead_limits": list(self.lookahead_limits),
+            "spatial_compression": self.tokenizer_spatial_compression_factor,
+            "temporal_compression": self.tokenizer_temporal_compression_factor,
+            "patch_spatial": self.patch_spatial,
+        }
+
     @staticmethod
     def _dataset_index(sample: dict[str, Any]) -> int:
         value = sample["dataset_index"]
@@ -56,6 +83,7 @@ class RecoverablePackingDataLoader(PackingDataLoader):
         return {
             "version": 2,
             "global_id": self.global_id,
+            "packing_policy": self._packing_policy(),
             "inner": self.dataloader_list[0].state_dict(),
             "buffer": (
                 [self._checkpoint_metadata(sample) for sample in buffer]
@@ -69,6 +97,9 @@ class RecoverablePackingDataLoader(PackingDataLoader):
             raise RuntimeError("Dataloader state must be restored before worker iterators are initialized.")
         if int(state_dict.get("version", 0)) != 2:
             raise ValueError(f"Unsupported dataloader checkpoint version: {state_dict.get('version')!r}")
+        saved_policy = state_dict.get("packing_policy")
+        if saved_policy is not None and saved_policy != self._packing_policy():
+            raise ValueError("Cannot resume with a different packing token budget or policy")
         self.dataloader_list[0].load_state_dict(state_dict["inner"])
         self.global_id = int(state_dict["global_id"])
         self._restored_buffer_metadata = copy.deepcopy(list(state_dict.get("buffer", [])))

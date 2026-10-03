@@ -36,6 +36,7 @@ class VideoTrainingMonitor(Callback):
         params = {k:list(s[k]) for k in ('warm_up_steps','cycle_lengths','f_start','f_max','f_min')}
         scheduler = LambdaWarmUpCosineScheduler(**params,verbosity_interval=0)
         row = dict(base_lr=float(cfg.optimizer.lr),scheduler=params,
+            weight_decay=float(cfg.optimizer.weight_decay),
             theoretical_lr={str(i):float(cfg.optimizer.lr)*scheduler(i) for i in (0,100,1500,3000)},
             action_gen=bool(cfg.model.config.action_gen),frames_per_chunk=int(cfg.model.config.frames_per_chunk),
             local_attention_frames=int(cfg.model.config.local_attention_frames),wandb_mode=str(cfg.job.wandb_mode),sigma_sampler='uniform_shift_postclamp',
@@ -61,11 +62,16 @@ class VideoTrainingMonitor(Callback):
     def on_training_step_start(self,model,data,iteration=0):
         torch.cuda.synchronize();self.resident=torch.cuda.memory_allocated()/2**30
         torch.cuda.reset_peak_memory_stats();self.start=time.perf_counter();self.clips=len(data['video'])
+        self.packed_tokens=int(data['_num_tokens'])
 
     def on_before_backward(self,model,loss,iteration=0):
         bad=(~torch.isfinite(loss.detach())).any().to(torch.int32)
         if dist.is_initialized(): dist.all_reduce(bad,op=dist.ReduceOp.MAX)
         if bad.item(): raise FloatingPointError('AR IT2V nonfinite loss before backward')
+
+    def on_before_optimizer_step(self,model,optimizer,scheduler,grad_scaler,iteration=0):
+        # Snapshot this update's rate before scheduler.step(); native optim/lr stays enabled.
+        self.learning_rates=[float(x) for x in scheduler.get_last_lr()]
 
     def on_after_backward(self,model,iteration=0):
         # Before native clipping/sanitization, including across FSDP mesh shards.
@@ -80,7 +86,7 @@ class VideoTrainingMonitor(Callback):
         torch.cuda.synchronize()
         norm=float(self.clip._last_global_norm[self.clip._state_key])
         local=torch.tensor([self.clips,torch.cuda.max_memory_allocated()/2**30,torch.cuda.max_memory_reserved()/2**30,
-            time.perf_counter()-self.start,self.resident,norm,float(norm>self.clip.clip_norm),float(loss.detach())],device=loss.device,dtype=torch.float64)
+            time.perf_counter()-self.start,self.resident,norm,float(norm>self.clip.clip_norm),float(loss.detach()),self.packed_tokens],device=loss.device,dtype=torch.float64)
         rows=[torch.empty_like(local) for _ in range(dist.get_world_size())] if dist.is_initialized() else [local]
         if dist.is_initialized(): dist.all_gather(rows,local)
         self.rows=torch.stack(rows).cpu()
@@ -91,7 +97,14 @@ class VideoTrainingMonitor(Callback):
         row=dict(step=iteration,global_batch=int(r[:,0].sum()),clips_per_rank=r[:,0].int().tolist(),
             peak_allocated_gib=float(r[:,1].max()),peak_reserved_gib=float(r[:,2].max()),train_step_seconds=float(r[:,3].max()),
             resident_allocated_gib=float(r[:,4].max()),preclip_norm=float(r[:,5].max()),grad_clip_triggered=bool(r[:,6].max()),
-            video_loss=mean_loss,stop_reason=reason)
+            video_loss=mean_loss,stop_reason=reason,
+            learning_rate_min=min(self.learning_rates),learning_rate_max=max(self.learning_rates),
+            packed_tokens_per_rank=r[:,8].int().tolist(),
+            packed_tokens_mean=float(r[:,8].mean()))
+        budget=self.config.dataloader_train.max_sequence_length
+        if budget is not None:
+            row.update(token_budget=int(budget),token_fill_mean=float(r[:,8].mean())/int(budget),
+                token_fill_min=float(r[:,8].min())/int(budget),token_fill_max=float(r[:,8].max())/int(budget))
         if not dist.is_initialized() or dist.get_rank()==0:
             with (self.root/'formal_monitor.jsonl').open('a') as f: f.write(json.dumps(row,allow_nan=False)+'\n')
             if wandb.run is not None:

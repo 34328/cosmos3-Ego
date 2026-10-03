@@ -1,12 +1,13 @@
 """Pure RGB/text EgoVerse IT2V clips, using the native Cosmos video contract.
 
-One continuous VAE encode sees 1+16N RGB frames. By default every original
-frame is retained and FPS is the source FPS. No action data is read.
+Full-segment mode retains every source frame and pads only the final VAE group.
+The explicit window mode retains older preview/crop compatibility. No action is read.
 """
 from __future__ import annotations
 
 import csv
 import hashlib
+import json
 from io import BytesIO
 from pathlib import Path
 import random
@@ -20,6 +21,71 @@ from torch.utils.data import Dataset, IterableDataset, get_worker_info
 
 
 DEFAULT_FRAME_TIERS = (97, 81, 65, 49, 33, 17)
+FULL_SEGMENT_TOKEN_FORMULA = 'caption_tokens + 3 + 240 * (1 + ceil((true_frames - 1) / 4))'
+
+
+def full_segment_geometry(true_frames):
+    """Retain every source frame; append at most three for the VAE's 4N+1 grid."""
+    if int(true_frames) < 2:
+        raise ValueError("IT2V segment needs a condition and at least one real future frame")
+    latent_frames = 1 + (int(true_frames) - 1 + 3) // 4
+    padded_frames = 1 + 4 * (latent_frames - 1)
+    return padded_frames, latent_frames, padded_frames - int(true_frames)
+
+
+def format_video_caption(text, true_frames, fps, append_video_metadata=True):
+    caption = text.strip().rstrip('.') + '.'
+    if append_video_metadata:
+        caption += f" The video is {true_frames/fps:.1f} seconds long and is of {fps:.0f} FPS. This video is of 368x640 resolution."
+    return caption
+
+
+def video_packing_tokens(text_tokens, padded_frames):
+    """Exact native PackingDataLoader cost: caption + three markers + 240/latent."""
+    if (int(padded_frames) - 1) % 4:
+        raise ValueError("Token cost requires VAE-aligned frames")
+    return int(text_tokens) + 3 + 240 * (1 + (int(padded_frames) - 1) // 4)
+
+
+def tokenizer_source_path(config_or_processor):
+    """Native lazy composition may already instantiate the tokenizer processor."""
+    tokenizer = getattr(config_or_processor, 'tokenizer', None)
+    path = getattr(tokenizer, 'name_or_path', None)
+    if not path and hasattr(config_or_processor, 'get'):
+        path = config_or_processor.get('pretrained_model_name')
+    if not path or not Path(path).is_dir():
+        raise ValueError('Cannot verify statistics: tokenizer must expose its actual local source directory')
+    return str(Path(path).resolve())
+
+
+def validate_full_segment_budget(receipt_path, split, manifest_paths, budget, tokenizer_path=None):
+    """Fail before iteration if the verified complete manifest exceeds the budget."""
+    receipt = json.loads(Path(receipt_path).read_text())
+    if receipt.get('token_formula') != FULL_SEGMENT_TOKEN_FORMULA or receipt.get('frame_stride') != 1:
+        raise ValueError('Full-segment statistics use a different token contract')
+    expected = {str(p):hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in manifest_paths}
+    if receipt['manifest_summaries'][split]['manifest_sha256'] != expected:
+        raise ValueError('Full-segment statistics manifest hashes differ')
+    if tokenizer_path is not None:
+        actual = {p.name:hashlib.sha256(p.read_bytes()).hexdigest()
+                  for p in Path(tokenizer_path).iterdir() if p.is_file()}
+        if actual != receipt['tokenizer_files_sha256']:
+            raise ValueError('Full-segment statistics tokenizer hashes differ')
+    records = Path(receipt['records'])
+    if hashlib.sha256(records.read_bytes()).hexdigest() != receipt['records_sha256']:
+        raise ValueError('Full-segment statistics records hash differs')
+    rows = [json.loads(line) for line in records.read_text().splitlines()]
+    rows = [r for r in rows if r['split'] == split]
+    if len(rows) != receipt['manifest_summaries'][split]['segments_total']:
+        raise ValueError('Full-segment statistics do not cover every segment')
+    oversized = [r for r in rows if r['packing_tokens'] >= int(budget)]
+    if oversized:
+        hours = sum(r['duration_seconds'] for r in oversized) / 3600
+        maximum = max(r['packing_tokens'] for r in rows)
+        raise ValueError(f'Full {split} manifest exceeds strict token budget {budget}: '
+                         f'{len(oversized)} segments / {hours:.6f} hours; max={maximum}. '
+                         'No segments may be dropped; choose an explicit supported budget.')
+    return {'segments':len(rows), 'max_tokens':max(r['packing_tokens'] for r in rows), 'budget':int(budget)}
 
 
 def select_clip_frames(source_frames, frame_stride=1, tiers=DEFAULT_FRAME_TIERS):
@@ -65,20 +131,26 @@ class CosmosCaptionTokenizer:
 
 
 class EgoVerseIT2VDataset(Dataset):
-    """One largest legal tier per caption segment, with reproducible random crops.
+    """Explicit complete segments, or legacy reproducible window crops.
 
     ``end_idx`` is exclusive. Manifest split is authoritative: missing episodes,
-    invalid bounds or blank text fail loudly, while genuinely short segments are
-    counted and excluded. No pose/visibility/quality/camera filter is applied.
+    invalid bounds or blank text fail loudly. Only window mode excludes clips
+    below its minimum tier. Full segments are never silently filtered or cropped.
     """
 
     def __init__(self, episodes_manifest, segments_manifest, *, split="train",
                  frame_stride=1, clip_frame_tiers=DEFAULT_FRAME_TIERS, seed=42,
                  random_window=True, tokenizer_config=None, caption_tokenizer=None,
-                 cfg_dropout_rate=0.1, append_video_metadata=True):
+                 cfg_dropout_rate=0.1, append_video_metadata=True,
+                 sample_mode="window", max_sequence_length=None, segment_statistics_path=None):
         if split not in ("train", "test"):
             raise ValueError("Use the original train or test split")
+        if sample_mode not in ("window", "full_segment"):
+            raise ValueError("sample_mode must be window or full_segment")
+        if sample_mode == "full_segment" and frame_stride != 1:
+            raise ValueError("Full segments require every original frame: frame_stride=1")
         select_clip_frames(0, frame_stride, clip_frame_tiers)
+        self.sample_mode, self.max_sequence_length = sample_mode, max_sequence_length
         if not 0 <= cfg_dropout_rate <= 1:
             raise ValueError("cfg_dropout_rate must be in [0,1]")
         self.seed, self.frame_stride = int(seed), int(frame_stride)
@@ -111,7 +183,11 @@ class EgoVerseIT2VDataset(Dataset):
             caption = row["text_normalized"].strip()
             if not caption:
                 raise ValueError(f"Empty segment caption: {sid}")
-            frames = select_clip_frames(end - start, self.frame_stride, clip_frame_tiers)
+            if self.sample_mode == "full_segment":
+                full_segment_geometry(end - start)
+                frames = end - start
+            else:
+                frames = select_clip_frames(end - start, self.frame_stride, clip_frame_tiers)
             item = dict(row, sample_id=sid, _clip_frames=frames)
             if frames is None:
                 self.excluded.append(dict(item, reason="too_short_for_minimum_tier"))
@@ -131,8 +207,22 @@ class EgoVerseIT2VDataset(Dataset):
             "clip_tier_counts": dict(sorted(Counter(r["_clip_frames"] for r in self.rows).items())),
             "sampled_clip_hours_per_epoch": sum(r["_clip_frames"]*self.frame_stride/float(self.episodes[r["episode_hash"]]["fps"]) for r in self.rows)/3600,
             "frame_stride": self.frame_stride, "speed_factor": 1.0,
+            "sample_mode": self.sample_mode,
             "manifest_sha256": {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths},
         }
+        contract = dict(sample_mode=sample_mode, frame_stride=self.frame_stride,
+                        manifest_sha256=self.manifest_summary['manifest_sha256'], seed=self.seed,
+                        cfg_dropout_rate=self.cfg_dropout_rate,
+                        append_video_metadata=self.append_video_metadata)
+        if sample_mode == 'window':
+            contract.update(clip_frame_tiers=list(clip_frame_tiers), random_window=self.random_window)
+        self.dataset_contract = hashlib.sha256(json.dumps(contract, sort_keys=True).encode()).hexdigest()
+        if segment_statistics_path is not None:
+            if sample_mode != 'full_segment' or max_sequence_length is None:
+                raise ValueError('Statistics receipt requires full_segment and an explicit token budget')
+            tokenizer_path = tokenizer_source_path(tokenizer_config)
+            self.manifest_summary['budget_preflight'] = validate_full_segment_budget(
+                segment_statistics_path, split, paths, max_sequence_length, tokenizer_path)
 
     def __len__(self):
         return len(self.rows)
@@ -146,6 +236,10 @@ class EgoVerseIT2VDataset(Dataset):
     def window_indices(self, index, *, epoch=None, window_start=None):
         row = self.rows[index]
         start, end = int(row["start_idx"]), int(row["end_idx"])
+        if self.sample_mode == "full_segment":
+            if window_start is not None and int(window_start) != start:
+                raise ValueError("Full segment cannot be cropped or shifted")
+            return np.arange(start, end, dtype=np.int64)
         span = 1 + self.frame_stride * (row["_clip_frames"] - 1)
         rng = random.Random(_seed(self.seed, self.epoch if epoch is None else epoch, index))
         if window_start is None:
@@ -176,11 +270,8 @@ class EgoVerseIT2VDataset(Dataset):
         rgb = group["images.front_1"]
         if rgb.shape[0] != int(ep["total_frames"]) or indices[-1] >= rgb.shape[0]:
             raise ValueError("Zarr frame count differs from manifest")
-        video = decode_rgb_video(rgb[indices])
         fps = float(ep["fps"]) / self.frame_stride
-        caption = row["text_normalized"].strip().rstrip(".") + "."
-        if self.append_video_metadata:
-            caption += f" The video is {len(indices)/fps:.1f} seconds long and is of {fps:.0f} FPS. This video is of 368x640 resolution."
+        caption = format_video_caption(row["text_normalized"], len(indices), fps, self.append_video_metadata)
         # Separate stream from crop selection, deterministic across worker layouts.
         rng = random.Random(_seed(self.seed + 1, epoch, index))
         if rng.random() < self.cfg_dropout_rate:
@@ -188,12 +279,21 @@ class EgoVerseIT2VDataset(Dataset):
         if self._caption_tokenizer is None:
             self._caption_tokenizer = CosmosCaptionTokenizer(self._tokenizer_config)
         ids = torch.as_tensor(self._caption_tokenizer(caption), dtype=torch.long)
-        return {
+        padded_frames, temporal_padding = len(indices), 0
+        if self.sample_mode == "full_segment":
+            padded_frames, _, temporal_padding = full_segment_geometry(len(indices))
+        cost = video_packing_tokens(ids.numel(), padded_frames)
+        if self.max_sequence_length is not None and cost >= self.max_sequence_length:
+            raise ValueError(f"Sample {row['sample_id']} needs {cost} tokens, exceeding strict budget {self.max_sequence_length}; no frames were dropped")
+        video = decode_rgb_video(rgb[indices])
+        if temporal_padding:
+            video = torch.cat((video, video[:, -1:].expand(-1, temporal_padding, -1, -1)), dim=1)
+        result = {
             "__key__": row["sample_id"], "__url__": ep["abs_zarr_path"],
             "sample_id": row["sample_id"], "dataset_index": int(index),
             "video": video, "ai_caption": caption, "text_token_ids": ids,
             "conditioning_fps": fps, "fps": float(ep["fps"]), "num_multiplier": self.frame_stride,
-            "n_orig_video_frames": int(ep["total_frames"]), "num_frames": len(indices),
+            "n_orig_video_frames": int(ep["total_frames"]), "num_frames": padded_frames,
             "frame_start": int(indices[0]), "frame_end": int(indices[-1]),
             "window_start": int(indices[0]),
             "source_frame_indices": torch.from_numpy(indices.copy()),
@@ -202,6 +302,10 @@ class EgoVerseIT2VDataset(Dataset):
             "sequence_plan": SequencePlan(has_text=True, has_vision=True,
                                           condition_frame_indexes_vision=[0]),
         }
+        if self.sample_mode == "full_segment":
+            result.update(sample_mode="full_segment", video_true_num_frames=len(indices),
+                          video_temporal_padding=temporal_padding)
+        return result
 
 
 class IT2VIterableDataset(IterableDataset):
@@ -222,6 +326,9 @@ class IT2VIterableDataset(IterableDataset):
         return dict(self._state)
 
     def load_state_dict(self, state):
+        contract = getattr(self._dataset, 'dataset_contract', None)
+        if state and contract is not None and state.get('dataset_contract') != contract:
+            raise ValueError('Cannot resume a different dataset contract (mode/manifests/sampling)')
         self._state = dict(state)
 
     def __iter__(self):
@@ -240,6 +347,9 @@ class IT2VIterableDataset(IterableDataset):
                 sample = self._dataset.get_item_at_window(order[pos], epoch=epoch)
                 self._state = {"epoch": epoch + (pos+1 == len(order)),
                                "offset": (pos+1) % len(order), "shard": shard, "nshards": nshards}
+                contract = getattr(self._dataset, 'dataset_contract', None)
+                if contract is not None:
+                    self._state['dataset_contract'] = contract
                 yield sample
             epoch, offset = epoch+1, 0
 

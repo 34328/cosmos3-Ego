@@ -8,6 +8,7 @@ import pytest
 import torch
 
 from cosmos3_ar_it2v.dataset import EgoVerseIT2VDataset, IT2VIterableDataset, select_clip_frames
+from cosmos3_ar_it2v.dataset import full_segment_geometry, video_packing_tokens
 
 
 @pytest.fixture
@@ -139,3 +140,98 @@ def test_resume_refuses_changed_sharding():
     restored=IT2VIterableDataset(MockDataset()); restored.load_state_dict(stream.state_dict())
     restored.shard_world_size=2
     with pytest.raises(ValueError,match='topology'): next(iter(restored))
+
+
+@pytest.mark.parametrize('true_frames,expected',[(2,(5,2,3)),(5,(5,2,0)),(6,(9,3,3)),(187,(189,48,2)),(200,(201,51,1))])
+def test_full_segment_preserves_tail_geometry(true_frames,expected):
+    assert full_segment_geometry(true_frames)==expected
+    assert video_packing_tokens(48,expected[0])==48+3+240*expected[1]
+
+
+def test_full_segments_keep_short_and_long_boundaries(manifests):
+    ds=dataset(manifests,sample_mode='full_segment')
+    assert len(ds)==4 and ds.excluded==[]
+    for epoch in [0,17]:
+        assert np.array_equal(ds.window_indices(0,epoch=epoch),np.arange(200))
+        assert np.array_equal(ds.window_indices(3,epoch=epoch),np.arange(298,300))
+    with pytest.raises(ValueError,match='cropped'):
+        ds.window_indices(0,window_start=1)
+    with pytest.raises(ValueError,match='every original frame'):
+        dataset(manifests,sample_mode='full_segment',frame_stride=2)
+
+
+def test_full_segment_actual_tail_text_and_exact_reconstruction(manifests,monkeypatch):
+    import zarr
+    import cosmos3_ar_it2v.dataset as module
+    class RGB:
+        shape=(300,)
+        def __getitem__(self,indices): return indices
+    monkeypatch.setattr(zarr,'open_group',lambda *a,**kw:{'images.front_1':RGB()})
+    monkeypatch.setattr(module,'decode_rgb_video',lambda ids:torch.tensor(ids).reshape(1,-1,1,1))
+    ds=dataset(manifests,sample_mode='full_segment',cfg_dropout_rate=0)
+    sample=ds[0]
+    assert sample['video_true_num_frames']==200 and sample['video_temporal_padding']==1
+    assert sample['num_frames']==201
+    assert sample['video'].flatten().tolist()==list(range(200))+[199]
+    assert sample['source_frame_indices'].tolist()==list(range(200))
+    assert sample['ai_caption'].startswith('pick and place cup.')
+    assert '6.7 seconds' in sample['ai_caption']
+    replay=ds.get_item_at_window(0,source_frame_indices=sample['source_frame_indices'])
+    assert torch.equal(replay['video'],sample['video'])
+    short=ds[3]
+    assert short['video'].flatten().tolist()==[298,299,299,299,299]
+    assert short['video_true_num_frames']==2 and short['video_temporal_padding']==3
+
+
+def test_full_segment_budget_error_precedes_rgb_decode(manifests,monkeypatch):
+    import zarr
+    class RGB:
+        shape=(300,)
+        def __getitem__(self,indices): raise AssertionError('oversized RGB must not decode')
+    monkeypatch.setattr(zarr,'open_group',lambda *a,**kw:{'images.front_1':RGB()})
+    ds=dataset(manifests,sample_mode='full_segment',max_sequence_length=12246)
+    with pytest.raises(ValueError,match='no frames were dropped'):
+        ds[0]  # 51 latent frames *240 +3 caption tokens +3 markers ==12246.
+
+
+def test_full_manifest_budget_preflight_checks_hashes_and_all_rows(manifests,tmp_path):
+    import hashlib,json
+    from cosmos3_ar_it2v.dataset import FULL_SEGMENT_TOKEN_FORMULA,validate_full_segment_budget
+    rows=[dict(split='train',packing_tokens=12000,duration_seconds=5),
+          dict(split='train',packing_tokens=60000,duration_seconds=25)]
+    records=tmp_path/'records.jsonl'; records.write_text('\n'.join(json.dumps(r) for r in rows))
+    receipt=dict(token_formula=FULL_SEGMENT_TOKEN_FORMULA,frame_stride=1,records=str(records),
+                 records_sha256=hashlib.sha256(records.read_bytes()).hexdigest(),
+                 manifest_summaries={'train':dict(segments_total=2,manifest_sha256={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in manifests})})
+    path=tmp_path/'receipt.json'; path.write_text(json.dumps(receipt))
+    with pytest.raises(ValueError,match='1 segments'):
+        validate_full_segment_budget(path,'train',manifests,45056)
+    assert validate_full_segment_budget(path,'train',manifests,65536)['segments']==2
+    records.write_text(records.read_text()+'\n')
+    with pytest.raises(ValueError,match='records hash'):
+        validate_full_segment_budget(path,'train',manifests,65536)
+
+
+def test_stream_refuses_window_or_changed_manifest_resume(manifests,monkeypatch):
+    ds=dataset(manifests,sample_mode='full_segment')
+    monkeypatch.setattr(ds,'get_item_at_window',lambda index,epoch: index)
+    stream=IT2VIterableDataset(ds); next(iter(stream)); state=stream.state_dict()
+    IT2VIterableDataset(dataset(manifests,sample_mode='full_segment')).load_state_dict(state)
+    with pytest.raises(ValueError,match='dataset contract'):
+        IT2VIterableDataset(dataset(manifests)).load_state_dict(state)
+    legacy=dict(state); legacy.pop('dataset_contract')
+    with pytest.raises(ValueError,match='dataset contract'):
+        IT2VIterableDataset(ds).load_state_dict(legacy)
+    manifests[1].write_text(manifests[1].read_text().replace('pick and place cup','place the cup'))
+    with pytest.raises(ValueError,match='dataset contract'):
+        IT2VIterableDataset(dataset(manifests,sample_mode='full_segment')).load_state_dict(state)
+
+
+def test_preflight_resolves_native_instantiated_tokenizer(tmp_path):
+    from types import SimpleNamespace
+    from cosmos3_ar_it2v.dataset import tokenizer_source_path
+    config={'pretrained_model_name':str(tmp_path)}
+    processor=SimpleNamespace(tokenizer=SimpleNamespace(name_or_path=str(tmp_path)))
+    assert tokenizer_source_path(config)==tokenizer_source_path(processor)==str(tmp_path.resolve())
+    with pytest.raises(ValueError,match='Cannot verify'):
+        tokenizer_source_path(SimpleNamespace(tokenizer=SimpleNamespace()))

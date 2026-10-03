@@ -3,7 +3,7 @@ from types import SimpleNamespace as NS
 import pytest
 import torch
 from cosmos_framework.model.generator.utils.data_and_condition import GenerationDataClean
-from cosmos3_ar_it2v.model import ARIT2VModel, sample_chunk_sigmas
+from cosmos3_ar_it2v.model import ARIT2VModel, sample_chunk_sigmas, latent_valid_weights
 
 
 class Flow:
@@ -89,3 +89,73 @@ def test_no_extra_condition_frames_or_action_allowed():
     pack.action=object()
     with pytest.raises(ValueError,match='non-video'):
         m.pre_noise_memory_hook(pack,None,{})
+
+
+@pytest.mark.parametrize('frames',[2,4,5,6,17,18,71,73,74])
+def test_real_frame_coverage_no_padding_denominator(frames):
+    latent_frames=1+(frames-1+3)//4
+    weights=latent_valid_weights(frames,latent_frames)
+    assert weights[0]==0 and weights[-1]>0
+    assert weights.sum().item()==(frames-1)/4
+    assert (weights[1:-1]==1).all()
+
+
+def test_partial_tail_official_loss_and_gradient_preserve_binary_condition():
+    m=model()
+    p=torch.ones(2,6,2,2,requires_grad=True)
+    with torch.no_grad(): p[:,-1]=2
+    cond=torch.zeros(6,1,1);cond[0]=1
+    pack=NS(vision=NS(tokens=[p],mse_loss_indexes=torch.arange(1,6),condition_mask=[cond],
+                      noisy_frame_indexes=[torch.arange(1,6)]),action=None,sound=None,lidar=None,
+            it2v_true_num_frames=[18])
+    loss,_=m._compute_losses(out_net={'preds_vision':[p]},data_batch_packed=pack,
+        gen_data_noised=NS(vt_target_vision=[torch.zeros_like(p)]),
+        timesteps=sample_chunk_sigmas([6])*1000,is_image_batch=False)
+    # Four full future latents + one quarter-valid final latent, no pad count.
+    assert loss.item()==pytest.approx((4+4*.25)/4.25)
+    assert pack.vision.condition_mask[0] is cond and cond[-1]==0
+    loss.backward()
+    assert p.grad[:,0].abs().sum()==0 and p.grad[:,-1].abs().sum()>0
+    assert p.grad[0,-1,0,0]/p.grad[0,1,0,0]==.5
+
+
+def test_partial_chunk_sigma_routes_every_frame():
+    m=model()
+    t,s=m._get_train_noise_level_vision(2,False,[2,19])
+    assert torch.equal(t,s*1000)
+    assert (s[0,2:]==0).all() and s[0,1]>0
+    assert (s[1,17:19]==s[1,17]).all() and s[1,17]!=s[1,13]
+
+
+def test_native_memory_hook_keeps_partial_tail_and_routes_true_length():
+    m=model()
+    m.config.teacher_forcing_transfer_control_dropout_rate=0.
+    m.config.teacher_forcing_frames_per_chunk=4
+    m.config.teacher_forcing_kv_implementation='singleview_threeway_kv'
+    latent=torch.randn(1,2,6,2,2)
+    data=GenerationDataClean(batch_size=1,is_image_batch=False,x0_tokens_vision=[latent],fps_vision=torch.tensor([30.]))
+    got,memory=m.memory_init_training(data,{'video_true_num_frames':[torch.tensor([18])],
+        'video_temporal_padding':[torch.tensor([3])]},[[1,2]])
+    assert got.x0_tokens_vision[0] is latent and latent.shape[2]==6
+    cond=torch.zeros(6,1,1);cond[0]=1
+    pack=NS(vision=NS(condition_mask=[cond]),action=None,sound=None,lidar=None)
+    m.pre_noise_memory_hook(pack,data,memory)
+    assert pack.it2v_true_num_frames==[18]
+    noised=m._add_noise_to_input(data,pack,sample_chunk_sigmas([6]))
+    assert torch.equal(noised.xt_tokens_vision[0][:,:,0],latent[:,:,0])
+    assert not torch.equal(noised.xt_tokens_vision[0][:,:,-1],latent[:,:,-1])
+    assert cond[-1]==0
+
+
+def test_aligned_metadata_preserves_native_loss_bitwise():
+    m=model()
+    p=torch.randn(2,6,2,2)
+    cond=torch.zeros(6,1,1);cond[0]=1
+    pack=NS(vision=NS(tokens=[p],mse_loss_indexes=torch.arange(1,6),condition_mask=[cond],
+                      noisy_frame_indexes=[torch.arange(1,6)]),action=None,sound=None,lidar=None)
+    kw=dict(out_net={'preds_vision':[p]},data_batch_packed=pack,
+        gen_data_noised=NS(vt_target_vision=[torch.randn_like(p)]),
+        timesteps=sample_chunk_sigmas([6])*1000,is_image_batch=False)
+    old=m._compute_losses(**kw)[0]
+    pack.it2v_true_num_frames=[21]
+    assert torch.equal(old,m._compute_losses(**kw)[0])

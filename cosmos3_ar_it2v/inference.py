@@ -22,9 +22,9 @@ def cache_chunk_index(start: int, chunk_size: int = 4):
 
 
 def chunk_ranges(latent_frames: int, chunk_size: int = 4):
-    if chunk_size < 1 or latent_frames < 1 or (latent_frames - 1) % chunk_size:
-        raise ValueError("latent video must have shape [1, C, C, ...]")
-    return [(0, 1)] + [(i, i + chunk_size) for i in range(1, latent_frames, chunk_size)]
+    if chunk_size < 1 or latent_frames < 1:
+        raise ValueError("latent video and chunk size must be positive")
+    return [(0, 1)] + [(i, min(i + chunk_size, latent_frames)) for i in range(1, latent_frames, chunk_size)]
 
 
 def refresh_latents(clean, sigma: float, *, seed: int):
@@ -234,6 +234,8 @@ def main():
         gt = sample["video"].permute(1, 2, 3, 0).cpu().numpy()
         if pred.shape != gt.shape:
             raise ValueError(f"decoded/GT shape mismatch: {pred.shape} vs {gt.shape}")
+        true_frames = int(sample.get('video_true_num_frames', len(gt)))
+        pred, gt = pred[:true_frames], gt[:true_frames]
         fps = float(sample["conditioning_fps"])
         # Remove only deterministic bottom padding, preserving original motion.
         pred, gt = pred[:, :360], gt[:, :360]
@@ -244,6 +246,9 @@ def main():
         metadata = dict(vars(args), checkpoint=str(Path(args.checkpoint).resolve()),
                         sample_id=sample["sample_id"], caption=sample["ai_caption"],
                         source_frame_indices=sample["source_frame_indices"].tolist(),
+                        frames=true_frames,
+                        video_true_num_frames=true_frames,
+                        video_temporal_padding=int(sample.get('video_temporal_padding', 0)),
                         latent_frames=latents.shape[2], frames_per_chunk=model.config.frames_per_chunk,
                         local_attention_frames=model.config.local_attention_frames,
                         fps=fps, modalities=["text", "video"], history="generated",

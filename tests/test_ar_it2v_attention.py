@@ -41,3 +41,12 @@ def test_future_loss_reaches_history_but_not_future_tokens():
 def test_block_mask_build_cpu():
     a=ChunkCausalAttention([(5,2,2)],[3],device='cpu')
     assert a.block_mask(128).shape[-2:] == (128,256)
+
+
+def test_partial_tail_nominal_window_and_packed_isolation():
+    a=ChunkCausalAttention([(19,1,1),(2,1,1)],[3,2],device='cpu')
+    mask=a.mask_mod(128)(0,0,torch.arange(a.gen_pad)[:,None],torch.arange(128+a.gen_pad)[None,:])
+    # Partial C4 at 17:19 keeps 12 history frames, matching inference cache.
+    assert mask[17,128:].nonzero().flatten().tolist()==list(range(5,19))
+    assert torch.equal(mask[17],mask[18])
+    assert not mask[:19,147:].any() and not mask[19:21,128:147].any()

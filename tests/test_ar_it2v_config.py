@@ -32,3 +32,20 @@ def test_final_toml_composes_through_official_schema():
     assert c.model.config.parallelism.data_parallel_replicate_degree==2
     assert c.optimizer.lr==2e-5
     assert c.job.wandb_mode=='online'
+
+
+def test_full_segment_recipe_uses_exclusive_token_budget():
+    from cosmos3_ar_it2v.config import full_segment_experiment
+    old=experiment()
+    c=full_segment_experiment()
+    assert c.dataloader_train.max_samples_per_batch is None
+    assert c.dataloader_train.max_sequence_length==65536
+    d=c.dataloader_train.dataloader.datasets.video.dataset
+    assert d.sample_mode=='full_segment' and not d.random_window
+    assert d.max_sequence_length==65536 and d.frame_stride==1
+    assert c.optimizer==old.optimizer and c.scheduler==old.scheduler
+    assert c.model.config.frames_per_chunk==old.model.config.frames_per_chunk
+    assert c.model.config.local_attention_frames==old.model.config.local_attention_frames
+    assert c.model.config.sigma_min==old.model.config.sigma_min
+    assert c.model.config.sigma_max==old.model.config.sigma_max
+    assert c.model.config.sigma_shift==old.model.config.sigma_shift

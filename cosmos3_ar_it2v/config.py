@@ -14,6 +14,7 @@ from .dataloader import RecoverablePackingDataLoader, IT2VDataLoaderStateCallbac
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_NAME = 'rbs_wam_ar_it2v_v0_1_ego100h_cmd_stage1'
+FULL_SEGMENT_CONFIG_NAME = 'rbs_wam_ar_it2v_v0_2_ego100h_full_segments'
 ensure_wandb_generate_id()
 callbacks = {k:copy.deepcopy(BASIC_CALLBACKS[k]) for k in (
     'wandb','wandb_2x','iter_speed','manual_gc','load_pretrained','param_count','sequence_packing_padding')}
@@ -72,6 +73,31 @@ def experiment():
         dataloader_val=None,upload_reproducible_setup=False),flags={'allow_objects':True})
 
 ConfigStore.instance().store(group='experiment',package='_global_',name=CONFIG_NAME,node=experiment())
+
+
+def full_segment_experiment(token_budget=65536):
+    """Complete segments, native packing; optimizer remains unchanged.
+
+    65536 is a validation budget, not permission to omit oversized segments.
+    Dataset preflight must reject the full manifest until all samples fit an
+    approved resource policy. V0.1 remains reproducible above.
+    """
+    if token_budget < 128 or token_budget % 128:
+        raise ValueError('Token budget must be a positive multiple of 128')
+    c=experiment()
+    c.job.update(group='ar_it2v_v0_2',name='ar_it2v_v0_2_full_segments')
+    c.model.config.max_num_tokens_after_packing=int(token_budget)
+    c.dataloader_train.max_samples_per_batch=None
+    c.dataloader_train.max_sequence_length=int(token_budget)
+    data=c.dataloader_train.dataloader.datasets.video.dataset
+    data.update(sample_mode='full_segment',random_window=False,
+        max_sequence_length=int(token_budget),
+        segment_statistics_path=str(ROOT/'outputs/maintenance/full_segment_audit_20261003/summary.json'))
+    return c
+
+
+ConfigStore.instance().store(group='experiment',package='_global_',
+    name=FULL_SEGMENT_CONFIG_NAME,node=full_segment_experiment())
 
 def make_config():
     from cosmos_framework.configs.base.config import make_config as base

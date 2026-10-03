@@ -1,11 +1,11 @@
-# Historical V0.1: random windows capped at 97 frames, fixed 4 samples/rank.
-# Stopped by user; retained for reproducibility.
+# Complete native-frame segments; token-budget validation recipe.
+# Full-manifest oversize preflight is mandatory. Formal launch needs user approval.
 [job]
 task = "vfm"
-experiment = "rbs_wam_ar_it2v_v0_1_ego100h_cmd_stage1"
+experiment = "rbs_wam_ar_it2v_v0_2_ego100h_full_segments"
 project = "rbs_wam_ar_it2v"
-group = "ar_it2v_v0_1"
-name = "ar_it2v_v0_1_ego100h_cmd_stage1"
+group = "ar_it2v_v0_2"
+name = "ar_it2v_v0_2_full_segments"
 wandb_mode = "online"
 [model]
 precision = "bfloat16"
@@ -19,6 +19,7 @@ mode = "full"
 enabled = false
 [optimizer]
 lr = 2.0e-5
+weight_decay = 0.0
 [scheduler]
 warm_up_steps = [100]
 cycle_lengths = [3000]
