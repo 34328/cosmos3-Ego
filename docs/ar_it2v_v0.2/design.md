@@ -44,13 +44,19 @@ Wan2.2 VAE要求4N+1：对实际输入的M帧仅追加0–3张末帧，整段连
 
 数据checkpoint保存rank/worker/epoch cursor、pending样本、真实源索引、CFG文本、packing预算/lookahead和dataset合同hash。合同包括sample_mode、manifest、retention policy、比例序列、预算及逐段计划hash。预算、清单、window/full模式或retention映射改变时拒绝恢复，避免旧状态的游标被误解释；恢复不得重新按当前随机状态选档或选帧。
 
+恢复训练同时从已有monitor日志还原首次10步loss基线和近期窗口，只读取checkpoint之前的有效分支；历史缺失时明确报错，不能静默换成恢复后的新基线。显存增长窗口仅在同一进程内比较，重启时清空。
+
 用户已选择新正式配置：四节点、每节点8卡，DP 8×4；`max_iter=1500`、每500步保存，官方AdamW `weight_decay=0.01`，全模型峰值lr `1e-4`；官方LambdaCosine `warmup=100`、`cycle_lengths=[1500]`、`f_max=1.0`、`f_min=0.3`，终点lr `3e-5`。AR分块、局部注意力、噪声抽样等原配方保持不变。数据/packing GPU验证短测保留旧`lr=2e-5, weight_decay=0`，不得将短测配置误标为正式配方。正式启动仍等待GPU短测结果和用户确认。
 
 原生W&B早已上传`optim/lr`，旧run API核实2511个点；新增monitor记录本次update前实际各组LR范围，便于找到曲线，不伪造旧实测值。
 
+官方AdamW支持weight decay；官方Nano SFT配置自身也使用`weight_decay=0`，不能仅凭旧值为0认定实现错误。新`.01`是本次用户确认的预训练选择。
+
 RoPE全段和streaming使用相同文本偏移、绝对latent位置及基座fps modulation；正常30fps对应24/30=0.8步距，retention段使用各自effective_fps，没有每块重置。CMD按current_start累加绝对位置，但其Predict2.5关闭fps modulation，不能直接复制频率到Cosmos3。Stage1未发现随机时间offset训练；保留基座并验证坐标/KV。来源：[CMD wrapper](https://github.com/nv-tlabs/cmd/blob/main/cosmos/wrapper.py)、[Stage1配置](https://github.com/nv-tlabs/cmd/blob/main/configs/cosmos/t24_l21_teacher_causal_flow.yaml)。
 
 ## 验证入口
+
+长视频推理复用官方有限DualKVCache：当前C4/local16配置4槽（3个历史块和当前写槽），读取仍限最近12 latent，不永久存储整段历史；首帧、绝对位置和部分末块规则保持不变。
 
 - CPU：与launch同一`PYTHONPATH=<repo>:<repo>/packages/cosmos3`，关闭CUDA后`python -m pytest tests`。
 - 全段统计：`python -m cosmos3_ar_it2v.segment_statistics --help`；当前策略需显式传`--long-segment-policy uniform_retention --policy-token-budget 75008`；产物不进源码，小型覆盖/hash回执放evidence。

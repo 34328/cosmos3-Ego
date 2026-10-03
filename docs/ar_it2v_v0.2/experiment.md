@@ -41,11 +41,25 @@ iter_000000003官方marker、model/optim/trainer/scheduler各DCP metadata及其�
 
 最终TOML SHA256：`be92f1f816cdbf11839b539c49a40345e9b027a47c170d370c2d84e11dd60c49`。正式启动时重新检查四个节点资源，W&B online并经API核实真实step/loss/LR；当前没有新正式run。75k短测采用旧低LR优化器，不等于新1e-4配方的长期稳定性或质量验收。
 
-官方LambdaCosine理论lr：step0=0、100=1e-4、750=6.89187566636e-5、1500=3e-5。W&B继续原生`optim/lr`并额外记录实际update前lr范围；旧run API已存在2511个optim/lr点，问题是曲线不易找到，而非调度器未运行。官方AdamW已实现weight decay，旧wd0是本项目覆盖值，新.01按用户选择。
+官方LambdaCosine理论lr：step0=0、100=1e-4、750=6.89187566636e-5、1500=3e-5。W&B继续原生`optim/lr`并额外记录实际update前lr范围；旧run API已存在2511个optim/lr点，问题是曲线不易找到，而非调度器未运行。官方AdamW已实现weight decay，官方Nano SFT配方本身也使用wd0；旧值为0不代表功能缺失，新.01按用户选择。
 
 RoPE继续官方绝对latent时间位置、文本偏移及fps modulation，30fps步距24/30=.8；没有每块重置。CMD Stage1同样使用绝对current_start，但其Predict2.5关闭fps modulation，不能把另一基座的频率直接覆盖Cosmos3。只迁移Stage1，未混入少步/长视频蒸馏；位置及KV实测见上。
 
-## 提交
+## 2026-10-03 独立复核
+
+以`e385d41`为审查起点，分别核对数据/packing、模型数学、训练生命周期与推理缓存，并对照官方实际实现。未发现完整segment、文本配对、token预算、DF逐块timestep、packed隔离、loss全局segment等权及绝对RoPE路径的新增阻断问题；75k短测回执已与真实日志/退出回执核对。
+
+发现并修复两项P2：恢复训练时原先重置首次10步loss基线，现从已有monitor记录恢复截至checkpoint的有效loss历史，缺失明确报错，新进程显存窗口重新计数；长视频推理原先无限保存KV、读取后才裁窗口，现复用官方有限DualKVCache，C4/local16使用4槽，保留相同12 latent可见历史和绝对坐标，不随rollout长度累积全部缓存。
+
+新增7项CPU用例，最终与launch相同PYTHONPATH、CUDA关闭，全量`tests/`为87 passed/121 warnings，24.60秒；原80项均通过。本次未重复GPU试验、未启动正式训练。AGENTS已明确复杂组件先查官方能力，只有实际缺口才写最小适配。
+
+审查边界：尾latent的r/4是覆盖率加权，不能精确拆掉VAE内部混入的补帧成分；已有GPU gate为8卡、0 workers、3步低LR，未实测32 rank×3 workers和1e-4长期稳定性。75k mask修复前后的首步梯度范数不同，但两次未开启deterministic_mode、未捕获sigma/epsilon/RNG，不能据此认定backward错误，也不能声称只是舍入差异。正式配方和启动确认要求不变。
+
+### 提交记录
+
+- `6468e76`：AGENTS明确复杂组件优先复用官方能力。
+- `9e66bcb`：恢复时保持原始loss停止基线及有效历史窗口。
+- `a058689`：长视频推理改用官方有界KV缓存，保持原可见性。
 
 - `4fbb1e9`：停止旧run、准确修正短窗口训练范围。
 - `9bf20b9`：完整segment、真实末尾监督和有保护的官方动态packing。
