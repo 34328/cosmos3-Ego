@@ -1,6 +1,6 @@
 # 完整segment接入与75k packing验证
 
-2026-10-03。本轮只修改并验证数据接入、动态packing、末块和日志；新正式训练尚未启动。旧V0.1准确标注为“最长97帧的随机短窗口训练”，用户要求停止时实际step2511，最后完整checkpoint为iter_000002500，权重和输出保留。W&B API核实旧run状态killed：[旧实验](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7oimekos)。
+2026-10-03。前半部分记录数据接入、动态packing、末块和日志的短测阶段；用户随后批准正式训练，启动信息见末节。旧V0.1准确标注为“最长97帧的随机短窗口训练”，用户要求停止时实际step2511，最后完整checkpoint为iter_000002500，权重和输出保留。W&B API核实旧run状态killed：[旧实验](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7oimekos)。
 
 ## 实现与数据覆盖
 
@@ -35,11 +35,11 @@ iter_000000003官方marker、model/optim/trainer/scheduler各DCP metadata及其�
 
 初次65536启动误用系统torchrun，在import阶段退出，0步/0更新；已修正PATH为cosmos3环境，未重复旧预算。输出完整保留在`segment_packing_gate_v1`。KV脚本的两次接口/manifest路径错误也保留，修复仅涉及验证脚本，不作为训练结果。
 
-## 新正式配方（待短测结果后确认启动）
+## 新正式配方
 
 用户已选4个空闲节点、HSDP8×4、CP1；max_iter1500，save500，warmup100/cycle1500；lr峰值1e-4/终点3e-5、weight_decay0.01。新注册`rbs_wam_ar_it2v_v0_2_ego100h_full_segments`，配置`cosmos3_ar_it2v/configs/ego100h_full_segments.toml`。从官方Nano开始，不恢复旧短窗口数据状态；首帧+文本、纯视频、GEN参数、C4/local16、原sigma配方和seed42不变。
 
-最终TOML SHA256：`be92f1f816cdbf11839b539c49a40345e9b027a47c170d370c2d84e11dd60c49`。正式启动时重新检查四个节点资源，W&B online并经API核实真实step/loss/LR；当前没有新正式run。75k短测采用旧低LR优化器，不等于新1e-4配方的长期稳定性或质量验收。
+最终TOML SHA256：`be92f1f816cdbf11839b539c49a40345e9b027a47c170d370c2d84e11dd60c49`。正式启动时重新检查四个节点资源，W&B online并经API核实真实step/loss/LR；短测交付时尚无新正式run；后续正式启动见末节。75k短测采用旧低LR优化器，不等于新1e-4配方的长期稳定性或质量验收。
 
 官方LambdaCosine理论lr：step0=0、100=1e-4、750=6.89187566636e-5、1500=3e-5。W&B继续原生`optim/lr`并额外记录实际update前lr范围；旧run API已存在2511个optim/lr点，问题是曲线不易找到，而非调度器未运行。官方AdamW已实现weight decay，官方Nano SFT配方本身也使用wd0；旧值为0不代表功能缺失，新.01按用户选择。
 
@@ -65,3 +65,23 @@ RoPE继续官方绝对latent时间位置、文本偏移及fps modulation，30fps
 - `9bf20b9`：完整segment、真实末尾监督和有保护的官方动态packing。
 - `3420afa`：批准的75k超长保留策略、4节点/1500步及用户选定优化器；75k短测代码源为完整hash `3420afa9194b3f4f4797f09bdcb658cba649ea57`。
 - `dd32448`：复用官方metadata-run构造器，消除token² mask临时内存；v2代码源`dd32448cfe573463df7b582a8131b4ec6f69d6fb`，不改mask规则或训练配方。
+
+
+## 2026-10-03 正式训练启动
+
+用户在独立review和修复交付后明确批准启动。2026-10-03 11:25–11:26北京时间分别经MCP启动Tdebug2/3/4/5，各8张H800，rank0/1/2/3；HSDP8×4/CP1，NCCL Socket、eth0内网TCP，master10.3.12.18:29873。启动前各节点GPU空闲、无compute进程，CPU quota120核、affinity200核，空闲内存约1.4TiB以上。复用官方启动器和Trainer，四端有独立claim/启动/退出记录；不得重复启动或自动恢复。
+
+本次名为`ar_it2v_v0_2_full_segments_75k_lr1e4_4nodes`，代码源`11c04ee7049b63b8fb1a3d348fbf419df9f208ff`。从官方Nano初始化，未恢复旧短窗口run；1500步/save500、75008 token、max_samples=None、完整segment及批准的超长retention策略、4节点/32卡、每rank3workers、lr峰值1e-4→3e-5、warmup100/cycle1500、wd.01、seed42均已核实实际config.yaml。实际配置SHA256 `a535c763fa7b7ddbe9ea56bbf542fe44b7f2c857eef6b4be31795656674e16b0`；TOML hash仍为上述be92f1f…，manifest和retention记录hash沿用覆盖回执。
+
+W&B online，[本次run 7aa7je4o](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o)。API已核实state=running、真实step2/video_loss/实际LR上传；step2实际更新LR为1e-6，官方optim/lr记录调度后的下一步2e-6，两者时点不同。启动回执及API有限字段见[evidence/formal_launch.json](evidence/formal_launch.json)。
+
+| step | 全局segment数 | token填充率 | 训练区间秒 | video loss | 裁剪前梯度范数 | 实际更新LR |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 210 | 97.35% | 77.71 | 0.336398 | 1.28339 | 0 |
+| 2 | 133 | 97.04% | 37.49 | 0.333856 | 1.35049 | 1e-6 |
+| 3 | 115 | 96.97% | 36.28 | 0.328138 | 1.31909 | 2e-6 |
+| 4 | 147 | 97.66% | 38.70 | 0.320381 | 1.37467 | 3e-6 |
+
+前4步峰值allocated62.46GiB/reserved74.08GiB，loss/梯度均有限，无STOPPED或节点退出。API step1到2时间差36.86秒。排除首步初始化，初期36–39秒/步；含保存与数据波动暂估1500步16–20小时，第500步约5–6小时。此为启动阶段估计，不以4步loss下降宣称收敛，不保证后续所有长pack均不会OOM；既有停止规则照常执行。
+
+输出：`/mnt/lzh/cosmos-ar-it2v/outputs/pretrain/20261003T032429Z/rbs_wam_ar_it2v/ar_it2v_v0_2/ar_it2v_v0_2_full_segments_75k_lr1e4_4nodes`。启动计划/四端日志/API回执：`outputs/maintenance/ar_it2v_v0_2_full_segments_preflight_20261003T032429Z/`。

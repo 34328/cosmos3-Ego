@@ -1,6 +1,6 @@
 # 完整segment与官方动态packing
 
-本轮实现完整segment采样、必要CPU/GPU短测与记录。用户已选定下述新配方，但正式启动仍须在GPU短测结果之后由用户确认；不恢复旧run。旧V0.1准确标注为“最长97帧的随机短窗口训练”，已停止且保留。
+本轮实现完整segment采样、必要CPU/GPU短测与记录。2026-10-03用户在短测和独立review交付后明确批准按下述新配方正式启动；不恢复旧run。旧V0.1准确标注为“最长97帧的随机短窗口训练”，已停止且保留。正式run资源、路径和在线记录见experiment.md。
 
 ## 数据和末块
 
@@ -46,7 +46,7 @@ Wan2.2 VAE要求4N+1：对实际输入的M帧仅追加0–3张末帧，整段连
 
 恢复训练同时从已有monitor日志还原首次10步loss基线和近期窗口，只读取checkpoint之前的有效分支；历史缺失时明确报错，不能静默换成恢复后的新基线。显存增长窗口仅在同一进程内比较，重启时清空。
 
-用户已选择新正式配置：四节点、每节点8卡，DP 8×4；`max_iter=1500`、每500步保存，官方AdamW `weight_decay=0.01`，全模型峰值lr `1e-4`；官方LambdaCosine `warmup=100`、`cycle_lengths=[1500]`、`f_max=1.0`、`f_min=0.3`，终点lr `3e-5`。AR分块、局部注意力、噪声抽样等原配方保持不变。数据/packing GPU验证短测保留旧`lr=2e-5, weight_decay=0`，不得将短测配置误标为正式配方。正式启动仍等待GPU短测结果和用户确认。
+用户已选择新正式配置：四节点、每节点8卡，DP 8×4；`max_iter=1500`、每500步保存，官方AdamW `weight_decay=0.01`，全模型峰值lr `1e-4`；官方LambdaCosine `warmup=100`、`cycle_lengths=[1500]`、`f_max=1.0`、`f_min=0.3`，终点lr `3e-5`。AR分块、局部注意力、噪声抽样等原配方保持不变。数据/packing GPU验证短测保留旧`lr=2e-5, weight_decay=0`，不得将短测配置误标为正式配方。用户已在短测和独立review交付后批准正式启动，实际run见experiment.md。
 
 原生W&B早已上传`optim/lr`，旧run API核实2511个点；新增monitor记录本次update前实际各组LR范围，便于找到曲线，不伪造旧实测值。
 
