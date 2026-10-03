@@ -92,3 +92,13 @@ W&B online，[本次run 7aa7je4o](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v
 使用本次完整segment正式run的 `iter_000001000/model`，train/test各3条完整动作段（train420/186/390帧，test722/309/373帧），原始30fps、对应整段文本、seed42、35步去噪、CFG1、历史刷新噪声0.02；长短是不同完整segment，无窗口截取，仅去除VAE对齐补帧。
 Tdebug6空闲GPU0–5并行，6/6正常退出，18个MP4已核对帧数与帧率；每段41.53–151.53秒，峰值allocated32.22–34.37GiB。预览实现提交1749434，不修改训练源或配方，不计算质量指标。
 产物及selection/完整checkpoint校验/media_validation回执位于 `outputs/visualization/ar_it2v_v0.2/step1000/full_segments/`；服务器回环18768通过原连接转发，GT/生成双栏，完整文本与实际时长可见，页面不发布样本身份或训练文件。
+
+
+## 2026-10-04 正式训练完成与 Step1500 预览
+
+2026-10-03T18:58:42Z（北京时间10月4日02:58:42），Tdebug2/3/4/5 四端退出回执均为 exit_code=0，正式训练完成1500步。
+formal_monitor 最后 step1500：video_loss=0.19157143344637007，实际更新学习率=3.0000088121430885e-05；原训练配方未改动。
+2026-10-04再次通过 W&B API 核实 [7aa7je4o](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o) 为 finished，iteration=1500，loss及学习率与本地回执一致。
+训练结束状态已核实；不据训练loss声明画质改善。
+
+最终step1500预览已完成：沿用step1000的train/test各3条完整segment和相同采样参数，Tdebug4空闲GPU0–5并行，6/6正常退出，18个MP4帧数/30fps核对通过。产物位于`outputs/visualization/ar_it2v_v0.2/step1500/full_segments/`，原回环18768网页切换至1500；旧1000产物保留。不计算质量指标、不改训练或推理配方。
