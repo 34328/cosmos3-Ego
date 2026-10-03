@@ -16,6 +16,50 @@ class VideoStopPolicy:
     """Video adaptation: clipping alone is normal, not a divergence criterion."""
     def __init__(self):
         self.losses=deque(maxlen=10);self.memory=deque(maxlen=10);self.baseline=None
+
+    @classmethod
+    def from_history(cls, path, iteration):
+        """Restore loss policy from this run's log; memory is process-local.
+
+        Native DCP exposes a state adapter for the dataloader, not arbitrary
+        callbacks. Reuse the existing per-step receipt rather than inventing a
+        second checkpoint format. A backwards/repeated step starts a replacement
+        log branch; entries after the selected checkpoint never affect its policy.
+        """
+        policy = cls()
+        if iteration == 0:
+            return policy
+        path = Path(path)
+        if not path.is_file():
+            raise ValueError(f'Cannot restore stop policy at step {iteration}: missing {path}')
+        losses = {}
+        for line_number, line in enumerate(path.read_text().splitlines(), 1):
+            try:
+                row = json.loads(line)
+                step = row['step']
+                if type(step) is not int or step < 1:
+                    raise ValueError('step must be a positive integer')
+                if step > iteration:
+                    continue
+                loss = float(row['video_loss'])
+                if not math.isfinite(loss):
+                    raise ValueError('nonfinite video_loss')
+            except (ValueError, KeyError, TypeError) as error:
+                raise ValueError(f'Cannot restore stop policy: {path}:{line_number}: {error}') from error
+            # Later resumed runs supersede the abandoned suffix, not merely the
+            # duplicate row. Missing replacement steps must not reuse stale loss.
+            for old_step in tuple(losses):
+                if old_step >= step:
+                    del losses[old_step]
+            losses[step] = loss
+        missing = [step for step in range(1, iteration + 1) if step not in losses]
+        if missing:
+            raise ValueError(f'Cannot restore stop policy at step {iteration}: missing history steps {missing[:10]}')
+        for step, loss in losses.items():
+            policy.update(False, [loss], 0., step=step)
+        # Allocation growth is meaningful only inside one process lifetime.
+        policy.memory.clear()
+        return policy
     def update(self,clipped,losses,resident_gib,*,step=None):
         if not all(math.isfinite(x) for x in (*losses,resident_gib)):
             return 'nonfinite loss or memory metric'
@@ -49,7 +93,7 @@ class VideoTrainingMonitor(Callback):
 
     def on_train_start(self,model,iteration=0):
         self.root=Path(self.config.job.path_local)
-        self.policy=VideoStopPolicy()
+        self.policy=VideoStopPolicy.from_history(self.root/'formal_monitor.jsonl',iteration)
         self.clip=next(c for c in self.trainer.callbacks._callbacks if isinstance(c,GradClip))
         self.params=_group_params_by_mesh([p for p in model.net.parameters() if p.requires_grad])
         forbidden=[n for n,p in model.net.named_parameters() if any(x in n for x in ('action2llm','llm2action','action_modality','action_state'))]
