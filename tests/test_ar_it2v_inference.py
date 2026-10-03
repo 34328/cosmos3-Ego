@@ -92,3 +92,37 @@ def test_native_rope_full_video_and_chunk_packs_align_at_30fps():
             cached_text_offset=None if start==0 else compute_text_split_length(2,special),**kw)
         actual=part.position_ids[:,part.vision.sequence_indexes]
         assert torch.allclose(actual,expected[:,start*4:end*4],atol=2e-6)
+
+
+@pytest.mark.parametrize('local_frames', [16, 4])
+def test_native_chunk_cache_bounds_storage_and_matches_training_history(local_frames):
+    from cosmos3_ar_it2v.inference import _make_chunk_cache
+    from cosmos_framework.model.generator.utils.kv_cache import ARMemoryState
+
+    chunk_size, patches_per_frame = 4, 2
+    cache = _make_chunk_cache(chunk_size, local_frames)
+    history_frames = local_frames - chunk_size
+    assert cache.gen_cache.cache_size == (4 if local_frames == 16 else 2)
+    # Cross the ring boundary many times, ending with a two-latent partial chunk.
+    ranges = chunk_ranges(83, chunk_size)
+    assert ranges[-1] == (81, 83)
+    for start, end in ranges:
+        index = cache_chunk_index(start, chunk_size)
+        memory = ARMemoryState(dual_kv_cache=[cache], frame_idx=index,
+            vision_token_shapes=[(end-start, 1, patches_per_frame)],
+            transfer_history_sink_tokens=0,
+            transfer_history_max_tokens=history_frames * patches_per_frame)
+        value = memory.read_for_layer(0)
+        expected = torch.arange(max(0, start-history_frames), start).repeat_interleave(patches_per_frame)
+        if expected.numel():
+            assert torch.equal(value.gen_k_hist.flatten(), expected.float())
+            assert torch.equal(value.gen_v_hist.flatten(), -expected.float())
+        else:
+            # Native max_tokens=0 must return no history, not Python's [-0:] slice.
+            assert value.gen_k_hist is None and value.gen_v_hist is None
+        current = torch.arange(start, end, dtype=torch.float32).repeat_interleave(patches_per_frame)
+        current = current.reshape(1, -1, 1, 1)
+        cache.gen_cache.store_kv(current, -current, frame_idx=index)
+        for storage in (cache.gen_cache.k_cache, cache.gen_cache.v_cache):
+            assert len(storage) == cache.gen_cache.cache_size
+            assert sum(t.numel() for t in storage if t is not None) <= cache.gen_cache.cache_size * chunk_size * patches_per_frame

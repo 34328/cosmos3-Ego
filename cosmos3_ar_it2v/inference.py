@@ -27,6 +27,14 @@ def chunk_ranges(latent_frames: int, chunk_size: int = 4):
     return [(0, 1)] + [(i, min(i + chunk_size, latent_frames)) for i in range(1, latent_frames, chunk_size)]
 
 
+def _make_chunk_cache(chunk_size, local_frames):
+    from cosmos_framework.model.generator.utils.kv_cache import DualKVCache
+    # Native capacity includes the current write slot: only capacity-1 entries
+    # are fetched as history. Entries are whole chunks, except the first image.
+    capacity = max(2, math.ceil((local_frames - chunk_size) / chunk_size) + 1)
+    return DualKVCache(gen_cache_size=capacity, preallocate_ring=False)
+
+
 def refresh_latents(clean, sigma: float, *, seed: int):
     """Refresh a history copy; never modify generated output or consume global RNG."""
     if not math.isfinite(sigma) or not 0 <= sigma <= 1:
@@ -67,7 +75,6 @@ def generate_latents(model, batch, *, num_steps=35, guidance=1.0, seed=42, conte
     """Batch size one, pure I+T to video; output includes the conditioned first latent."""
     from cosmos_framework.data.generator.sequence_packing.autoregressive import pack_input_sequence_autoregressive
     from cosmos_framework.data.generator.sequence_packing.modality import compute_text_split_length
-    from cosmos_framework.model.generator.utils.kv_cache import DualKVCache
 
     if num_steps < 1 or not math.isfinite(guidance):
         raise ValueError("invalid sampler arguments")
@@ -90,7 +97,7 @@ def generate_latents(model, batch, *, num_steps=35, guidance=1.0, seed=42, conte
     cond, uncond = model._get_inference_text_tokens(batch, False)
     texts = [cond[0], uncond[0]] if guidance != 1 else [cond[0]]
     offsets = [compute_text_split_length(len(t), model.llm_special_tokens, has_generation=True) for t in texts]
-    caches = [[DualKVCache(gen_cache_size=None, preallocate_ring=False)
+    caches = [[_make_chunk_cache(chunk_size, local_frames)
                for _ in range(model.net.num_hidden_layers)] for _ in texts]
     fps = clean.fps_vision.tolist()
     tcf = model.tokenizer_vision_gen.temporal_compression_factor
