@@ -1,0 +1,74 @@
+{
+  "checkpoint_step": 2000,
+  "checkpoint": "/mnt/lzh/cosmos-ar-it2v/outputs/pretrain/20261002T174227Z/rbs_wam_ar_it2v/ar_it2v_v0_1/ar_it2v_v0_1_ego100h_cmd_stage1/checkpoints/iter_000002000/model",
+  "training_source_commit": "aa81810b97fb76c9ac267ae557f44afccfb64e96",
+  "preview_source_commit": "993d4b4",
+  "config_sha256": "2b278f6dde29b3685fed89dda1f5cae8aec710750f9b2c57c4800311e089e1b4",
+  "selection_sha256": "94277a1738a716d0b6722031922b5d17008428441b9aa3d6750917a2c8b9c490",
+  "node": "Tdebug4",
+  "gpus": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "train_windows": 3,
+  "validation_windows": 3,
+  "frames": 257,
+  "fps": 30,
+  "short_frames": 90,
+  "denoise_steps": 35,
+  "guidance": 1.0,
+  "context_sigma": 0.02,
+  "seed": 42,
+  "completed_windows": 6,
+  "completed_mp4": 24,
+  "verified_comparison_videos": 12,
+  "outputs": "/mnt/lzh/cosmos-ar-it2v/outputs/visualization/ar_it2v_v0.1/step2000/preview",
+  "server_url": "http://127.0.0.1:18768/",
+  "windows": [
+    {
+      "id": "train_01",
+      "split": "train",
+      "runtime_seconds": 61.559228972531855,
+      "peak_allocated_gib": 32.56490182876587,
+      "peak_reserved_gib": 35.0859375
+    },
+    {
+      "id": "train_02",
+      "split": "train",
+      "runtime_seconds": 54.02852871268988,
+      "peak_allocated_gib": 32.56254053115845,
+      "peak_reserved_gib": 35.0546875
+    },
+    {
+      "id": "train_03",
+      "split": "train",
+      "runtime_seconds": 54.04120677057654,
+      "peak_allocated_gib": 32.56529092788696,
+      "peak_reserved_gib": 34.78125
+    },
+    {
+      "id": "test_01",
+      "split": "test",
+      "runtime_seconds": 55.33886621054262,
+      "peak_allocated_gib": 32.56680154800415,
+      "peak_reserved_gib": 35.072265625
+    },
+    {
+      "id": "test_02",
+      "split": "test",
+      "runtime_seconds": 53.38975553680211,
+      "peak_allocated_gib": 32.56475305557251,
+      "peak_reserved_gib": 34.134765625
+    },
+    {
+      "id": "test_03",
+      "split": "test",
+      "runtime_seconds": 57.65350626595318,
+      "peak_allocated_gib": 32.56539964675903,
+      "peak_reserved_gib": 35.099609375
+    }
+  ],
+  "scope": "Video preview only. Long rollout257 exceeds training max97; short3s is a crop of the same rollout. No numerical quality metrics or training recipe changes."
+}

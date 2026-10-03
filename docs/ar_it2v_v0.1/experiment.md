@@ -30,3 +30,9 @@
 - W&B：[ar_it2v_v0_1_ego100h_cmd_stage1](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7oimekos)，run `7oimekos`。API于北京时间2026-10-03 01:57核实running及连续step1–5的video loss上传，step5=0.3019655；同时上传gradient、step耗时和显存。
 - 实际全局64 clips，step5前后向9.9318s，allocated33.1915GiB/reserved42.0449GiB（各rank最大）；无action参数。首步初始化41.66s，不用于稳态估算。
 - 3000步、每500保存，从官方Nano起点重新训练。当前仅启动与数值验收，不宣称画质已改善。完整启动回执见 [evidence/formal_startup.json](evidence/formal_startup.json)。
+
+## iter2000 视频预览
+
+- 使用已完整保存的 `iter_000002000`，train/test 各3个按GT选择的明显操作窗口；原始30fps、seed42、每块35步、CFG1、历史刷新噪声0.02，输入仅首帧与文本。
+- 每窗257帧长片（8.57秒）及同次生成的90帧动作裁剪（3秒），GT／生成RGB双栏；长片超出训练最大97帧（3.23秒），不将其当作训练长度内的独立短段评测。本次仅视频观察、不算质量指标。
+- Tdebug4 空闲GPU0先验证，GPU1/2/3并行完成余下5窗，6/6退出0、24份MP4；单窗生成及渲染53.39–61.56秒（不含权重加载）。服务器私有网页 `http://127.0.0.1:18768/` 已转发并验证6视频加载，产物位于 `outputs/visualization/ar_it2v_v0.1/step2000/preview/`；完整回执与固定清单见 `evidence/step2000_preview.json`、`evidence/step2000_preview_selection.json`。
