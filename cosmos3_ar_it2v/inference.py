@@ -114,7 +114,10 @@ def generate_latents(model, batch, *, num_steps=35, guidance=1.0, seed=42, conte
         raise ValueError("chunk AR preview currently requires eager inference")
     if model.parallel_dims is not None and model.parallel_dims.cfgp_enabled:
         raise ValueError("preview uses sequential CFG, not CFG parallelism")
-    clean = model.get_data_and_condition(batch, vision_condition_indexes=[[0]])
+    # [[0]] encodes only the image and zero-fills the future latent tail.
+    # GT history needs a complete continuous encode, not that inference shortcut.
+    encode_condition_indexes = None if history_mode == "gt" else [[0]]
+    clean = model.get_data_and_condition(batch, vision_condition_indexes=encode_condition_indexes)
     if clean.batch_size != 1 or clean.x0_tokens_action is not None or len(clean.x0_tokens_vision) != 1:
         raise ValueError("expected one pure-video sample, without action tokens")
     reference = clean.x0_tokens_vision[0].to(**model.tensor_kwargs)

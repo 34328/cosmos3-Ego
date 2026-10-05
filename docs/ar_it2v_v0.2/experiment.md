@@ -102,3 +102,9 @@ formal_monitor 最后 step1500：video_loss=0.19157143344637007，实际更新�
 训练结束状态已核实；不据训练loss声明画质改善。
 
 最终step1500预览已完成：沿用step1000的train/test各3条完整segment和相同采样参数，Tdebug4空闲GPU0–5并行，6/6正常退出，18个MP4帧数/30fps核对通过。产物位于`outputs/visualization/ar_it2v_v0.2/step1500/full_segments/`，原回环18768网页切换至1500；旧1000产物保留。不计算质量指标、不改训练或推理配方。
+
+## 2026-10-05 Step1500 真实历史诊断预览
+
+首次GT历史实现08e7c9a无效：`get_data_and_condition(..., vision_condition_indexes=[[0]])`触发官方首帧编码优化，未来latent填零，却被误当GT写入历史，导致第17帧起崩坏。这不是模型能力证据；原生成历史模式只使用首latent，未受影响。无效产物与6份退出回执完整移至`outputs/visualization/ar_it2v_v0.2/step1500/gt_history_invalid_prefix_encoding/`并写入INVALID.json，页面已撤下。
+修复仅使GT模式传入`vision_condition_indexes=None`，官方连续编码完整segment；生成历史仍传[[0]]。注意力条件仍只标记首latent为干净条件，后续GT只在对应块预测结束后写入历史，输出保持预测；位置、噪声、seed、去噪次数及KV读写路径均不改，未调整训练。
+原采样参数保持step1500、seed42、35次去噪、CFG1、刷新噪声0.02及train/test各3段完整视频。原109项CPU虽通过，却未覆盖真实编码入口；补充入口回归并重新生成有效GT历史后再发布，暂时网页只展示原模型生成历史。

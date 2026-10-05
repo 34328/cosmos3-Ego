@@ -3,7 +3,7 @@ import pytest
 import torch
 
 from cosmos3_ar_it2v.inference import (
-    _make_chunk_cache, cache_chunk_index, refresh_latents, rollout_chunks,
+    _make_chunk_cache, cache_chunk_index, generate_latents, refresh_latents, rollout_chunks,
 )
 
 
@@ -112,3 +112,44 @@ def test_invalid_gt_reference(gt):
 def test_generated_rejects_ambiguous_gt_argument():
     with pytest.raises(ValueError, match='only accepted'):
         run(reference(), gt_latents=reference())
+
+
+@pytest.mark.parametrize('mode', ['generated', 'gt'])
+def test_real_generate_entry_requests_full_encode_only_for_gt_history(mode):
+    """Exercise the actual entry; native [[0]] encoding returns a zero tail.
+
+    Simulate that documented native contract, stopping before GPU sampling.
+    Rollout-only tests with hand-built GT do not cover this production API seam.
+    """
+    from types import SimpleNamespace
+
+    class EncodeChecked(Exception):
+        pass
+
+    class Model:
+        config = SimpleNamespace(action_gen=False, compile=SimpleNamespace(enabled=False),
+                                 frames_per_chunk=4, local_attention_frames=16)
+        parallel_dims = None
+        tensor_kwargs = dict(device='cpu', dtype=torch.float32)
+
+        def get_data_and_condition(self, batch, *, vision_condition_indexes):
+            assert batch is input_batch
+            assert vision_condition_indexes == (None if mode == 'gt' else [[0]])
+            encoded = reference()
+            if vision_condition_indexes is not None:
+                encoded[:, :, 1:] = 0
+            self.clean = SimpleNamespace(batch_size=1, x0_tokens_action=None,
+                                         x0_tokens_vision=[encoded])
+            return self.clean
+
+        def _get_inference_text_tokens(self, batch, unused):
+            tail = self.clean.x0_tokens_vision[0][:, :, 1:]
+            if mode == 'gt':
+                assert torch.equal(tail, reference()[:, :, 1:])
+            else:
+                assert torch.count_nonzero(tail) == 0
+            raise EncodeChecked()
+
+    input_batch = {'video': 'complete continuous segment'}
+    with pytest.raises(EncodeChecked):
+        generate_latents(Model(), input_batch, history_mode=mode)
