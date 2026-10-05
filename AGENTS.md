@@ -4,7 +4,7 @@
 
 本项目在 Cosmos3-Nano 上迁移 CMD Stage 1 的因果视频训练方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。输入是首帧图像与 segment 文本，输出只有视频；没有 action、state、骨架或联合监督。项目适配放在 `cosmos3_ar_it2v/`，官方框架保留在 `packages/cosmos3/`。
 
-当前基线为 V0.2 完整 segment / 75008 token 配方，已完成1500步。用户已批准 V0.3 从官方 Nano 重新训练：四节点32卡、5000步/save500、C4/local32、单目标块 loss，历史噪声按 LingBot-VA 公开代码。新模型、配置和文档分版本保留，不能改写旧实验；这次批准不包含自动恢复或失败重训。此前 V0.1 是最长97帧随机短窗口训练，仅供历史复现。
+当前基线为 V0.2 完整 segment / 75008 token 配方，已完成1500步。V0.3 单目标65K实验已按用户要求停在194步，无save500 checkpoint。正在实现 V0.4：LingBot式GT历史/预测两条表示，所有非条件预测块并行监督；历史不直接算loss，仍有间接梯度。历史噪声按LingBot公开代码，预测噪声复用Cosmos3官方Nano waver/分辨率shift，不再用手写uniform/clamp。四节点32卡、5000步/save500、C4/local32、Nano起点与65K源预算沿用批准值；CPU offload被用户明确拒绝，先GPU短测和Astra/xhigh审查再启动。见 `docs/ar_it2v_v0.4/design.md`。下述V0.3条目仅供历史复现，不得用于覆盖V0.4。新模型、配置和文档分版本保留；不自动恢复或失败重训。此前 V0.1 是最长97帧随机短窗口训练。
 
 本地项目：`/Users/cnf2026953090/Desktop/rbs-WAM-videogen pretrain`；远端仓库：`/mnt/lzh/cosmos-ar-it2v`；分支：`ar-it2v-pretrain`。本地保存源码和文档，计算、数据、权重与视频服务在远端。主导航见 `README.md`，现状与问题见 `docs/problems.md`，完整实验见 `docs/ar_it2v_v0.2/experiment.md`。
 

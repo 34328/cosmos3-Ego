@@ -110,3 +110,4 @@ def make_config():
 
 # Register the new recipe without changing either historical experiment.
 from . import config_v03 as _config_v03  # noqa: E402,F401
+from . import config_v04 as _config_v04  # noqa: E402,F401

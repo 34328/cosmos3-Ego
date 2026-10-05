@@ -86,11 +86,20 @@ class VideoTrainingMonitor(Callback):
             action_gen=bool(cfg.model.config.action_gen),frames_per_chunk=int(cfg.model.config.frames_per_chunk),
             local_attention_frames=int(cfg.model.config.local_attention_frames),wandb_mode=str(cfg.job.wandb_mode),sigma_sampler='uniform_shift_postclamp',
             sigma_min=float(cfg.model.config.sigma_min),sigma_max=float(cfg.model.config.sigma_max),sigma_shift=float(cfg.model.config.sigma_shift))
+        if getattr(cfg.model.config,'prediction_noise_mode',None)=='cosmos3_native':
+            rf=cfg.model.config.rectified_flow_training_config
+            row.update(sigma_sampler='cosmos3_native',
+                prediction_time_distribution=str(rf.train_time_video_distribution),
+                prediction_shift=int(rf.shift) if isinstance(rf.shift,int) else dict(rf.shift),
+                prediction_noise_granularity='chunk',additional_sigma_clamp=False)
+            for key in ('sigma_min','sigma_max','sigma_shift'):
+                row.pop(key)
         if hasattr(cfg.model.config,'history_noise_mode'):
             row.update(history_noise_mode=str(cfg.model.config.history_noise_mode),
                 clean_history_probability=float(cfg.model.config.clean_history_probability),
                 history_timestep_index_range=[500,999],history_sigma_shift=5.,
-                history_noise_granularity='latent_frame',loss_scope='one_target_chunk_per_segment',
+                history_noise_granularity='latent_frame',
+                loss_scope=str(getattr(cfg.model.config,'loss_scope','one_target_chunk_per_segment')),
                 target_history_seed=int(cfg.model.config.target_history_seed))
         if not dist.is_initialized() or dist.get_rank()==0:
             root=Path(cfg.job.path_local);root.mkdir(parents=True,exist_ok=True)
@@ -156,6 +165,16 @@ class VideoTrainingMonitor(Callback):
         if budget is not None:
             row.update(token_budget=int(budget),token_fill_mean=float(r[:,8].mean())/int(budget),
                 token_fill_min=float(r[:,8].min())/int(budget),token_fill_max=float(r[:,8].max())/int(budget))
+        if 'v04_transformer_tokens' in output_batch:
+            lengths=torch.tensor([output_batch['v04_source_tokens'],output_batch['v04_transformer_tokens']],
+                                 device=loss.device,dtype=torch.int64)
+            all_lengths=[torch.empty_like(lengths) for _ in range(dist.get_world_size())] if dist.is_initialized() else [lengths]
+            if dist.is_initialized(): dist.all_gather(all_lengths,lengths)
+            counts=torch.stack(all_lengths).cpu()
+            row.update(source_sequence_tokens_per_rank=counts[:,0].tolist(),
+                transformer_tokens_per_rank=counts[:,1].tolist(),
+                transformer_tokens_max=int(counts[:,1].max()),
+                transformer_tokens_mean=float(counts[:,1].float().mean()))
         if not dist.is_initialized() or dist.get_rank()==0:
             with (self.root/'formal_monitor.jsonl').open('a') as f: f.write(json.dumps(row,allow_nan=False)+'\n')
             if wandb.run is not None:

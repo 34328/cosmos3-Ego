@@ -4,7 +4,7 @@ Cosmos3-Nano 上的纯视频 AR 继续预训练：输入首帧图像与动作段
 
 ## 当前状态
 
-V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_000001500`。[训练记录](docs/ar_it2v_v0.2/experiment.md)和 [W&B run](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o)保留完整来源。用户已批准 [V0.3](docs/ar_it2v_v0.3/design.md)：从官方 Nano 重启，四节点32卡/5000步、窗口32 latent、只监督一个目标块，GT历史按 LingBot-VA 公开代码加噪。
+V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_000001500`。[训练记录](docs/ar_it2v_v0.2/experiment.md)和 [W&B run](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o)保留完整来源。V0.3 单目标实验已按用户要求停在194步。当前推进 [V0.4](docs/ar_it2v_v0.4/design.md)：GT历史与所有预测块并行监督，历史按LingBot加噪、预测使用Cosmos3官方flow matching；Nano起点、四节点32卡/5000步、C4/local32、65K源token预算。已完成CPU验证与独立代码审查，正式启动前仍须GPU容量短测。
 
 V0.2基线设置（旧配方保留）：
 
@@ -24,7 +24,8 @@ V0.2基线设置（旧配方保留）：
 |---|---|
 | 协作规则 | [AGENTS.md](AGENTS.md) |
 | 当前设计 / 实验 | [V0.2设计](docs/ar_it2v_v0.2/design.md) / [实验记录](docs/ar_it2v_v0.2/experiment.md) |
-| 新训练设计 / 实验 | [V0.3设计](docs/ar_it2v_v0.3/design.md) / [实验记录](docs/ar_it2v_v0.3/experiment.md) |
+| 新训练设计 / 实验 | [V0.4设计](docs/ar_it2v_v0.4/design.md) / [实验记录](docs/ar_it2v_v0.4/experiment.md) |
+| 历史单目标实验 | [V0.3设计](docs/ar_it2v_v0.3/design.md) / [实验记录](docs/ar_it2v_v0.3/experiment.md) |
 | 模型 / 注意力 | [model.py](cosmos3_ar_it2v/model.py) / [attention.py](cosmos3_ar_it2v/attention.py) |
 | 完整段数据 / 官方 packing 适配 | [dataset.py](cosmos3_ar_it2v/dataset.py) / [dataloader.py](cosmos3_ar_it2v/dataloader.py) |
 | 配置 / 启动 | [ego100h_full_segments.toml](cosmos3_ar_it2v/configs/ego100h_full_segments.toml) / [launch.sh](cosmos3_ar_it2v/launch.sh) |
