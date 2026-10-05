@@ -62,7 +62,7 @@ function changeLength(card){
 const s=card.sample;card.video.pause();card.video.src=s.media[!fullSegment&&lengthMode==='short'?'short_preview.mp4':'preview.mp4'];card.error.classList.remove('visible');card.video.load();
 const end=s.short_start+s.short_duration;
 card.note.textContent=fullSegment?`${s.length_group==='short'?'完整短片':'完整长片'} · ${fmt(s.duration)} 秒 · ${s.frames} 帧`:lengthMode==='short'?`${fmt(s.short_duration)} 秒 · 长片 ${fmt(s.short_start)}–${fmt(end)} 秒`:`${fmt(s.duration)} 秒 · ${s.frames} 帧`;
-card.description.textContent=historyComparison?(s.history_mode==='gt'?'每块独立观察预测质量；完成后以真实视频更新后续历史。':'仅起始图像为真实条件，后续使用模型生成历史。'):(fullSegment?'原始动作段完整起止，使用上方对应文本；无片中截取。':lengthMode==='short'?'来自下方“长片”同一次生成的动作区间裁剪。':'从首帧与文本出发，逐块连续生成完整视频。');
+card.description.textContent=historyComparison?(s.history_mode==='gt'?'每块使用真实历史预测；整段拼接预览的接缝暂不作为单块质量结论。':'仅起始图像为真实条件，后续使用模型生成历史。'):(fullSegment?'原始动作段完整起止，使用上方对应文本；无片中截取。':lengthMode==='short'?'来自下方“长片”同一次生成的动作区间裁剪。':'从首帧与文本出发，逐块连续生成完整视频。');
 }
 function applyFilters(){
 for(const card of cards){const visible=(splitMode==='all'||card.sample.split===splitMode)&&(!fullSegment||lengthMode==='all'||card.sample.length_group===lengthMode)&&(!historyComparison||card.sample.history_mode===historyMode);card.video.closest('.sample').hidden=!visible;if(!visible)card.video.pause();}
