@@ -117,3 +117,25 @@ def test_paired_server_only_serves_selected_media_with_ranges(tmp_path):
                 assert (await client.get('/' + name)).status == 404
 
     asyncio.run(check())
+
+
+def test_extra_gallery_preserves_old_page_and_private_files(tmp_path):
+    build_page(make_gallery(tmp_path))
+    nested = tmp_path / 'boundary_diagnostic'
+    nested.mkdir()
+    build_page(make_gallery(nested, comparison=False))
+    (nested / 'latents.pt').write_bytes(b'private')
+
+    async def check():
+        async with TestClient(TestServer(create_app(tmp_path, extra_pages=['boundary_diagnostic']))) as client:
+            assert (await client.get('/')).status == 200
+            assert (await client.get('/boundary_diagnostic/index.html')).status == 200
+            response = await client.get('/boundary_diagnostic/full_segments/train_01/preview.mp4',
+                                        headers={'Range': 'bytes=2-4'})
+            assert response.status == 206 and await response.read() == b'234'
+            for name in ('selection.json', 'latents.pt', 'full_segments/train_01/manifest.json'):
+                assert (await client.get('/boundary_diagnostic/' + name)).status == 404
+
+    asyncio.run(check())
+    with pytest.raises(ValueError):
+        create_app(tmp_path, extra_pages=['../outside'])

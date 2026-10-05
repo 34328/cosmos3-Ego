@@ -1,5 +1,15 @@
 # 纯视频 AR 预览网页
 
+## 接缝诊断（独立实验）
+
+`boundary_preview.py` 只取一个已选完整短 segment；从同一 checkpoint 生成一次原GT历史预测和一次共享边界预测，不更新权重。`decoder_diagnostic.py` 将同一原预测分别连续解码、在完整GT前缀下逐块解码并裁出绝对RGB范围，另提供GT连续重建。GT前缀拼图是单块诊断，不能称为连续自由生成；所有调用均从latent零开始，不重置后单独解码目标块，也不将RGB重新编码。
+
+`boundary_sampling.py` 保留原C4/local16、seed和四个新latent的官方RF solver。从第二个预测块起，在原时间start−1锁定上一预测末latent，并去掉同位置的历史KV，只刷新原完整块。额外条件是新的推理分布，尚未经过训练；本实验不修改默认sampler。PT存档保存显式continuous normalized格式，不能读取旧联合分块latent。
+
+单卡使用官方`python -m torch.distributed.run --standalone --nproc_per_node=1 -m cosmos3_ar_it2v.visualization.boundary_preview`，参数为`--selection <原完整清单> --id train_02 --output <全新purpose目录> --toml <原配置> --checkpoint <真实checkpoint>`。输出目录是原子claim，失败回执保留，不能重复派发。
+
+完成后通过现有服务的`--extra-page boundary_diagnostic`开放独立子页；仍仅允许该页index与清单选定MP4，latent、manifest、日志不发布。原父页面及其产物保持可用。
+
 本目录集中管理纯视频预览：`preview.py` 复用现成 sampler 批量推理；`build_page.py` 将完成的产物组成网页；`serve.py` 提供只监听回环地址的轻量服务。不计算指标，不依赖历史联合模型。
 
 ## 完整动作段（当前默认）
