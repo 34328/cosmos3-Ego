@@ -176,7 +176,7 @@ def main():
                                            'guidance','context_sigma','fps')}
         display.update(preview_mode='full_segment', windows=windows)
         write_json(root/'selection.json', display)
-        build_diagnostic_page(root)
+        # Trial media is reviewed directly; build a page only after approval.
         write_json(root/'completed.json', dict(provenance, variants=list(VARIANTS),
             baseline_generation_seconds=baseline_seconds, boundary_generation_seconds=boundary_seconds,
             total_seconds=time.monotonic()-started,

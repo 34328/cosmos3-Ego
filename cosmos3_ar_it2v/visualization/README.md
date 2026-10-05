@@ -2,6 +2,12 @@
 
 统一复用现有 sampler、选样清单、renderer和服务器页面。`preview.py` 生成视频，`build_page.py` 构建页面，`serve.py` 只服务清单允许的媒体。不训练、不计算质量指标。
 
+## 先临时查看，再发布
+
+临时推理、GT历史和接缝测试统一放 `outputs/diagnostics/<version>/step<step>/<purpose>/`，默认只生成视频和来源记录，不调用`build_page.py`、不加入网页服务。查看时仅同步选定MP4到本地`tmp/previews/<version>/step<step>/<purpose>/`，直接在对话里展示。
+
+用户确认最终版本后，才把选定结果放入下面的`outputs/visualization/`发布目录，构建并更新正式网页；复用已完成视频，不重新推理。服务器继续部署在远端。历史测试保留在诊断目录，不在网页里堆叠。
+
 ## 完整动作段
 
 新清单使用 `preview_mode="full_segment"`。默认从 train/test 各选几个拿起、移动、放下动作明显的完整 segment；`length_group=short/long` 表示不同的完整短/长动作段，不能从长片截出短片。保留段起止、整段对应文本及真实回放速度，输出去除VAE对齐补帧。
@@ -40,7 +46,9 @@ GT模式必须用官方 `get_data_and_condition(..., vision_condition_indexes=No
 
 `decoder_diagnostic.py`复用同一预测，比较预测前缀解码、匹配GT前缀解码和GT连续重建。`boundary_preview.py` / `boundary_sampling.py`另测试锁定上一预测末latent的共享边界；这是额外推理条件，不修改默认sampler。在step1500的一条完整短段上未改善，不设为默认；保留小型证据与独立产物，避免重复试验。
 
-现有实验页面 `/boundary_diagnostic/index.html` 保留原四种明确标记的显示，不将其他旧GT视频自动改名或重算。
+原`/boundary_diagnostic/index.html`及GT历史比较已撤出服务。step1500诊断产物归入`outputs/diagnostics/ar_it2v_v0.2/step1500/`，其中原视频及失败回执保留，不改名冒充新结果、不重复计算。旧页面文件仅作为历史存档，不对外服务。
+
+`boundary_preview.py`完成后仅写视频及记录，不自动构建页面；最终获确认时再调用已有`build_diagnostic_page()`，保留四种显示方式的准确标题。
 
 ## 构建与服务
 
@@ -53,4 +61,4 @@ GT模式必须用官方 `get_data_and_condition(..., vision_condition_indexes=No
 
 构建前核对选定样本的manifest和非空MP4；网页使用根内相对媒体路径、支持历史和train/test/长短切换，同时只播放一个视频。checkpoint、seed、每块去噪次数、CFG、回放帧率及历史刷新噪声必须记录，不能把帧率和模型时间步混用。
 
-启动服务前检查现有进程及端口。服务只监听远端`127.0.0.1`，经已有连接转发；支持Range/HEAD，只开放index和选定MP4，manifest、latent、日志、权重、目录遍历均不公开。独立实验页通过`--extra-page <purpose>`加入相同allowlist。不默认把视频下载到本地，也不为每次预览重复启动服务。
+启动服务前检查现有进程及端口。服务只监听远端`127.0.0.1`，经已有连接转发；支持Range/HEAD，只开放index和选定MP4，manifest、latent、日志、权重、目录遍历均不公开。只有用户确认发布的页面才允许`--extra-page`，临时测试不使用它，也不为每次测试重复启动服务。

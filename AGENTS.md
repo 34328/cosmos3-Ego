@@ -38,10 +38,11 @@
 
 ## 推理与可视化
 
-- 统一入口 `cosmos3_ar_it2v/visualization/`，先读该目录 README。产物按 `outputs/visualization/<version>/step<step>/<purpose>/` 命名，保留版本、checkpoint与采样设置。
+- 统一入口 `cosmos3_ar_it2v/visualization/`，先读该目录 README。临时测试放 `outputs/diagnostics/<version>/step<step>/<purpose>/`，保留版本、checkpoint与采样设置，默认不构建网页、不加入已有页面或服务。
+- 查看临时结果时只同步用户需要的少量MP4至本地 `tmp/previews/<version>/step<step>/<purpose>/`，直接在对话中预览；不全量下载、不入Git。用户确认最终版本后，才将选定结果发布至 `outputs/visualization/<version>/step<step>/<purpose>/` 并构建/更新正式网页。可移动已验收产物，无须重新推理。
 - 默认 train/test 各选几个手部移动明显的拿起、移动、放下动作，长短分别选不同的完整 segment，使用对应完整文本；不从长片裁出短片。页面为 GT RGB／模型 RGB，不显示内部身份、存储路径或联合模型骨架。
 - 必须区分 Transformer 的历史 KV 与 VAE 的解码前缀。`generated` 是只给初始图像、后续使用自身预测历史的自由生成，整段预测 latent 连续解码（`decoder_mode=predicted_prefix`）。
 - `gt` 是真实历史单块诊断：官方 `get_data_and_condition(..., vision_condition_indexes=None)` 连续编码完整 GT，仅已完成块可写入历史 KV；当前目标块没有自身 GT 条件。显示采用同一 GT 前缀连续解码预测目标块，再按绝对时间裁出 RGB（`decoder_mode=gt_prefix_montage`）。这是 GT 锚定的单块预测拼图，不能当作完整自由生成能力。
 - 生成历史的官方首帧优化 `vision_condition_indexes=[[0]]` 不可用于提取完整 GT 历史。不得单独重置 VAE 解码目标块，不得 decode→encode 回填历史。
 - 旧 manifest 未记录 decoder_mode 时按旧 `predicted_prefix` 解释，不能把旧 MP4 改名成新解码结果。共享预测末 latent 的额外边界条件在短测中未改善，不设为默认；证据保留，避免重复试验。
-- 网页服务仅监听远端回环地址，经已有连接转发；只发布页面与选定 MP4，不公开 manifest、latent、日志、数据或权重，不默认下载视频到本地。
+- 正式网页服务仅监听远端回环地址，经已有连接转发；只发布已确认页面与选定MP4，不公开manifest、latent、日志、数据或权重。临时测试不加`--extra-page`；临时查看按上一条只同步所需视频。

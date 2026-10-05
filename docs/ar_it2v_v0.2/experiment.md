@@ -127,3 +127,9 @@ formal_monitor 最后 step1500：video_loss=0.19157143344637007，实际更新�
 用户选择采用匹配GT解码前缀的诊断显示；后续新GT预览复用该实现，`decoder_mode=gt_prefix_montage`，生成历史仍为`predicted_prefix`，不改sampler、权重或训练配方。
 旧视频保留真实解码口径，不改名、不重复推理；新增入口及页面标签通过33项聚焦CPU测试，未运行新GPU实验。
 新本地项目`rbs-WAM-videogen pretrain`与远端纯视频分支同步，根AGENTS/README和文档导航重写；保留纯视频历史，移除旧联合任务的活跃规则，问题集中在`docs/problems.md`。
+
+### 临时产物与网页整理
+
+按用户要求，step1500的GT历史、无效GT编码、接缝对照及两次失败尝试移至`outputs/diagnostics/ar_it2v_v0.2/step1500/`，原视频、latent及回执保留；旧网页/服务记录存入该目录`previous_gallery/`。
+回环18768改为仅服务原`step1500/full_segments/`六段预览，撤下GT比较和`/boundary_diagnostic/index.html`；未重跑推理或指标。
+后续临时测试仅按需同步少量MP4至本地`tmp/previews/`，直接在对话查看；用户确认最终版本后才构建并更新正式网页。

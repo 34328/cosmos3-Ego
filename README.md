@@ -14,6 +14,8 @@ V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_0
 
 目前自由生成仍有任务偏离与累积误差。GT历史诊断采用匹配GT解码前缀，减少了已观察样本的重影，但这是依赖GT的单块拼图；不能称为自由生成修复。现状和后续问题见 [problems.md](docs/problems.md)。
 
+临时测试先在对话中展示选定视频，不进入正式网页；产物放`outputs/diagnostics/`。用户确认最终版本后才发布到`outputs/visualization/`，沿用统一网页。
+
 ## 导航
 
 | 内容 | 入口 |
