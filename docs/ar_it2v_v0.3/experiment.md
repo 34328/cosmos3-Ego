@@ -24,4 +24,10 @@ W&B online，API确认本run为 [fv40e8uq](https://wandb.ai/alexlzh431564/rbs_wa
 
 ## 65536预算修订
 
-用户随后批准65K＝65536，从官方Nano重新开run，其余配方不动。重用同一官方统计入口生成绑定新预算的完整receipt；train全帧段31266→30812（95.23%），排除22→40段，额外排除.38539小时（23.12分钟）。训练可用32315段；test额外14段进入抽帧、排除2→3段。新记录待正式启动与API确认后填写。
+用户随后批准65K＝65536，从官方Nano重新开run，其余配方不动。重用同一官方统计入口生成绑定新预算的完整receipt；train全帧段31266→30812（95.23%），排除22→40段，额外排除.38539小时（23.12分钟）。训练可用32315段；test额外14段进入抽帧、排除2→3段。
+
+2026-10-05 20:55北京时间，分别经MCP启动 Tdebug1/3/4/5，各8×H800，HSDP8×4、CP1、NCCL Socket/eth0 内网TCP，master10.3.12.57:29893。Tdebug2多次连接超时且尚无启动claim，故在派发前替换为空闲Tdebug1；计算配方不变。新run为 `target_only_df_lingbot_history_ctx32_65k_5000_20261005T124732Z`，输出 `outputs/pretrain/ar_it2v_v0.3/20261005T124732Z/rbs_wam_ar_it2v/ar_it2v_v0_3/<run>`，四端独立回执在 `outputs/maintenance/ar_it2v_v03_target_only_65k_preflight_20261005T124732Z/`。
+
+训练源 `20f717bf8c8663c569d0bd610fa25585900077ec`；TOML SHA256 `ef6cda600b004d6c98157118ba5731a6725f207e509d4acf9f7a82020c95c850`。模型与清单hash同上；新统计回执 `full_segment_retention_65536_20261005/summary.json`，records SHA256 `22697620df91aee713dcae1a454dded5d0613f759ddfaa03316050a3ac898967`。Astra/xhigh复核了新配置、预算回执及Nano起点，未发现阻塞问题。
+
+21:03北京时间，真实monitor已完成step5，四端均无退出；W&B API核实新run [daxa2qx7](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/daxa2qx7) online/running，history step2/3/4含video_loss=.48592/.51343/.46096及LR=1e-6/2e-6/3e-6，证明持续上传，API回执保存在preflight目录。step3–5耗时40.29/39.61/38.67秒，global样本107/131/115，token平均填充96.88%/96.61%/96.62%；最大allocated56.95GiB/reserved77.13GiB，梯度有限、无STOPPED。此为启动阶段实测，不代表完整5000步的最坏显存或收敛验收。
