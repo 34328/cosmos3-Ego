@@ -23,7 +23,7 @@
 ## 保持的配方
 
 - 官方 Nano 初始化、GEN训练/UND冻结、纯视频 IT2V；无 action。
-- 完整连续原始 segment、75008 token、官方动态 packing；超预算段沿用既有批准保留策略，不重新筛数据。
+- 完整连续原始 segment、65536 token、官方动态 packing；超预算段沿用既有批准90%→50%保留策略，按新的预算重算回执。
 - 官方 Trainer/VAE/flow/AdamW/调度/DCP；LR峰值1e-4、warmup100、LambdaCosine cycle5000/f_min.3，wd.01、clip1、seed42。
 - HSDP8×4、CP1，NCCL内网Socket/eth0 TCP；W&B online，API核实。
 - 原数值/OOM/内存与10步loss停止规则保留。失败不得自动重训或恢复，不因主观画质停训。
@@ -31,3 +31,5 @@
 入口：`cosmos3_ar_it2v/model_v03.py`、`config_v03.py`、`configs/ego100h_target_only_df.toml`。旧 V0.1/V0.2 模型和配置不变。
 
 开发测试和一次性通信 profiler 仅在 ignored `tmp/ar_it2v_v03/`，不进Git。复用官方 profiler，在正式训练21–23步采样四个跨节点代表 rank，随后关闭。报告同机/跨节点NCCL活动区间并集及与计算重叠，不能由 kernel 耗时求和断言纯通信开销。
+
+2026-10-05预算修订：初次75008/local32正式run在第2步反传OOM，用户批准改为65536并重开，不更改模型/窗口/噪声/loss/优化器。新版数据回执 `outputs/maintenance/full_segment_retention_65536_20261005/summary.json`：train32355段中30812全帧保留，32315段可用，40段50%仍超限被排除；相比75008，454段进入额外抽帧、排除增加18段（原时长增加.38539小时）。短段不裁剪，整段时间跨度和文本保持。

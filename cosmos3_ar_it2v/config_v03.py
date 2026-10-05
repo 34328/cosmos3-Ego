@@ -2,14 +2,17 @@
 from hydra.core.config_store import ConfigStore
 from cosmos_framework.utils.lazy_config import LazyCall as L, LazyDict
 
-from .config import full_segment_experiment
+from .config import ROOT, full_segment_experiment
 from .model_v03 import ARIT2VModelV03, ARIT2VModelV03Config
 
 CONFIG_NAME = 'rbs_wam_ar_it2v_v0_3_target_only_df'
 
 
 def target_only_experiment():
-    c = full_segment_experiment()
+    c = full_segment_experiment(token_budget=65536)
+    c.dataloader_train.dataloader.datasets.video.dataset.segment_statistics_path = str(
+        ROOT /
+        'outputs/maintenance/full_segment_retention_65536_20261005/summary.json')
     model_config = dict(c.model.config)
     model_config.update(local_attention_frames=32, history_noise_mode='lingbot_public',
                         clean_history_probability=.5, target_history_seed=42)
