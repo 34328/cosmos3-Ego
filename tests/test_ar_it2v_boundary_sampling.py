@@ -83,6 +83,19 @@ def make_pack(value, start, condition):
         cached_text_offset=3, force_action_tokens=False)
 
 
+def native_velocity_items(pack, scalar):
+    """Exercise the real model output reconstruction, including batch singleton.
+
+    Native model predictions are list[[1,C,T,H,W]], not the older denoise
+    docstring's list[[C,T,H,W]]. Condition frames are restored as zeros.
+    """
+    from cosmos_framework.model.generator.mot.cosmos3_vfm_network import Cosmos3VFMNetwork
+    network = SimpleNamespace(latent_patch_size=1,latent_channel=1)
+    patches = torch.full((len(pack.vision.mse_loss_indexes),1),scalar)
+    return Cosmos3VFMNetwork.unpatchify_and_unpack_latents(network,patches,
+        pack.vision.token_shapes,pack.vision.noisy_frame_indexes)
+
+
 @pytest.mark.parametrize('guidance', [1., 2.])
 def test_actual_official_unipc_and_cfg_keep_boundary_clean_and_outside_solver(monkeypatch, guidance):
     from cosmos_framework.model.generator.diffusion.samplers.unipc import UniPCSampler
@@ -107,9 +120,10 @@ def test_actual_official_unipc_and_cfg_keep_boundary_clean_and_outside_solver(mo
             assert torch.equal(pack.vision.condition_mask[0].flatten(),torch.tensor([1.,0.,0.,0.,0.]))
             assert (pack.vision.timesteps > 0).all()
             seen.append(value.clone())
-            result = torch.full_like(value,2. if pack is packs[0] else 0.)
-            result[:, :, :1] = 9999.  # Never allowed to affect the condition or target.
-            return {'preds_vision':[result[0]]}
+            result = native_velocity_items(pack,2. if pack is packs[0] else 0.)
+            assert result[0].shape == value.shape
+            assert torch.count_nonzero(result[0][:, :, :1]) == 0
+            return {'preds_vision':result}
     result = sample_known_boundary(Model(), noise, known, packed_sequences=packs,
         memories=[object() for _ in packs], guidance=guidance, num_steps=7, seed=42, start=5,latent_frames=19)
     # Compare against the exact native shifted schedule, including its nonzero
@@ -179,12 +193,12 @@ def test_real_entry_continuous_gt_encode_once_boundary_time_and_refresh_contract
                 assert torch.allclose(positions,full_positions[:,start:start+value.shape[2]],atol=2e-6)
                 if native.frame_idx==2:
                     assert value[:, :, :1].item() == -10.
-                return {'preds_vision':[torch.ones_like(value[0])]}
+                return {'preds_vision':native_velocity_items(pack,1.)}
             keys = value.flatten().reshape(1,-1,1,1)
             zero = torch.zeros(1,0,1,1)
             memory.write_for_layer(0,(keys,keys,zero,zero))
             events.append(('refresh',native.frame_idx,value.clone()))
-            return {'preds_vision':[torch.zeros_like(value[0])]}
+            return {'preds_vision':native_velocity_items(pack,0.)}
     out, continuous = generate_boundary_latents(Model(),{},num_steps=3,history_mode=mode,return_reference=True)
     assert torch.equal(continuous,gt) and out.shape==gt.shape
     assert [x[0] for x in events].count('encode')==1

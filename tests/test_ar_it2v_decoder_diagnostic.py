@@ -117,6 +117,32 @@ def test_latent_archive_preserves_normalized_values_dtype_and_provenance(tmp_pat
         save_latent_archive(path, predicted, gt, true_frames=23)
 
 
+def test_mixed_dtype_roundtrip_and_decode_preserve_sampler_output(tmp_path):
+    predicted, gt = latent_pair()
+    predicted[:, :, 1:] += 0.125  # These sampler values would be lost in BF16.
+    gt = gt.to(torch.bfloat16)
+    path = tmp_path / "mixed.pt"
+    metadata = save_latent_archive(path, predicted, gt, true_frames=23)
+    archive = load_latent_archive(path)
+    assert archive["predicted_latents"].dtype == torch.float32
+    assert archive["gt_latents"].dtype == torch.bfloat16
+    assert torch.equal(archive["predicted_latents"], predicted)
+    assert torch.equal(archive["gt_latents"], gt)
+    assert metadata["latent_dtype"] == "torch.float32"
+    assert metadata["gt_latent_dtype"] == "torch.bfloat16"
+    model = RecordingDecoder()
+    result = decode_comparison(model, archive["predicted_latents"], archive["gt_latents"], true_frames=23)
+    assert model.calls[0].dtype == torch.float32
+    assert torch.equal(model.calls[0], predicted)
+    assert model.calls[-1].dtype == torch.bfloat16
+    assert all(value.shape[2] == 23 for value in result.values())
+    archive["metadata"]["gt_latent_dtype"] = "torch.float32"
+    invalid = tmp_path / "invalid_dtype.pt"
+    torch.save(archive, invalid)
+    with pytest.raises(ValueError, match="disagrees"):
+        load_latent_archive(invalid)
+
+
 def test_old_or_inconsistent_archive_is_rejected(tmp_path):
     path = tmp_path / "old.pt"
     torch.save({"generated": torch.zeros(3, 17, 1, 1)}, path)

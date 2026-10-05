@@ -125,7 +125,13 @@ def sample_known_boundary(model, noise, boundary, *, packed_sequences, memories,
             OmniMoTCausalModel._set_ar_vision_noise(model, pack, value, branch_timestep)
             pack.to_cuda()
             output = model.denoise(data_batch_packed=pack, memory=memories[index])
-            velocity = torch.stack(output["preds_vision"])
+            # Native unpatchify returns a list of [1,C,T,H,W] items, including
+            # zero velocities at conditioned frames (cosmos3_vfm_network.py).
+            # This entry accepts exactly one item; stack would add a sixth dim.
+            predictions = output["preds_vision"]
+            if len(predictions) != 1:
+                raise ValueError("boundary probe expects exactly one vision prediction item")
+            velocity = predictions[0]
             if velocity.shape != value.shape:
                 raise ValueError("boundary forward returned an unexpected latent shape")
             return velocity[:, :, 1:]

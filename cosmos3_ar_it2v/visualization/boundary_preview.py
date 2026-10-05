@@ -130,17 +130,19 @@ def main():
             predicted = generate_latents(model, training_layout_batch(sample), **settings).detach().cpu()
             baseline_seconds = time.monotonic() - begin
             print(json.dumps(dict(event='baseline_latents_ready', seconds=baseline_seconds)), flush=True)
-            begin = time.monotonic()
-            boundary, reference = generate_boundary_latents(model, training_layout_batch(sample),
-                                                            return_reference=True, **settings)
-            boundary, reference = boundary.detach().cpu(), reference.detach().cpu()
-            boundary_seconds = time.monotonic() - begin
-            if not torch.equal(predicted[:, :, :1], reference[:, :, :1]):
-                raise ValueError('The two runs did not encode the same first-frame condition')
-            if not torch.equal(predicted[:, :, :5], boundary[:, :, :5]):
-                raise ValueError('The unchanged first target C4 differs from baseline')
+            reference = model.get_data_and_condition(training_layout_batch(sample),
+                vision_condition_indexes=None).x0_tokens_vision[0].to(**model.tensor_kwargs).detach().cpu()
             save_latent_archive(root/'baseline_latents.pt', predicted, reference,
                                 true_frames=true_frames, metadata=provenance)
+            begin = time.monotonic()
+            boundary, boundary_reference = generate_boundary_latents(model, training_layout_batch(sample),
+                                                                     return_reference=True, **settings)
+            boundary, boundary_reference = boundary.detach().cpu(), boundary_reference.detach().cpu()
+            boundary_seconds = time.monotonic() - begin
+            if not torch.equal(reference, boundary_reference):
+                raise ValueError('The two runs did not encode the same continuous GT reference')
+            if not torch.equal(predicted[:, :, :5], boundary[:, :, :5]):
+                raise ValueError('The unchanged first target C4 differs from baseline')
             save_latent_archive(root/'boundary_latents.pt', boundary, reference,
                 true_frames=true_frames, metadata=dict(provenance, boundary='previous predicted last latent; original time'))
             print(json.dumps(dict(event='boundary_latents_ready', seconds=boundary_seconds)), flush=True)

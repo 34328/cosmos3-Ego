@@ -37,9 +37,8 @@ def _validate_latents(predicted_latents, gt_latents, true_frames, frames_per_chu
         if not value.is_floating_point() or not torch.isfinite(value).all():
             raise ValueError(f"{name} latents must be finite floating-point model latents")
     if (predicted_latents.shape != gt_latents.shape
-            or predicted_latents.dtype != gt_latents.dtype
             or predicted_latents.device != gt_latents.device):
-        raise ValueError("predicted and GT latents must match shape, dtype and device")
+        raise ValueError("predicted and GT latents must match shape and device")
     if not torch.equal(predicted_latents[:, :, :1], gt_latents[:, :, :1]):
         raise ValueError("predicted and GT must share the conditioned first latent")
     if not isinstance(true_frames, int) or isinstance(true_frames, bool) or true_frames < 1:
@@ -124,6 +123,7 @@ def save_latent_archive(path, predicted_latents, gt_latents, *, true_frames: int
         latent_format=LATENT_FORMAT,
         latent_normalization="official model/tokenizer normalized latent; no additional transform",
         latent_shape=list(predicted_latents.shape), latent_dtype=str(predicted_latents.dtype),
+        gt_latent_dtype=str(gt_latents.dtype),
         latent_frames=latent_frames, true_frames=true_frames,
         aligned_frames=1 + 4 * (latent_frames - 1),
         video_temporal_padding=1 + 4 * (latent_frames - 1) - true_frames,
@@ -159,6 +159,7 @@ def load_latent_archive(path):
     predicted = payload["predicted_latents"]
     expected = {
         "latent_shape": list(predicted.shape), "latent_dtype": str(predicted.dtype),
+        "gt_latent_dtype": str(payload["gt_latents"].dtype),
         "latent_frames": predicted.shape[2], "aligned_frames": 1 + 4 * (predicted.shape[2] - 1),
         "video_temporal_padding": 1 + 4 * (predicted.shape[2] - 1) - metadata["true_frames"],
         "temporal_compression_factor": 4, "latent_chunk_ranges": [list(r) for r in ranges],
