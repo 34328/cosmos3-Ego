@@ -31,3 +31,20 @@ W&B online，API确认本run为 [fv40e8uq](https://wandb.ai/alexlzh431564/rbs_wa
 训练源 `20f717bf8c8663c569d0bd610fa25585900077ec`；TOML SHA256 `ef6cda600b004d6c98157118ba5731a6725f207e509d4acf9f7a82020c95c850`。模型与清单hash同上；新统计回执 `full_segment_retention_65536_20261005/summary.json`，records SHA256 `22697620df91aee713dcae1a454dded5d0613f759ddfaa03316050a3ac898967`。Astra/xhigh复核了新配置、预算回执及Nano起点，未发现阻塞问题。
 
 21:03北京时间，真实monitor已完成step5，四端均无退出；W&B API核实新run [daxa2qx7](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/daxa2qx7) online/running，history step2/3/4含video_loss=.48592/.51343/.46096及LR=1e-6/2e-6/3e-6，证明持续上传，API回执保存在preflight目录。step3–5耗时40.29/39.61/38.67秒，global样本107/131/115，token平均填充96.88%/96.61%/96.62%；最大allocated56.95GiB/reserved77.13GiB，梯度有限、无STOPPED。此为启动阶段实测，不代表完整5000步的最坏显存或收敛验收。
+
+21:19北京时间，monitor/API均核实到step28（loss=.20549、LR=2.7e-5），四端无退出或STOPPED。排除初始两步及采样/导出21–24步，step3–20/25–28共22步平均40.63秒（38.19–44.12），平均每步108.59个segment、填充96.70%；累计最大allocated56.96GiB/reserved77.26GiB。`startup_acceptance.json`保存在preflight目录。按当前速度5000步约56.4小时，不含周期性checkpoint保存等额外开销。
+
+## 一次性通信测量
+
+复用官方profiler，在本次正式run的21–23步采样rank0/8/16/24，代表四节点同一个replicate lane，不代表全部32rank的平均。临时wrapper、4份完整trace、wall回执和CPU汇总均在 ignored `tmp/ar_it2v_v03/comm_target_only_df_lingbot_history_ctx32_65k_5000_20261005T124732Z/`，不入Git；GPU采样已自动结束。Tdebug6仅CPU聚合，退出码0、51秒。
+
+按实际process-group和trace关联区分跨节点与单节点，全部NCCL kernel均归属成功、unknown=0；跨机replicate PG359=[0,8,16,24]，本机shard PG367/368/369/370分别含各节点8卡。每个rank在每步内合并通信区间，除以真实wall时间，不累加重叠kernel或跨rank时间。
+
+| 采样节点/rank | 平均wall秒/步 | 跨节点活动区间占比 | 未与计算/拷贝重叠秒/步 | 未重叠占比 |
+| --- | ---: | ---: | ---: | ---: |
+| Tdebug1/0 | 41.12 | 32.65% | 3.48 | 8.45% |
+| Tdebug3/8 | 41.12 | 44.72% | 3.19 | 7.77% |
+| Tdebug4/16 | 41.12 | 54.67% | 4.10 | 9.97% |
+| Tdebug5/24 | 41.12 | 31.53% | 3.52 | 8.56% |
+
+跨节点活动有72.85–82.63%与本卡计算/拷贝重叠。未重叠部分是暴露的通信活动估计，含等待其他rank，仍可能与其他通信重叠；不能解释成纯网络传输耗时或可消除的加速比例。原始32–55%活动占比不能叫额外通信开销。采样仅三步，不是单/双/四节点同工作量的扩展效率对照；本次通信临时测量到此结束。
