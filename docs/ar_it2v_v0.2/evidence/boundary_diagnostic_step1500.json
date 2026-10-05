@@ -1,0 +1,53 @@
+{
+  "source_commit": "74a6b851d1824875a64774939dda8047d1da1bff",
+  "toml_sha256": "be92f1f816cdbf11839b539c49a40345e9b027a47c170d370c2d84e11dd60c49",
+  "checkpoint": "/mnt/lzh/cosmos-ar-it2v/outputs/pretrain/20261003T032429Z/rbs_wam_ar_it2v/ar_it2v_v0_2/ar_it2v_v0_2_full_segments_75k_lr1e4_4nodes/checkpoints/iter_000001500/model",
+  "seed": 42,
+  "denoise_steps": 35,
+  "guidance": 1.0,
+  "context_sigma": 0.02,
+  "frames": 186,
+  "fps": 30.0,
+  "baseline_generation_seconds": 25.833441825583577,
+  "boundary_generation_seconds": 25.371562724933028,
+  "total_seconds": 236.8031948748976,
+  "peak_allocated_gib": 33.31175136566162,
+  "peak_reserved_gib": 34.1015625,
+  "optimizer_updates": 0,
+  "identical_predictions_in_decoder_comparison": true,
+  "node": "Tdebug4",
+  "gpu": 0,
+  "purpose": "outputs/visualization/ar_it2v_v0.2/step1500/boundary_diagnostic",
+  "cpu_tests": {
+    "boundary": 8,
+    "decoder": 11,
+    "gallery": 12
+  },
+  "mp4_count": 12,
+  "exit_code": 0,
+  "selection_sha256": "3394dce161dcaca23eb587b53f9c682df9a5c7ece41b65eca73582ca87cb8390",
+  "episodes_manifest_sha256": "98d8abdff990cc3cf0b39a0d1ac0b0338b8d3be9e7b2ea7ed8757acfdacec41d",
+  "segments_manifest_sha256": "64655579936e40bf2774c0aca50993f1ef6b53c5fc37a44d70cb752950f9be60",
+  "files_sha256": {
+    "cosmos3_ar_it2v/inference.py": "d4209d262be8a861030c029bc0a3f54081e360c6b1cc4ba57784cb20a0a8976a",
+    "cosmos3_ar_it2v/visualization/boundary_sampling.py": "29438aa67c5ae5bcfcd4bcb0acbc2b273aeeeb39434dc97eaf8bbba20800ac5d",
+    "cosmos3_ar_it2v/visualization/decoder_diagnostic.py": "6ce10e774e8ceda400841d0aadc9abc706521d1dc47ca9f3f2f4bc23923fcf84"
+  },
+  "server_verification": {
+    "": 200,
+    "boundary_diagnostic/index.html": 200,
+    "boundary_diagnostic/selection.json": 404,
+    "boundary_diagnostic/baseline_latents.pt": 404,
+    "boundary_diagnostic/predicted_prefix/manifest.json": 404,
+    "media_range": [
+      206,
+      32,
+      "bytes 0-31/1521821"
+    ]
+  },
+  "conclusions": {
+    "decoder": "GT-prefix matching reduces ghosting; residual boundary jumps remain",
+    "vae": "GT continuous reconstruction visually stable",
+    "shared_boundary": "No effective improvement on this segment; stalled motion and late scene drift"
+  }
+}

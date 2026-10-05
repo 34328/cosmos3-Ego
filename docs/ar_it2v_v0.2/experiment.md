@@ -111,3 +111,13 @@ formal_monitor 最后 step1500：video_loss=0.19157143344637007，实际更新�
 
 修复提交2e046cb后重新推理：相关CPU25项通过（新增2项真实入口回归），Tdebug6 GPU0–5的6/6任务正常退出，18个MP4帧数/30fps核对通过；每段40.47–155.83秒，峰值allocated33.28–36.13GiB。有效产物回到`step1500/gt_history/`，页面恢复两种历史切换，默认GT；错误产物不参与比较。
 抽查train_02/test_02的块边界，大片灰褐崩坏消失，边界重影仍存在。GT KV条件与拼接预测序列的连续decoder状态不同，故不能据此直接判定真实历史下的单块能力。未训练、未改配方、未计算质量指标；后续严格单块诊断应匹配GT解码前缀。
+
+## 2026-10-05 Step1500 解码前缀与共享边界短片实验
+
+只取既有train_02完整186帧（6.2秒），保持step1500、seed42、35次去噪、CFG1、历史刷新噪声0.02和原时间轴。A整段预测连续解码；B使用完全相同预测，在完整GT前缀下解码每个目标块并按绝对时间裁出RGB，属于单块诊断拼图；C为GT连续VAE重建；D单独尝试原时间start−1的预测末latent作为锁定条件，去掉同位置历史KV，仍只采样原C4新latent。未更新权重，未改默认sampler或训练配方。
+
+计算源74a6b85，Tdebug4空闲GPU0：A预测25.83秒、D预测25.37秒，总236.80秒（含模型加载、连续编码及解码对照），峰值allocated33.31GiB/reserved34.10GiB，exit_code=0；4种显示共12个MP4均186帧/30fps。相关CPU31项通过（boundary8、decoder11、gallery12）。初次缺少RANK及随后官方输出多批次维度适配失败均保留回执；修复后测试直接使用官方unpatchify输出，不把mock通过当作真实GPU验收。
+
+同时间接缝抽查：C重建平稳；B相较A明显少重影，但GT重新锚定与块间预测差异造成的跳变仍存在。由此支持decoder历史不匹配是重影的一个来源，不能归因全部跳变。D在这条样本上出现画面停滞、动作滞后和后段场景偏离，未得到有效改善；额外边界条件属于未经训练的新推理分布，不能当作已验证修复。只做本短片，不展开全量评测、不自动训练。
+
+独立产物为`outputs/visualization/ar_it2v_v0.2/step1500/boundary_diagnostic/`，同端口子页`/boundary_diagnostic/index.html`；原GT/generated页面和产物保留。normalized latent及回执不公开，服务器仍只允许选定MP4和页面。小型验收证据见[evidence/boundary_diagnostic_step1500.json](evidence/boundary_diagnostic_step1500.json)。

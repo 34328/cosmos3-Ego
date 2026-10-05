@@ -35,7 +35,7 @@ def build_diagnostic_page(root):
 document.title='接缝诊断 · Step 1500';
 document.querySelector('.intro h1').textContent='同一段动作，检查画面接缝。';
 document.querySelector('.intro p').textContent='同一个完整短片，原速 30fps。前两项使用完全相同的预测，只改变解码历史；第四项单独尝试共享边界。所有实验均不更新模型权重。';
-document.querySelector('.toolbar').hidden=true;
+document.querySelector('.toolbar').style.display='none';
 document.querySelector('.section-heading h2').textContent='训练集 · 取香块并摆入盒中';
 document.querySelector('.section-heading p').textContent='1 个完整动作段 · 4 种显示方式 · 每段 6.2 秒';
 document.querySelector('#noise-note').textContent='预测块使用此前的真实视频作为历史，因此属于诊断模式。历史写入噪声为 0.02。共享边界取自上一块的模型预测，不提供当前块的真实图像。';
