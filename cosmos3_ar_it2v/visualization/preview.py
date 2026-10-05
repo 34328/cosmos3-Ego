@@ -17,6 +17,31 @@ def write_json(path, value):
     temporary.replace(path)
 
 
+def decode_preview(model, batch, predicted_latents, *, history_mode, true_frames,
+                   frames_per_chunk=4):
+    """Select the real decoder contract without changing the AR sampler.
+
+    Generated history never requests GT encoding. GT history uses one extra
+    deterministic official full-segment encode because the sampler does not
+    return its reference; no RGB output is encoded and no A/C variants run.
+    """
+    import torch
+    if history_mode not in ('generated', 'gt'):
+        raise ValueError('history_mode must be generated or gt')
+    with torch.no_grad():
+        if history_mode == 'generated':
+            decoded = model.decode(predicted_latents.to(**model.tensor_kwargs))
+            return decoded[:, :, :true_frames].detach().cpu(), 'predicted_prefix'
+        from .decoder_diagnostic import decode_gt_prefix
+        clean = model.get_data_and_condition(batch, vision_condition_indexes=None)
+        if clean.batch_size != 1 or clean.x0_tokens_action is not None or len(clean.x0_tokens_vision) != 1:
+            raise ValueError('expected one continuously encoded pure-video GT segment')
+        reference = clean.x0_tokens_vision[0].to(**model.tensor_kwargs)
+        decoded = decode_gt_prefix(model, predicted_latents, reference,
+            true_frames=true_frames, frames_per_chunk=frames_per_chunk)
+        return decoded, 'gt_prefix_montage'
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--selection', type=Path, required=True)
@@ -41,6 +66,10 @@ def main():
                      for w in selected}
     if any(mode not in ('generated', 'gt') for mode in history_modes.values()):
         raise ValueError('history_mode must be generated or gt')
+    for window in selected:
+        expected_decoder = 'gt_prefix_montage' if history_modes[window['id']] == 'gt' else 'predicted_prefix'
+        if window.get('decoder_mode', selection.get('decoder_mode', expected_decoder)) != expected_decoder:
+            raise ValueError('decoder_mode disagrees with the new preview history mode')
     full_segment = selection.get('preview_mode') == 'full_segment'
     worker_name = '_'.join(args.ids)
     worker_dir = root / 'workers' / worker_name
@@ -96,19 +125,22 @@ def main():
             if len(indices) != int(window['num_frames']) or not np.all(np.diff(indices) == 1):
                 raise ValueError('Preview must use the requested continuous original frames')
             torch.cuda.reset_peak_memory_stats()
+            true_frames = int(sample.get('video_true_num_frames', sample['video'].shape[1]))
+            batch = training_layout_batch(sample)
             with torch.no_grad():
-                latent = generate_latents(model, training_layout_batch(sample),
+                latent = generate_latents(model, batch,
                     num_steps=selection['denoise_steps'], guidance=selection['guidance'],
                     seed=selection['seed'], context_sigma=selection['context_sigma'],
                     history_mode=history_mode)
-                decoded = model.decode(latent.to(**model.tensor_kwargs))
+                decoded, decoder_mode = decode_preview(model, batch, latent,
+                    history_mode=history_mode, true_frames=true_frames,
+                    frames_per_chunk=model.config.frames_per_chunk)
             if not torch.isfinite(decoded).all():
                 raise ValueError('Nonfinite decoded RGB')
             pred = ((decoded[0].float().clamp(-1, 1) + 1) * 127.5).round().byte().permute(1, 2, 3, 0).cpu().numpy()
-            gt = sample['video'].permute(1, 2, 3, 0).cpu().numpy()
+            gt = sample['video'].permute(1, 2, 3, 0).cpu().numpy()[:true_frames]
             if pred.shape != gt.shape:
                 raise ValueError(f'Generated/GT shape mismatch: {pred.shape}, {gt.shape}')
-            true_frames = int(sample.get('video_true_num_frames', len(pred)))
             pred, gt = pred[:true_frames, :360], gt[:true_frames, :360]
             fps = float(sample['conditioning_fps'])
             preview = np.concatenate((gt, pred), axis=2)
@@ -134,7 +166,7 @@ def main():
                 frames=len(pred), fps=fps, latent_frames=latent.shape[2],
                 frames_per_chunk=model.config.frames_per_chunk,
                 local_attention_frames=model.config.local_attention_frames,
-                history=history_mode, history_mode=history_mode,
+                history=history_mode, history_mode=history_mode, decoder_mode=decoder_mode,
                 modalities=['text','video'], frame_stride=1,
                 source_frame_indices=indices.tolist(), short_start_frame=short_first,
                 short_num_frames=short_count, runtime_seconds=elapsed,
@@ -145,7 +177,7 @@ def main():
             write_json(output / 'manifest.json', metadata)
             print(json.dumps(dict(event='window_completed', id=window['id'], seconds=elapsed,
                                   frames=len(pred)), ensure_ascii=False), flush=True)
-            del latent, decoded, pred, gt, preview, videos, sample
+            del latent, decoded, pred, gt, preview, videos, sample, batch
             torch.cuda.empty_cache()
     except BaseException:
         error = traceback.format_exc()

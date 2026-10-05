@@ -35,7 +35,7 @@ const button=document.createElement('button');button.className='switch';button.d
 document.querySelector('.toolbar').prepend(group);
 }
 if(fullSegment){
-document.querySelector('.intro p').textContent='每条视频对应一个完整动作段及其原始文本，从第一帧到最后一帧连续生成。短片和长片是不同的完整 segment，不从长片中裁剪，也不改变原始动作速度。';
+document.querySelector('.intro p').textContent='每条预览对应一个完整动作段及其原始文本，保留所有真实帧。短片和长片是不同的完整 segment，不从长片中裁剪，也不改变原始动作速度。';
 document.querySelector('.endnote').textContent='只提供视频观察，不计算指标。每条片段均保留完整动作与对应文本；长短筛选切换样本，不裁剪视频。';
 document.querySelector('[data-length="short"]').textContent='短片 · 完整动作段';
 document.querySelector('[data-length="long"]').textContent='长片 · 完整动作段';
@@ -52,17 +52,28 @@ const durations=[...new Set(data.samples.map(s=>`${s.frames} 帧 / ${fmt(s.durat
 const parameters=[['模型','Cosmos3-Nano · 纯视频 AR'],[fullSegment?'生成范围':'长片时长',fullSegment?'完整动作段 · 各段时长见下方':durations.join('；')],['回放速度',`${fmt(data.fps)} fps · 原始时间轴`],['随机种子',data.seed],['每块去噪次数',`${data.denoise_steps} 次`],['文本引导强度',`${fmt(data.guidance)}（CFG）`],['历史刷新噪声',fmt(data.context_sigma)],['对照方式','左：真实视频　右：模型生成']];
 for(const [label,value] of parameters){const item=text('div','','param');item.append(text('dt',label),text('dd',value));document.querySelector('#params').append(item);}
 function updateHistoryNote(){
-const source=historyMode==='gt'?'每块预测结束后，用对应时间段的真实视频更新历史记忆。右侧仍是每块的模型预测，不是整段自由生成；当前目标块不会获得其真实图像。':'只提供起始图像，后续使用模型已生成的块作为历史，逐块连续生成。';
+const source=historyMode==='gt'?'每块预测结束后，用对应时间段的真实视频更新历史记忆。右侧仍是每块的模型预测，不是整段自由生成；当前目标块不会获得其真实图像。每段下方注明解码方式，匹配真实前缀版本是单块诊断拼图。':'只提供起始图像，后续使用模型已生成的块作为历史，逐块连续生成。';
 document.querySelector('#noise-note').textContent=`${source} “历史刷新噪声 ${fmt(data.context_sigma)}”指写入历史记忆前加入的噪声，不是给展示视频添加噪点。`;
 }
 updateHistoryNote();
 let lengthMode=fullSegment?'all':'short', splitMode='all';
 const cards=[];
+function predictionLabel(s){
+return s.decoder_mode==='gt_prefix_montage'?'模型预测 · 匹配真实前缀解码':s.history_mode==='gt'?'模型预测 · 原预测前缀解码':'模型生成 · 连续解码';
+}
+function decoderDescription(s){
+if(s.decoder_mode==='gt_prefix_montage')return '每块沿完整真实前缀解码后裁出当前预测；单块诊断拼图，不代表连续自由生成。';
+if(s.history_mode==='gt')return '真实历史预测，整段预测前缀连续解码；沿用原产物口径，解码历史与预测条件可能不一致。';
+return '仅首帧图像与文本为真实条件，后续使用模型生成历史，整段预测连续解码。';
+}
 function changeLength(card){
 const s=card.sample;card.video.pause();card.video.src=s.media[!fullSegment&&lengthMode==='short'?'short_preview.mp4':'preview.mp4'];card.error.classList.remove('visible');card.video.load();
 const end=s.short_start+s.short_duration;
 card.note.textContent=fullSegment?`${s.length_group==='short'?'完整短片':'完整长片'} · ${fmt(s.duration)} 秒 · ${s.frames} 帧`:lengthMode==='short'?`${fmt(s.short_duration)} 秒 · 长片 ${fmt(s.short_start)}–${fmt(end)} 秒`:`${fmt(s.duration)} 秒 · ${s.frames} 帧`;
-card.description.textContent=historyComparison?(s.history_mode==='gt'?'每块使用真实历史预测；整段拼接预览的接缝暂不作为单块质量结论。':'仅起始图像为真实条件，后续使用模型生成历史。'):(fullSegment?'原始动作段完整起止，使用上方对应文本；无片中截取。':lengthMode==='short'?'来自下方“长片”同一次生成的动作区间裁剪。':'从首帧与文本出发，逐块连续生成完整视频。');
+card.description.textContent=decoderDescription(s)+(!fullSegment&&lengthMode==='short'?' 此短片来自同一次长片的动作区间裁剪。':'');
+card.video.previousElementSibling.lastElementChild.textContent=predictionLabel(s);
+card.video.setAttribute('aria-label',`${s.split==='train'?'训练集':'验证集'}，${s.title}，真实视频与${predictionLabel(s)}`);
+card.video.closest('.sample').querySelector('.source-links').lastElementChild.textContent=s.history_mode==='gt'?'预测视频':'生成视频';
 }
 function applyFilters(){
 for(const card of cards){const visible=(splitMode==='all'||card.sample.split===splitMode)&&(!fullSegment||lengthMode==='all'||card.sample.length_group===lengthMode)&&(!historyComparison||card.sample.history_mode===historyMode);card.video.closest('.sample').hidden=!visible;if(!visible)card.video.pause();}
@@ -72,10 +83,10 @@ for(const split of ['train','test']){const samples=data.samples.filter(s=>s.spli
 for(const button of document.querySelectorAll('[data-length]'))button.addEventListener('click',()=>{lengthMode=button.dataset.length;document.querySelectorAll('[data-length]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));if(!fullSegment)cards.forEach(changeLength);applyFilters();});
 for(const button of document.querySelectorAll('button[data-split]'))button.addEventListener('click',()=>{splitMode=button.dataset.split;document.querySelectorAll('button[data-split]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));applyFilters();});
 if(historyComparison){
-document.querySelector('.intro p').textContent='同一批完整动作段，切换真实视频历史和模型生成历史，观察错误是否随连续生成累积。右栏始终播放模型预测；当前预测块不会获得对应真实图像。';
-document.querySelector('.endnote').textContent='真实视频历史是诊断模式：每块预测后，以真实视频更新后续记忆。它不代表只靠首帧完成整段任务。模型生成历史使用已生成结果继续预测。';
+document.querySelector('.intro p').textContent='同一批完整动作段，切换真实视频历史和模型生成历史，比较模型预测。每段下方注明其真实解码方式；当前预测块不会获得对应真实图像。';
+document.querySelector('.endnote').textContent='真实视频历史是诊断模式：每块预测后，以真实视频更新后续记忆。匹配真实前缀解码是单块诊断拼图。模型生成历史使用已生成结果继续预测，并连续解码整段预测。';
 for(const card of cards){
-card.video.previousElementSibling.lastElementChild.textContent=card.sample.history_mode==='gt'?'模型预测 · 真实视频历史':'模型预测 · 模型生成历史';
+card.video.previousElementSibling.lastElementChild.textContent=predictionLabel(card.sample);
 }
 for(const section of document.querySelectorAll('section[data-split]')){
 const count=data.samples.filter(s=>s.split===section.dataset.split&&s.history_mode===historyMode).length;

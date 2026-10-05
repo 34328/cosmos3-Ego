@@ -65,18 +65,7 @@ def _decode_from_zero(model, latents):
     return decoded.detach().cpu()
 
 
-@torch.no_grad()
-def decode_comparison(model, predicted_latents, gt_latents, *, true_frames: int,
-                      frames_per_chunk: int = 4):
-    """Return three raw RGB tensors ``[1,3,true_frames,H,W]`` on CPU.
-
-    A and B use exactly the same predicted latents. B calls ``model.decode``
-    on ``GT[:start] + predicted[start:end]`` from latent zero for every block,
-    then takes its absolute RGB range. It never passes target or future GT to
-    that block's decoder. C is the complete GT reconstruction. The official
-    decoder owns normalization and all causal cache operations.
-    """
-    ranges = _validate_latents(predicted_latents, gt_latents, true_frames, frames_per_chunk)
+def _validate_decoder(model):
     tokenizer = getattr(model, "tokenizer_vision_gen", None)
     if tokenizer is not None:
         if not tokenizer.is_causal or tokenizer.temporal_compression_factor != 4:
@@ -85,18 +74,48 @@ def decode_comparison(model, predicted_latents, gt_latents, *, true_frames: int,
                 or getattr(tokenizer, "keep_decoder_cache", False)):
             raise ValueError("full-prefix diagnostic cannot run inside a cached decoder scope")
 
-    predicted_prefix = _decode_from_zero(model, predicted_latents)[:, :, :true_frames].clone()
+
+@torch.no_grad()
+def decode_gt_prefix(model, predicted_latents, gt_latents, *, true_frames: int,
+                     frames_per_chunk: int = 4):
+    """Decode only the GT-prefix single-block montage, with no A/C recomputation.
+
+    Each call starts at latent zero and contains only completed GT history plus
+    the current predicted block. The returned native RGB tensor is on CPU and
+    trimmed to true_frames. This montage is not a continuous rollout.
+    """
+    ranges = _validate_latents(predicted_latents, gt_latents, true_frames, frames_per_chunk)
+    _validate_decoder(model)
     parts = []
     for start, end in ranges:
         prefix = torch.cat((gt_latents[:, :, :start], predicted_latents[:, :, start:end]), dim=2)
         rgb_start, rgb_end = rgb_frame_range(start, end)
         decoded = _decode_from_zero(model, prefix)
         part = decoded[:, :, rgb_start:min(rgb_end, true_frames)].clone()
-        if part.shape[3:] != predicted_prefix.shape[3:]:
+        if parts and part.shape[3:] != parts[0].shape[3:]:
             raise ValueError("prefix decoder spatial shapes differ")
         parts.append(part)
         del decoded, prefix
     gt_prefix_montage = torch.cat(parts, dim=2)
+    if gt_prefix_montage.shape[2] != true_frames:
+        raise ValueError("GT-prefix montage does not cover every true frame")
+    return gt_prefix_montage
+
+
+@torch.no_grad()
+def decode_comparison(model, predicted_latents, gt_latents, *, true_frames: int,
+                      frames_per_chunk: int = 4):
+    """Return three raw RGB tensors ``[1,3,true_frames,H,W]`` on CPU.
+
+    A and B use exactly the same predicted latents. B delegates to
+    decode_gt_prefix; C is the complete GT reconstruction. The official
+    decoder owns normalization and all causal cache operations.
+    """
+    _validate_latents(predicted_latents, gt_latents, true_frames, frames_per_chunk)
+    _validate_decoder(model)
+    predicted_prefix = _decode_from_zero(model, predicted_latents)[:, :, :true_frames].clone()
+    gt_prefix_montage = decode_gt_prefix(model, predicted_latents, gt_latents,
+        true_frames=true_frames, frames_per_chunk=frames_per_chunk)
     gt_reconstruction = _decode_from_zero(model, gt_latents)[:, :, :true_frames].clone()
     if gt_prefix_montage.shape != predicted_prefix.shape or gt_reconstruction.shape != predicted_prefix.shape:
         raise ValueError("decoded comparison shapes differ")

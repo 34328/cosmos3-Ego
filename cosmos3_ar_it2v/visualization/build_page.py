@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 PARAMETERS = ('checkpoint_step', 'seed', 'denoise_steps', 'guidance', 'context_sigma', 'fps')
 MEDIA = ('preview.mp4', 'short_preview.mp4', 'generated.mp4', 'gt.mp4')
+DECODER_MODES = ('predicted_prefix', 'gt_prefix_montage')
 
 
 def media_names(selection):
@@ -65,7 +66,7 @@ def load_gallery(selection_path):
         if window.get('split') not in ('train', 'test'):
             raise ValueError('A window split must be train or test')
         sample_id = window.get('id')
-        history_mode = window.get('history_mode', 'generated')
+        history_mode = window.get('history_mode', selection.get('history_mode', 'generated'))
         if history_mode not in ('gt', 'generated'):
             raise ValueError('history_mode must be gt or generated')
         if history_comparison and 'history_mode' not in window:
@@ -85,6 +86,16 @@ def load_gallery(selection_path):
             raise ValueError(f'{sample_id}: manifest history fields disagree')
         if manifest_history != history_mode:
             raise ValueError(f'{sample_id}: history_mode differs from the displayed experiment')
+        # Missing fields identify the original predicted-prefix decode. Never
+        # silently relabel completed legacy RGB as the new GT-prefix montage.
+        decoder_mode = manifest.get('decoder_mode', 'predicted_prefix')
+        if decoder_mode not in DECODER_MODES:
+            raise ValueError(f'{sample_id}: unknown decoder_mode')
+        if decoder_mode == 'gt_prefix_montage' and history_mode != 'gt':
+            raise ValueError(f'{sample_id}: GT-prefix decoding requires GT history')
+        displayed_decoder = window.get('decoder_mode', selection.get('decoder_mode', decoder_mode))
+        if displayed_decoder != decoder_mode:
+            raise ValueError(f'{sample_id}: decoder_mode differs from the displayed experiment')
         # Missing manifests/media are failures, never rendered as a completed sample.
         for key in PARAMETERS:
             if key in manifest and manifest[key] != selection[key]:
@@ -107,7 +118,7 @@ def load_gallery(selection_path):
             path.resolve().relative_to(root.resolve())
             if not path.is_file() or path.stat().st_size == 0:
                 raise FileNotFoundError(f'Incomplete preview media: {path}')
-            revision = quote(f"{selection['version']}-{selection['checkpoint_step']}-{selection.get('preview_mode', 'window')}-{history_mode}", safe='')
+            revision = quote(f"{selection['version']}-{selection['checkpoint_step']}-{selection.get('preview_mode', 'window')}-{history_mode}-{decoder_mode}", safe='')
             media[filename] = quote(path.relative_to(root).as_posix(), safe='/') + '?v=' + revision
         caption = window.get('caption', manifest.get('caption', ''))
         if not isinstance(caption, str):
@@ -123,15 +134,22 @@ def load_gallery(selection_path):
         samples.append(dict(split=window['split'], title=window.get('title') or f'片段 {index+1:02d}',
                             caption=caption, frames=frames, fps=fps, duration=duration,
                             short_start=start, short_duration=short,
-                            length_group=window.get('length_group'), history_mode=history_mode, media=media))
+                            length_group=window.get('length_group'), history_mode=history_mode,
+                            decoder_mode=decoder_mode, media=media))
     if history_comparison:
         for sample_id, pair in pairs.items():
             if set(pair) != {'gt', 'generated'} or pair['gt'] != pair['generated']:
                 raise ValueError(f'{sample_id}: history modes must pair the same complete segment')
+    else:
+        actual_modes = {sample['history_mode'] for sample in samples}
+        default_history = next(iter(actual_modes)) if len(actual_modes) == 1 else 'generated'
+        if ('default_history_mode' in selection
+                and selection['default_history_mode'] != default_history):
+            raise ValueError('default_history_mode differs from the displayed results')
     # Internal IDs, source hashes, checkpoint paths and raw manifest fields are not published.
     return dict(version=selection['version'], preview_mode='full_segment' if full_segment else 'window',
                 history_comparison=history_comparison,
-                default_history_mode=default_history if history_comparison else 'generated',
+                default_history_mode=default_history,
                 **{k: selection[k] for k in PARAMETERS}, samples=samples)
 
 

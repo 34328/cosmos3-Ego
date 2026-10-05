@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from cosmos3_ar_it2v.visualization.decoder_diagnostic import (
-    LATENT_FORMAT, decode_comparison, load_latent_archive, rgb_frame_range, save_latent_archive,
+    LATENT_FORMAT, decode_comparison, decode_gt_prefix, load_latent_archive, rgb_frame_range, save_latent_archive,
 )
 
 
@@ -61,6 +61,16 @@ def test_same_predictions_complete_gt_prefix_no_target_or_future_and_true_crop()
     assert (result["gt_prefix_montage"][:, :, 17:21] == gt[:, :, :5].sum() + predicted[:, :, 5].item()).all()
     assert (result["gt_prefix_montage"][:, :, 21:] == gt[:, :, :5].sum() + predicted[:, :, 5:].sum()).all()
     assert not torch.equal(result["predicted_prefix"][:, :, 17:], result["gt_prefix_montage"][:, :, 17:])
+
+
+def test_gt_prefix_only_does_not_decode_extra_comparison_variants():
+    predicted, gt = latent_pair()
+    model = RecordingDecoder()
+    result = decode_gt_prefix(model, predicted, gt, true_frames=23)
+    assert result.shape == (1, 3, 23, 1, 1)
+    assert [call.shape[2] for call in model.calls] == [1, 5, 7]
+    assert torch.equal(model.calls[-1][:, :, :5], gt[:, :, :5])
+    assert torch.equal(model.calls[-1][:, :, 5:], predicted[:, :, 5:])
 
 
 def test_gt_target_change_cannot_change_earlier_block_diagnostic():
