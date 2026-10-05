@@ -1,31 +1,34 @@
 # Cosmos3 AR IT2V
 
-将 CMD Stage 1 的因果视频训练方法迁移到 **Cosmos3-Nano**，使用 EgoVerse 约 100 小时视频做领域 AR 继续预训练。输入为**首帧图像＋文本**，输出为逐块生成的视频；本项目没有 action 模态。
+Cosmos3-Nano 上的纯视频 AR 继续预训练：输入首帧图像与动作段文本，逐块生成视频。迁移 CMD Stage 1 的核心训练方法，保留官方 Cosmos3 的 VAE、文本路径、Packer、Trainer 与 checkpoint；不含 action 模态。
 
-## 当前配方
+## 当前状态
 
-- 完整文本segment为一个样本，原始30fps连续源帧、不随机裁剪、不跨段。
-- 官方token-budget Packer预算75008；仅超预算单段按用户批准的90%→50%阶梯均匀保留帧，保持原时间跨度，50%仍超限则明确排除并记录。旧最长97帧随机短窗口训练已停止并保留。
-- 完整 clip 连续 VAE 编码；latent 分块 `[1,4,4,…]`，local16 总窗口，无永久首帧 sink。
-- 单遍 Diffusion Forcing：首帧干净且不计 loss，未来块分别采样 σ、块内共享，所有未来块计算 flow MSE。
-- 官方 Nano 起点，GEN-only 参数训练，保留官方 Trainer、optimizer、scheduler、DCP 和 W&B。
-- 本轮为多步 AR 预训练，不包含 Context-matched distillation。
+V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_000001500`。[训练记录](docs/ar_it2v_v0.2/experiment.md)和 [W&B run](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o)保留完整来源；当前没有新训练任务授权。
 
-## 入口
+- 一个完整文本 segment 是一个训练样本；正常段使用全部连续原始帧，原始30fps，不随机裁窗口、不跨段。
+- 官方动态 Packer 预算75008 token；仅单条超预算段使用批准的90%→50%均匀保留策略，仍超限则明确排除。
+- 整段连续 VAE 编码，latent 分块 `[1,4,4,…]`，C4/local16，绝对 RoPE，有界 KV cache。
+- 单遍 Diffusion Forcing：首 latent 干净且不计 loss；每个后续 GT 块独立加噪、块内共享 σ，并计算 flow loss。
+- 从官方 Nano 初始化、GEN训练/UND冻结；4节点32卡、1500步/save500、lr1e-4→3e-5、weight_decay0.01。
 
-| 内容 | 路径 |
+目前自由生成仍有任务偏离与累积误差。GT历史诊断采用匹配GT解码前缀，减少了已观察样本的重影，但这是依赖GT的单块拼图；不能称为自由生成修复。现状和后续问题见 [problems.md](docs/problems.md)。
+
+## 导航
+
+| 内容 | 入口 |
 |---|---|
-| 设计与验收口径 | [docs/ar_it2v_v0.1/design.md](docs/ar_it2v_v0.1/design.md) |
-| 训练状态与实验回执 | [docs/ar_it2v_v0.1/experiment.md](docs/ar_it2v_v0.1/experiment.md) |
-| 新完整segment设计与配置 | [design.md](docs/ar_it2v_v0.2/design.md)、[ego100h_full_segments.toml](cosmos3_ar_it2v/configs/ego100h_full_segments.toml) |
-| 完整segment覆盖与短测 | [experiment.md](docs/ar_it2v_v0.2/experiment.md) |
-| 模型与块因果注意力 | [model.py](cosmos3_ar_it2v/model.py)、[attention.py](cosmos3_ar_it2v/attention.py) |
-| 数据 | [dataset.py](cosmos3_ar_it2v/dataset.py) |
-| 官方训练启动入口 | [launch.sh](cosmos3_ar_it2v/launch.sh) |
+| 协作规则 | [AGENTS.md](AGENTS.md) |
+| 当前设计 / 实验 | [V0.2设计](docs/ar_it2v_v0.2/design.md) / [实验记录](docs/ar_it2v_v0.2/experiment.md) |
+| 模型 / 注意力 | [model.py](cosmos3_ar_it2v/model.py) / [attention.py](cosmos3_ar_it2v/attention.py) |
+| 完整段数据 / 官方 packing 适配 | [dataset.py](cosmos3_ar_it2v/dataset.py) / [dataloader.py](cosmos3_ar_it2v/dataloader.py) |
+| 配置 / 启动 | [ego100h_full_segments.toml](cosmos3_ar_it2v/configs/ego100h_full_segments.toml) / [launch.sh](cosmos3_ar_it2v/launch.sh) |
 | 逐块推理 | [inference.py](cosmos3_ar_it2v/inference.py) |
-| 测试 | `tests/test_ar_it2v_*.py` |
-| 官方 Cosmos3 框架 | [packages/cosmos3/AGENTS.md](packages/cosmos3/AGENTS.md) |
+| 统一预览与服务器网页 | [visualization/README.md](cosmos3_ar_it2v/visualization/README.md) |
+| 回归测试 | `tests/test_ar_it2v_*.py` |
+| 官方框架 | [packages/cosmos3/AGENTS.md](packages/cosmos3/AGENTS.md) |
+| 历史短窗口实验 | [V0.1设计](docs/ar_it2v_v0.1/design.md) / [实验记录](docs/ar_it2v_v0.1/experiment.md) |
 
-远端工作目录 `/mnt/lzh/cosmos-ar-it2v`，分支 `ar-it2v-pretrain`。原始清单引用 `/mnt/lzh/cosmos-EgoWAM/training_manifests/` 下的 100 小时数据，视频与权重直接使用共享存储，不复制进源码目录。
+远端 `/mnt/lzh/cosmos-ar-it2v`，分支 `ar-it2v-pretrain`。本地新项目保存本分支源码与文档；数据、权重、运行产物和网页服务在远端。共享数据清单仍位于 `/mnt/lzh/cosmos-EgoWAM/training_manifests/`，作为只读数据源；不复制到项目，不依赖该目录中的联合模型代码。
 
-环境使用 `/home/lzh/miniconda3/envs/cosmos3/bin/python`，`PYTHONPATH` 同时包含仓库根和 `packages/cosmos3`。正式启动前遵循 [AGENTS.md](AGENTS.md) 检查资源、已有任务与配置；正式训练 online W&B，真实进度以实验记录和 API 核实结果为准。
+环境：`/home/lzh/miniconda3/envs/cosmos3/bin/python`，`PYTHONPATH=<repo>:<repo>/packages/cosmos3`。执行前遵守 [AGENTS.md](AGENTS.md)，优先复用官方组件。

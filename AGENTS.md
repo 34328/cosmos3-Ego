@@ -1,60 +1,47 @@
 # Cosmos3 AR IT2V 协作指南
 
-## AR 视频边界与旧联合格式
+## 项目范围与当前状态
 
-- 2026-10-03 已核实旧联合 V0.3/V0.3.1 将 AR 分块与 VAE 时间上下文重置绑定：训练逐块独立编码，推理末帧反复 decode→encode，输出逐块解码拼接。这是画面跳变的重要嫌疑，尚未证明是唯一原因；纯视频 V0.1 的连续性观察不能直接归功于正在训练的完整 segment V0.2。
-- 保持本分支连续编码、同一 latent 序列和连续解码语义。旧联合修正版在 `/mnt/lzh/cosmos-EgoWAM` 的独立 V0.4 文件/配置实施，action 策略保持，检查时间对齐和历史 KV，不改本分支训练源文件或配方。
-- 旧联合 checkpoint/NPZ 的分块 latent 格式不可直接按连续 latent 解码；新入口必须校验格式。公共问题证据维护在旧联合仓库及本地的 `docs/problems.md`。用户授权清理旧联合 V0.3* 产物，不包括纯视频 IT2V、官方权重、共享数据和活跃任务产物。
+本项目在 Cosmos3-Nano 上迁移 CMD Stage 1 的因果视频训练方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。输入是首帧图像与 segment 文本，输出只有视频；没有 action、state、骨架或联合监督。项目适配放在 `cosmos3_ar_it2v/`，官方框架保留在 `packages/cosmos3/`。
 
+当前基线为 V0.2 完整 segment / 75008 token 配方，已完成 1500 步，最终 checkpoint 为 `iter_000001500`。此前 V0.1 是最长 97 帧的随机短窗口训练，记录仅供历史复现。现阶段推进纯视频诊断与预览；没有新训练、自动恢复或重训授权。新配方需要用户确认后才能启动。
 
-## 项目与当前授权
+本地项目：`/Users/cnf2026953090/Desktop/rbs-WAM-videogen pretrain`；远端仓库：`/mnt/lzh/cosmos-ar-it2v`；分支：`ar-it2v-pretrain`。本地保存源码和文档，计算、数据、权重与视频服务在远端。主导航见 `README.md`，现状与问题见 `docs/problems.md`，完整实验见 `docs/ar_it2v_v0.2/experiment.md`。
 
-本分支 `ar-it2v-pretrain` 在 Cosmos3-Nano 上迁移 CMD Stage 1 的核心方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。项目扩展统一放在 `cosmos3_ar_it2v/`；旧短窗口记录放在 `docs/ar_it2v_v0.1/`，完整segment设计和实验记录放在 `docs/ar_it2v_v0.2/`。交流与文档默认中文，代码标识符保留英文。
+## 模型、数据与训练语义
 
-用户已停止最长97帧的随机短窗口实验。2026-10-03用户在短测和独立review交付后明确批准按下述完整segment配方启动正式训练；不恢复旧run或自动重训。具体配方以本分支设计、配置和实际运行回执为准。
+- 优先复用官方 Cosmos3 的 VAE、文本路径、RoPE、flow 参数化、Packer、Trainer、优化器、调度器、DCP checkpoint 和 W&B。复杂功能先查官方代码及扩展接口；只有已核实的缺口才写最小适配，不另造训练主循环或重复实现。
+- 使用官方 Nano 起点，训练 GEN 相关参数、冻结 UND。当前只迁移 CMD Stage 1，不能称为完整复现 CMD，也不混入少步或长视频蒸馏。
+- 一个完整文本 segment 是一个样本，保留段边界、文本配对及原始 train/test 划分。正常段连续读取全部原始 30fps 帧，不随机裁窗口、不跨 segment、不改变动作速度。连续编码整段，不能按 AR 块重置 VAE。
+- 清单位于共享存储 `/mnt/lzh/cosmos-EgoWAM/training_manifests/`；这是只读数据位置，不是本项目的联合模型依赖。不复制数据，不混入 test。
+- 官方 token-budget Packer：`max_samples_per_batch=None`、`max_sequence_length=75008`，packed 样本间注意力隔离。仅单条超预算时采用已批准的 90%→80%→70%→60%→50% 均匀保留帧策略，保持原首尾与时间跨度；50%仍超限则明确排除。记录源索引、真实/对齐长度与 effective_fps，不能静默丢弃或倍速播放。
+- VAE 时间对齐保留动作末尾；补帧不计有效监督，支持部分末 AR 块。推理输出去除对齐补帧。
+- 单遍 Diffusion Forcing：latent 分块 `[1,4,4,…]`；首 latent 是干净图像条件，不计 loss。每个后续块由 GT latent 独立加噪，块内共享 σ，所有后续块计算 flow loss；训练历史不是前一块的模型预测。σ 为 uniform 经 shift5 后截断至 `[0.02,0.98]`，没有特殊低噪声前缀或前缀 loss 屏蔽。
+- 当前注意力 C4/local16 latent 总窗口，当前块内双向、块间因果，历史最多12 latent；无永久首帧 sink。复用官方绝对时间 RoPE、有界 KV cache 和块级去噪/刷新语义，不在新块重置位置。
+- 已完成 V0.2 配方：4节点/32卡、HSDP8×4/CP1、seed42、1500步/save500；官方 LambdaCosine warmup100/cycle1500、峰值1e-4/终点3e-5、weight_decay0.01。此处是历史基线，不构成重新启动授权；实际配置和回执以实验文档为准。
 
-## 核心约定
+## 远端操作与资源
 
-- 输入只有首帧图像和文本；生成模态只有视频。没有 action、state、audio 或 LiDAR 输入、token、投影头和监督。
-- 从官方 Cosmos3-Nano 权重起步。复用其视频 VAE、文本路径、位置编码及 flow 参数化；训练 GEN 相关参数，冻结 UND 路径。
-- 数据使用 `training_manifests` 原始 train/test 划分与动作段文本。实际清单位于 `/mnt/lzh/cosmos-EgoWAM/training_manifests/`；不复制共享原始数据，不混入 test。
-- 原始视频为30fps，正常segment连续读取全部源帧。仅单条完整segment超过75008 token预算时，按用户批准的90%→80%→70%→60%→50%阶梯均匀保留帧，保持原首尾、文本和时间跨度；50%仍超预算则明确排除并记录原因。effective_fps、实际源索引及真实/对齐长度必须保存，不把抽帧段当30fps倍速播放。VAE原生时间压缩不属于数据抽帧。
-- 连续编码完整segment，不在每个AR块重置VAE；原始边界和文本配对不变，不随机裁短窗口、不跨segment。末尾VAE对齐必须保留真实长度、排除补帧计数，支持部分末AR块。旧97/81/65/49/33/17随机窗口配置仅保留作历史复现，不再作为新训练默认。
-- 单遍 Diffusion Forcing，latent 分块为 `[1,4,4,…]`。首个 latent 是干净图像条件，其余块内共享噪声、块间独立；首帧从 loss 分子和分母排除，所有未来块参与 flow loss。
-- 当前注意力为 C4、local16 latent 总窗口，当前块内双向、块间因果，历史最多 12 latent；不额外保留永久首帧 sink。各 packed 样本必须隔离。
-- σ 采样为 uniform 经 shift5 后截断到 `[0.02,0.98]`，首帧为 0；不引入低噪声前缀或前缀 loss 屏蔽。推理按整个块去噪、按整个块刷新 KV，保留绝对时间位置。
-- 当前只迁移 Stage 1，不把少步蒸馏或长视频蒸馏混入同一次实验。
-- 完整segment使用官方token-budget Packer，`max_samples_per_batch=None`、`max_sequence_length=75008`；禁止静默丢弃或随机裁剪。已批准配方为4个空闲节点、HSDP8×4、1500步、每500步保存，LambdaCosine warmup100/cycle1500、峰值lr1e-4/终点3e-5、weight_decay0.01。新run从官方Nano起点开始；启动后不得重复派发。
+- 所有远端操作只用 MCP SSH Apply Patch，统一账号 `lzh`；禁止本地 SSH/SCP 或 root。首次先查询已知 host，确认仓库、分支、适用 AGENTS、`git log -5` 与 `git status`，查明他人变更，不顺手提交。
+- Tdebug1–6 共享存储；不要复制数据/权重，不修改其他仓库或活跃任务使用的源文件、输出。
+- GPU 任务前检查 `nvidia-smi` 的利用率、显存和进程；只用空闲资源，不抢占、不杀他人进程。多节点使用内网通信，分别通过各节点 MCP 派发，禁止节点间 SSH。
+- 耗时 CPU 阶段先检查 quota、affinity、内存和负载，合理限制 BLAS/OpenMP 线程。启动前核对 claim、真实进程和退出回执，禁止重复派发；失败保留证据，不自动重试或恢复。
+- 环境为 `/home/lzh/miniconda3/envs/cosmos3/bin/python`；测试与启动统一 `PYTHONPATH=<repo>:<repo>/packages/cosmos3`。官方规则见 `packages/cosmos3/AGENTS.md`。
 
-## 远端入口与资源
+## 验证、记录与提交
 
-- 开发、测试、训练与推理均在远端进行。本分支工作目录为 `/mnt/lzh/cosmos-ar-it2v`；本地仅保留协作资料。
-- 远端操作只能使用 MCP SSH Apply Patch 插件，统一账号 `lzh`，禁止自行改用本地 SSH、SCP 或 root。先调用 `listKnownHosts`，以当前工具 schema 的 `hostAlias` 等真实字段执行命令。
-- 获准节点为 Tdebug1–6。首次工作先读适用 AGENTS、确认路径、`git log -5`、`git status` 与环境；不能用本地状态代替远端状态。
-- 六节点共享存储。不要并发修改同一文件或复制数据/权重；保持旧仓库与其他 worktree 独立，不改动其他正在运行任务的源文件或输出。
-- 启动 GPU 任务前检查 `nvidia-smi` 的显存、利用率与进程。忙则换空闲 GPU/节点，不杀他人进程、不抢占资源。多节点通信使用内网；未验证节点间 SSH 时，分别通过 MCP 启动两端。
-- 耗时 CPU 阶段先检查 CPU quota、affinity、空闲内存与负载。独立工作合理并行，每进程限制 BLAS/OpenMP 线程；复用已验证产物，禁止不必要的全量重算。
-- 启动前检查 launch claim、进程、输出及退出回执，避免重复任务。失败保留完整证据；没有明确恢复方案和授权时不自动重启。
+- 验证只覆盖本次变化的真实路径：数据边界、timestep、mask、loss、历史梯度、KV、VAE及训练生命周期。复用已验收产物；必要检查通过后推进，不重复无关全量实验。CPU 测试显式关闭 CUDA；涉及真实 GPU 行为的变化才做相应短测。
+- 正式训练必须 W&B online，启动后用 API 核实本次 run/step/loss/LR，交付真实链接；不输出密钥，不用旧 run 或本地日志代替 API。配置、清单、源提交和资源写入版本实验记录。
+- 停止条件以已确认 monitor/配方为准；非有限数值、OOM 等保留完整证据，不因主观画质擅自停止或改配方。
+- 输出放独立 `outputs/` 版本目录；数据、权重、checkpoint、视频、缓存和密钥不进 Git。小型必要回执可进 `docs/<version>/evidence/`，临时材料仅放 `tmp/`。
+- 独立任务可多 Agent 并行，明确文件负责人；同一文件、配置或资源按依赖顺序处理。提交前审查 diff，分批 commit/push，每次 push 前 `git pull --rebase`，不覆盖他人变更。
 
-## 训练、验证与记录
+## 推理与可视化
 
-- 复用官方 Cosmos3 CLI、Trainer、优化器、调度器、DCP checkpoint 和 W&B。扩展点足够时不另写训练主循环，不全局劫持官方日志。
-- 实现新功能前先查官方现有代码、接口和配置，能复用就直接复用，尤其是复杂计算和功能组件（注意力 mask、RoPE、VAE、packing、分布式 loss 归约、KV cache、状态恢复等）。不得未经核实就另造一套实现。
-- 官方能力确实不满足需求时，先说明缺口与采用的扩展点，只写必要的最小适配；保留官方计算语义和生命周期。Review 同样检查已有自定义实现是否可以直接换回官方组件，不能只凭小型测试通过就认定复杂组件适合真实规模。
-- 运行环境：`/home/lzh/miniconda3/envs/cosmos3/bin/python`；测试与启动脚本都使用 `PYTHONPATH=<repo>:<repo>/packages/cosmos3`。官方框架的额外导航与规则见 `packages/cosmos3/AGENTS.md`。
-- 验证聚焦真实 noising、timestep、mask、loss、历史梯度、cache 等价性及正式训练生命周期。必要检查通过后推进工作，不重复已通过的同一套测试。
-- CPU 回归显式关闭 CUDA；原生配置的运行期验证可能初始化 CUDA，放在实际 GPU 短测中验证。
-- 正式训练必须 W&B online；启动前核实最终配置和环境覆盖，启动后通过 API 确认真实 run/step/loss 已上传，交付可点击链接并记入实验文档。不得输出密钥，不用旧 run 或本地日志代替 API 核实。
-- run 名称包含版本与实验方向，日期不能成为主要标识。记录 source/config/manifest hash、资源、吞吐、loss、裁剪前梯度与显存。
-- 梯度裁剪是训练算法的一部分；频繁触发本身不等于发散。具体停止条件以本分支 monitor 和已记录配方为准；保留非有限数值、OOM、持续 loss 爆炸及显存异常的失败证据，不因主观画质判断擅自停训。
-- 输出写入独立 `outputs/` 子目录，checkpoint、视频、NPZ、缓存不入源码 Git。必要小型回执与实验结论写入版本文档；临时材料放 `tmp/`。
-
-## 可视化
-
-- 纯视频预览入口为 `cosmos3_ar_it2v/visualization/`，先读其中 README，复用现有 sampler、固定清单和页面。产物按 `outputs/visualization/<version>/step<step>/<purpose>/` 隔离；保留原始30fps，GT／生成RGB双栏，不引入联合任务骨架或旧17块规则。
-- 默认 train/test 各三个按真实GT选择的明显操作完整 segment，使用原始起止和对应完整文本。长片、短片选择各自完整的长短 segment，不从长片中截取短片，不随机裁窗口；VAE 对齐补帧只在解码后去除，保留全部真实帧。旧V0.1裁剪预览仅保留作历史；新版本依据真实训练长度和有效帧率标注。真实checkpoint、seed、去噪次数、CFG与历史刷新噪声均展示。
-- 网页服务仅监听服务器回环地址，经已有远程连接转发，不自动下载视频副本。只发布页面及选定MP4，不公开日志、样本身份、清单、权重或训练目录。
-
-## 协作与提交
-
-无依赖工作优先多 Agent 并行，明确文件写入负责人；涉及同一配置、代码或运行资源的步骤按依赖顺序推进。提交前检查 diff，不能顺手提交他人变更；分批 commit/push，每次 push 前先 `git pull --rebase`。有冲突先核对来源，不覆盖正在训练使用的版本。旧实验历史由其他分支保留，不在本纯视频分支重新引入其目录或路线约束。
+- 统一入口 `cosmos3_ar_it2v/visualization/`，先读该目录 README。产物按 `outputs/visualization/<version>/step<step>/<purpose>/` 命名，保留版本、checkpoint与采样设置。
+- 默认 train/test 各选几个手部移动明显的拿起、移动、放下动作，长短分别选不同的完整 segment，使用对应完整文本；不从长片裁出短片。页面为 GT RGB／模型 RGB，不显示内部身份、存储路径或联合模型骨架。
+- 必须区分 Transformer 的历史 KV 与 VAE 的解码前缀。`generated` 是只给初始图像、后续使用自身预测历史的自由生成，整段预测 latent 连续解码（`decoder_mode=predicted_prefix`）。
+- `gt` 是真实历史单块诊断：官方 `get_data_and_condition(..., vision_condition_indexes=None)` 连续编码完整 GT，仅已完成块可写入历史 KV；当前目标块没有自身 GT 条件。显示采用同一 GT 前缀连续解码预测目标块，再按绝对时间裁出 RGB（`decoder_mode=gt_prefix_montage`）。这是 GT 锚定的单块预测拼图，不能当作完整自由生成能力。
+- 生成历史的官方首帧优化 `vision_condition_indexes=[[0]]` 不可用于提取完整 GT 历史。不得单独重置 VAE 解码目标块，不得 decode→encode 回填历史。
+- 旧 manifest 未记录 decoder_mode 时按旧 `predicted_prefix` 解释，不能把旧 MP4 改名成新解码结果。共享预测末 latent 的额外边界条件在短测中未改善，不设为默认；证据保留，避免重复试验。
+- 网页服务仅监听远端回环地址，经已有连接转发；只发布页面与选定 MP4，不公开 manifest、latent、日志、数据或权重，不默认下载视频到本地。

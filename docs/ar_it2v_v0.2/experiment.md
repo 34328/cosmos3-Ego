@@ -121,3 +121,9 @@ formal_monitor 最后 step1500：video_loss=0.19157143344637007，实际更新�
 同时间接缝抽查：C重建平稳；B相较A明显少重影，但GT重新锚定与块间预测差异造成的跳变仍存在。由此支持decoder历史不匹配是重影的一个来源，不能归因全部跳变。D在这条样本上出现画面停滞、动作滞后和后段场景偏离，未得到有效改善；额外边界条件属于未经训练的新推理分布，不能当作已验证修复。只做本短片，不展开全量评测、不自动训练。
 
 独立产物为`outputs/visualization/ar_it2v_v0.2/step1500/boundary_diagnostic/`，同端口子页`/boundary_diagnostic/index.html`；原GT/generated页面和产物保留。normalized latent及回执不公开，服务器仍只允许选定MP4和页面。小型验收证据见[evidence/boundary_diagnostic_step1500.json](evidence/boundary_diagnostic_step1500.json)。
+
+## 2026-10-05 纯视频项目与诊断默认入口
+
+用户选择采用匹配GT解码前缀的诊断显示；后续新GT预览复用该实现，`decoder_mode=gt_prefix_montage`，生成历史仍为`predicted_prefix`，不改sampler、权重或训练配方。
+旧视频保留真实解码口径，不改名、不重复推理；新增入口及页面标签通过33项聚焦CPU测试，未运行新GPU实验。
+新本地项目`rbs-WAM-videogen pretrain`与远端纯视频分支同步，根AGENTS/README和文档导航重写；保留纯视频历史，移除旧联合任务的活跃规则，问题集中在`docs/problems.md`。
