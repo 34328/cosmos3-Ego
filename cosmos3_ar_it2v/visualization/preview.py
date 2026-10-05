@@ -37,6 +37,10 @@ def main():
     if len(set(args.ids)) != len(args.ids) or any(i not in windows for i in args.ids):
         raise ValueError('IDs must be unique existing selection windows')
     selected = [windows[i] for i in args.ids]
+    history_modes = {w['id']: w.get('history_mode', selection.get('history_mode', 'generated'))
+                     for w in selected}
+    if any(mode not in ('generated', 'gt') for mode in history_modes.values()):
+        raise ValueError('history_mode must be generated or gt')
     full_segment = selection.get('preview_mode') == 'full_segment'
     worker_name = '_'.join(args.ids)
     worker_dir = root / 'workers' / worker_name
@@ -66,6 +70,7 @@ def main():
                 sample_mode='full_segment' if full_segment else 'window', long_segment_policy='error',
                 max_sequence_length=None, segment_statistics_path=None)
         for window in selected:
+            history_mode = history_modes[window['id']]
             output = root / window['output_dir']
             output.mkdir(parents=False, exist_ok=False)
             write_json(output / 'started.json', {**claim, 'window': window})
@@ -94,7 +99,8 @@ def main():
             with torch.no_grad():
                 latent = generate_latents(model, training_layout_batch(sample),
                     num_steps=selection['denoise_steps'], guidance=selection['guidance'],
-                    seed=selection['seed'], context_sigma=selection['context_sigma'])
+                    seed=selection['seed'], context_sigma=selection['context_sigma'],
+                    history_mode=history_mode)
                 decoded = model.decode(latent.to(**model.tensor_kwargs))
             if not torch.isfinite(decoded).all():
                 raise ValueError('Nonfinite decoded RGB')
@@ -128,7 +134,8 @@ def main():
                 frames=len(pred), fps=fps, latent_frames=latent.shape[2],
                 frames_per_chunk=model.config.frames_per_chunk,
                 local_attention_frames=model.config.local_attention_frames,
-                history='generated', modalities=['text','video'], frame_stride=1,
+                history=history_mode, history_mode=history_mode,
+                modalities=['text','video'], frame_stride=1,
                 source_frame_indices=indices.tolist(), short_start_frame=short_first,
                 short_num_frames=short_count, runtime_seconds=elapsed,
                 peak_allocated_gib=torch.cuda.max_memory_allocated()/2**30,

@@ -10,6 +10,25 @@
 
 例如本轮输出到 `outputs/visualization/ar_it2v_v0.2/step1000/full_segments/`。完成三个非空 MP4 后构建页面，服务只开放这三个 MP4 与 index；URL 包含版本、checkpoint 和模式以防切换预览时命中旧媒体缓存。
 
+## 真实历史诊断与生成历史切换
+
+完整动作段可复用已完成的生成历史产物，仅新增真实历史推理。生成历史只给初始图像，后续读取模型自己的输出；真实历史模式在每块预测完成后，用对应时间段的 GT 更新历史记忆，右栏仍播放模型预测。当前目标块不会得到自己的真实图像，真实历史结果不代表无反馈的整段生成能力。两种模式使用相同样本、checkpoint、seed、去噪次数、CFG 和历史刷新噪声。
+
+混合页面以共同父目录（例如 `step1500/`）作为根目录，不使用指向根外的媒体链接，也不复制视频：
+
+```text
+step1500/
+  selection.json
+  index.html
+  full_segments/train_01/{manifest.json,preview.mp4,generated.mp4,gt.mp4}
+  gt_history/train_01/{manifest.json,preview.mp4,generated.mp4,gt.mp4}
+  ...
+```
+
+清单沿用完整动作段参数，增加 `history_comparison=true` 和 `default_history_mode="gt"`。每个样本成对列入 `windows`，两项使用相同 `id`，分别指定 `history_mode="generated"`／`"gt"`，`output_dir` 分别为 `full_segments/train_01`／`gt_history/train_01`。新 manifest 保存真实 `history_mode`；旧 manifest 的 `history` 字段仍兼容。两字段同时存在必须一致，未记录历史来源的旧产物只认作 generated。
+
+构建器核对配对样本的文本、真实长度、源帧范围及采样参数。页面默认真实历史，提供两种历史来源切换，布局仍为左 GT／右模型预测；完整长短动作段与 train/test 筛选保持不变。服务器继续仅允许清单列出的 MP4 和 index，不发布其他父目录文件。构建与服务命令的根目录改为上述共同父目录即可。
+
 ## 历史裁剪模式（仅兼容已有产物）
 
 未指定 `preview_mode` 的旧预览继续使用以下四视频格式；不作为新预览选样标准。

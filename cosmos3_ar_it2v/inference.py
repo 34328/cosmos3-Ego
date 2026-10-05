@@ -46,11 +46,31 @@ def refresh_latents(clean, sigma: float, *, seed: int):
     return ((1 - sigma) * clean.float() + sigma * noise).to(clean.dtype)
 
 
-def rollout_chunks(first_latent, latent_frames, *, chunk_size, seed, context_sigma, denoise, refresh):
-    """Orchestrate whole-chunk writes. Callbacks receive absolute latent positions."""
+def rollout_chunks(first_latent, latent_frames, *, chunk_size, seed, context_sigma, denoise, refresh,
+                   history_mode="generated", gt_latents=None):
+    """Generate outputs, then refresh only completed chunks as causal history.
+
+    GT history is a diagnostic: ``gt_latents`` must be one continuously encoded
+    segment, not independently encoded chunks. Its completed ``start:end`` slice
+    replaces the history write only; outputs always remain model predictions.
+    Callbacks receive absolute latent positions and never receive future GT.
+    """
     ranges = chunk_ranges(latent_frames, chunk_size)
     if first_latent.ndim != 5 or first_latent.shape[0] != 1 or first_latent.shape[2] != 1:
         raise ValueError("first_latent must be [1,C,1,H,W]")
+    if history_mode not in ("generated", "gt"):
+        raise ValueError("history_mode must be 'generated' or 'gt'")
+    if history_mode == "gt":
+        expected = list(first_latent.shape)
+        expected[2] = latent_frames
+        if not isinstance(gt_latents, torch.Tensor) or list(gt_latents.shape) != expected:
+            raise ValueError("GT history requires the complete matching [1,C,T,H,W] latent segment")
+        if gt_latents.device != first_latent.device or gt_latents.dtype != first_latent.dtype:
+            raise ValueError("GT history must match the first latent device and dtype")
+        if not torch.equal(gt_latents[:, :, :1], first_latent):
+            raise ValueError("GT history must have the same conditioned first latent")
+    elif gt_latents is not None:
+        raise ValueError("gt_latents is only accepted with history_mode='gt'")
     # Validate even for a one-frame-only call.
     refresh_latents(first_latent, context_sigma, seed=seed)
     chunks = [first_latent.clone()]
@@ -65,19 +85,29 @@ def rollout_chunks(first_latent, latent_frames, *, chunk_size, seed, context_sig
             raise ValueError("denoised chunk shape or finiteness mismatch")
         chunks.append(clean.clone())
         if end < latent_frames:
-            history = refresh_latents(clean, context_sigma, seed=seed + 100000 + start)
+            history_source = gt_latents[:, :, start:end] if history_mode == "gt" else clean
+            if not torch.isfinite(history_source).all():
+                raise ValueError("nonfinite history chunk")
+            history = refresh_latents(history_source, context_sigma, seed=seed + 100000 + start)
             refresh(history, start=start, sigma=context_sigma)
     return torch.cat(chunks, dim=2)
 
 
 @torch.no_grad()
-def generate_latents(model, batch, *, num_steps=35, guidance=1.0, seed=42, context_sigma=0.02):
-    """Batch size one, pure I+T to video; output includes the conditioned first latent."""
+def generate_latents(model, batch, *, num_steps=35, guidance=1.0, seed=42, context_sigma=0.02,
+                     history_mode="generated"):
+    """Pure I+T rollout, optionally replacing completed history with continuous GT.
+
+    ``gt`` is an oracle-history diagnostic, not autonomous I+T generation.
+    The conditioned first latent and all prediction outputs retain their meaning.
+    """
     from cosmos_framework.data.generator.sequence_packing.autoregressive import pack_input_sequence_autoregressive
     from cosmos_framework.data.generator.sequence_packing.modality import compute_text_split_length
 
     if num_steps < 1 or not math.isfinite(guidance):
         raise ValueError("invalid sampler arguments")
+    if history_mode not in ("generated", "gt"):
+        raise ValueError("history_mode must be 'generated' or 'gt'")
     if model.config.action_gen:
         raise ValueError("IT2V requires action_gen=False")
     if model.config.compile.enabled:
@@ -151,7 +181,8 @@ def generate_latents(model, batch, *, num_steps=35, guidance=1.0, seed=42, conte
             transfer_history_max_tokens=history_tokens)
 
     return rollout_chunks(reference[:, :, :1], frames, chunk_size=chunk_size,
-                          seed=seed, context_sigma=context_sigma, denoise=denoise, refresh=refresh)
+                          seed=seed, context_sigma=context_sigma, denoise=denoise, refresh=refresh,
+                          history_mode=history_mode, gt_latents=reference if history_mode == "gt" else None)
 
 
 def training_layout_batch(sample):
