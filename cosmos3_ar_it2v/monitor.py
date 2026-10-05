@@ -86,6 +86,12 @@ class VideoTrainingMonitor(Callback):
             action_gen=bool(cfg.model.config.action_gen),frames_per_chunk=int(cfg.model.config.frames_per_chunk),
             local_attention_frames=int(cfg.model.config.local_attention_frames),wandb_mode=str(cfg.job.wandb_mode),sigma_sampler='uniform_shift_postclamp',
             sigma_min=float(cfg.model.config.sigma_min),sigma_max=float(cfg.model.config.sigma_max),sigma_shift=float(cfg.model.config.sigma_shift))
+        if hasattr(cfg.model.config,'history_noise_mode'):
+            row.update(history_noise_mode=str(cfg.model.config.history_noise_mode),
+                clean_history_probability=float(cfg.model.config.clean_history_probability),
+                history_timestep_index_range=[500,999],history_sigma_shift=5.,
+                history_noise_granularity='latent_frame',loss_scope='one_target_chunk_per_segment',
+                target_history_seed=int(cfg.model.config.target_history_seed))
         if not dist.is_initialized() or dist.get_rank()==0:
             root=Path(cfg.job.path_local);root.mkdir(parents=True,exist_ok=True)
             (root/'learning_rate_receipt.json').write_text(json.dumps(row,indent=2))

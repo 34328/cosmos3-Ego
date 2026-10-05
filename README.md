@@ -4,7 +4,9 @@ Cosmos3-Nano 上的纯视频 AR 继续预训练：输入首帧图像与动作段
 
 ## 当前状态
 
-V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_000001500`。[训练记录](docs/ar_it2v_v0.2/experiment.md)和 [W&B run](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o)保留完整来源；当前没有新训练任务授权。
+V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_000001500`。[训练记录](docs/ar_it2v_v0.2/experiment.md)和 [W&B run](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o)保留完整来源。用户已批准 [V0.3](docs/ar_it2v_v0.3/design.md)：从官方 Nano 重启，四节点32卡/5000步、窗口32 latent、只监督一个目标块，GT历史按 LingBot-VA 公开代码加噪。
+
+V0.2基线设置（旧配方保留）：
 
 - 一个完整文本 segment 是一个训练样本；正常段使用全部连续原始帧，原始30fps，不随机裁窗口、不跨段。
 - 官方动态 Packer 预算75008 token；仅单条超预算段使用批准的90%→50%均匀保留策略，仍超限则明确排除。
@@ -22,6 +24,7 @@ V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_0
 |---|---|
 | 协作规则 | [AGENTS.md](AGENTS.md) |
 | 当前设计 / 实验 | [V0.2设计](docs/ar_it2v_v0.2/design.md) / [实验记录](docs/ar_it2v_v0.2/experiment.md) |
+| 新训练设计 / 实验 | [V0.3设计](docs/ar_it2v_v0.3/design.md) / [实验记录](docs/ar_it2v_v0.3/experiment.md) |
 | 模型 / 注意力 | [model.py](cosmos3_ar_it2v/model.py) / [attention.py](cosmos3_ar_it2v/attention.py) |
 | 完整段数据 / 官方 packing 适配 | [dataset.py](cosmos3_ar_it2v/dataset.py) / [dataloader.py](cosmos3_ar_it2v/dataloader.py) |
 | 配置 / 启动 | [ego100h_full_segments.toml](cosmos3_ar_it2v/configs/ego100h_full_segments.toml) / [launch.sh](cosmos3_ar_it2v/launch.sh) |

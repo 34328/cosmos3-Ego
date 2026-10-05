@@ -40,7 +40,10 @@ def main():
         LOG_FILENAME='formal_sft.log',BASE_CHECKPOINT_PATH='/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp',
         WAN_VAE_PATH='/mnt/checkpoints/Wan2.2-TI2V-5B/Wan2.2_VAE.pth',TEXT_TOKENIZER_PATH='/mnt/checkpoints/Cosmos3-Nano/text_tokenizer',
         TOML_FILE=plan['toml_file'],
+        TRAINING_MODULE=plan.get('training_module','cosmos3_ar_it2v.train'),
         EXTRA_TAIL_OVERRIDES='job.name='+plan['run_name']+' job.wandb_mode=online')
+    if plan.get('communication_profile_root'):
+        env['AR_IT2V_COMM_PROFILE_ROOT']=plan['communication_profile_root']
     command=['bash',str(repo/'cosmos3_ar_it2v/launch.sh')]
     receipt=dict(node=node,rank=rank,hostname=socket.gethostname(),started_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         source_commit=plan['source_commit'],command=command,gpu=gpu,cpu_quota=Path('/sys/fs/cgroup/cpu.max').read_text().strip(),

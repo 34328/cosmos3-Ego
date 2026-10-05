@@ -4,7 +4,7 @@
 
 本项目在 Cosmos3-Nano 上迁移 CMD Stage 1 的因果视频训练方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。输入是首帧图像与 segment 文本，输出只有视频；没有 action、state、骨架或联合监督。项目适配放在 `cosmos3_ar_it2v/`，官方框架保留在 `packages/cosmos3/`。
 
-当前基线为 V0.2 完整 segment / 75008 token 配方，已完成 1500 步，最终 checkpoint 为 `iter_000001500`。此前 V0.1 是最长 97 帧的随机短窗口训练，记录仅供历史复现。现阶段推进纯视频诊断与预览；没有新训练、自动恢复或重训授权。新配方需要用户确认后才能启动。
+当前基线为 V0.2 完整 segment / 75008 token 配方，已完成1500步。用户已批准 V0.3 从官方 Nano 重新训练：四节点32卡、5000步/save500、C4/local32、单目标块 loss，历史噪声按 LingBot-VA 公开代码。新模型、配置和文档分版本保留，不能改写旧实验；这次批准不包含自动恢复或失败重训。此前 V0.1 是最长97帧随机短窗口训练，仅供历史复现。
 
 本地项目：`/Users/cnf2026953090/Desktop/rbs-WAM-videogen pretrain`；远端仓库：`/mnt/lzh/cosmos-ar-it2v`；分支：`ar-it2v-pretrain`。本地保存源码和文档，计算、数据、权重与视频服务在远端。主导航见 `README.md`，现状与问题见 `docs/problems.md`，完整实验见 `docs/ar_it2v_v0.2/experiment.md`。
 
@@ -16,8 +16,10 @@
 - 清单位于共享存储 `/mnt/lzh/cosmos-EgoWAM/training_manifests/`；这是只读数据位置，不是本项目的联合模型依赖。不复制数据，不混入 test。
 - 官方 token-budget Packer：`max_samples_per_batch=None`、`max_sequence_length=75008`，packed 样本间注意力隔离。仅单条超预算时采用已批准的 90%→80%→70%→60%→50% 均匀保留帧策略，保持原首尾与时间跨度；50%仍超限则明确排除。记录源索引、真实/对齐长度与 effective_fps，不能静默丢弃或倍速播放。
 - VAE 时间对齐保留动作末尾；补帧不计有效监督，支持部分末 AR 块。推理输出去除对齐补帧。
-- 单遍 Diffusion Forcing：latent 分块 `[1,4,4,…]`；首 latent 是干净图像条件，不计 loss。每个后续块由 GT latent 独立加噪，块内共享 σ，所有后续块计算 flow loss；训练历史不是前一块的模型预测。σ 为 uniform 经 shift5 后截断至 `[0.02,0.98]`，没有特殊低噪声前缀或前缀 loss 屏蔽。
-- 当前注意力 C4/local16 latent 总窗口，当前块内双向、块间因果，历史最多12 latent；无永久首帧 sink。复用官方绝对时间 RoPE、有界 KV cache 和块级去噪/刷新语义，不在新块重置位置。
+- V0.3 单遍单目标 Diffusion Forcing：latent 分块 `[1,4,4,…]`，首 latent 干净且不计 loss。每个完整 segment 均匀选一个非条件目标块 k；该块沿用 V0.2 uniform→shift5→clamp[.02,.98] 的块内共享 σ 和官方速度目标。k 前的历史由 GT 加噪，50% 整样本历史干净，50% 每 latent 独立抽 timestep index500..999/1000，经官方 FlowMatch scheduler shift5，实际 σ≈.00498.. .83333。历史与目标选择使用独立于原 σ/ε 的可恢复 iteration/rank RNG；不是模型预测历史。
+- 仅 k 进入 loss 分子和有效分母，保留真实末帧权重及官方样本平均。历史输出无直接 loss，但历史输入/隐藏 KV 保留来自目标的梯度；未来块无 loss 且不可见。不能把历史标成首帧条件或 detach。V0.2 所有后续块均算 loss 的旧配方保留不变。
+- V0.3 注意力 C4/local32 latent 总窗口，当前块内双向、块间因果，最多7个历史块；无永久首帧 sink。复用官方绝对时间 RoPE、有界 KV cache 和块级去噪/刷新语义，不在新块重置位置。V0.2 原窗口 local16 保留。
+- V0.3 使用官方 LambdaCosine warmup100/cycle5000、峰值1e-4/终点3e-5、weight_decay0.01；完整 segment 数据、75008预算及其他训练组件沿用 V0.2。新入口为 `configs/ego100h_target_only_df.toml`，详细语义见 `docs/ar_it2v_v0.3/design.md`。
 - 已完成 V0.2 配方：4节点/32卡、HSDP8×4/CP1、seed42、1500步/save500；官方 LambdaCosine warmup100/cycle1500、峰值1e-4/终点3e-5、weight_decay0.01。此处是历史基线，不构成重新启动授权；实际配置和回执以实验文档为准。
 
 ## 远端操作与资源
@@ -31,6 +33,7 @@
 ## 验证、记录与提交
 
 - 验证只覆盖本次变化的真实路径：数据边界、timestep、mask、loss、历史梯度、KV、VAE及训练生命周期。复用已验收产物；必要检查通过后推进，不重复无关全量实验。CPU 测试显式关闭 CUDA；涉及真实 GPU 行为的变化才做相应短测。
+- 用户要求新的开发测试、通信 profiling 脚本与结果仅放 ignored `tmp/`，不用 Git 记录；已有 tracked 测试保留。通信仅测一次，复用官方 profiler，报告区间并集与计算重叠，不把 NCCL kernel 总和称为纯通信开销。
 - 正式训练必须 W&B online，启动后用 API 核实本次 run/step/loss/LR，交付真实链接；不输出密钥，不用旧 run 或本地日志代替 API。配置、清单、源提交和资源写入版本实验记录。
 - 停止条件以已确认 monitor/配方为准；非有限数值、OOM 等保留完整证据，不因主观画质擅自停止或改配方。
 - 输出放独立 `outputs/` 版本目录；数据、权重、checkpoint、视频、缓存和密钥不进 Git。小型必要回执可进 `docs/<version>/evidence/`，临时材料仅放 `tmp/`。

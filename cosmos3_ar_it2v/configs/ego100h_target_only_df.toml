@@ -1,0 +1,35 @@
+# Full segments / native 75008-token packing; one supervised chunk per segment.
+# Official Nano restart. C4; current chunk + at most 7 history chunks (32 latent).
+# History augmentation follows LingBot-VA public timestep-index sampling, shift5.
+[job]
+task = "vfm"
+experiment = "rbs_wam_ar_it2v_v0_3_target_only_df"
+project = "rbs_wam_ar_it2v"
+group = "ar_it2v_v0_3"
+name = "ar_it2v_v0_3_target_only_df"
+wandb_mode = "online"
+[model]
+precision = "bfloat16"
+[model.parallelism]
+data_parallel_shard_degree = 8
+data_parallel_replicate_degree = 4
+context_parallel_shard_degree = 1
+[model.activation_checkpointing]
+mode = "full"
+[model.compile]
+enabled = false
+[optimizer]
+lr = 1.0e-4
+weight_decay = 0.01
+[scheduler]
+warm_up_steps = [100]
+cycle_lengths = [5000]
+f_start = [0.0]
+f_max = [1.0]
+f_min = [0.3]
+[trainer]
+max_iter = 5000
+logging_iter = 1
+[checkpoint]
+load_path = "${oc.env:BASE_CHECKPOINT_PATH,/mnt/lzh/icl/VideoGen/checkpoints/Cosmos3-Nano-official-dcp}"
+save_iter = 500

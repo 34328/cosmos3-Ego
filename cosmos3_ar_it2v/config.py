@@ -106,3 +106,7 @@ ConfigStore.instance().store(group='experiment',package='_global_',
 def make_config():
     from cosmos_framework.configs.base.config import make_config as base
     return base()
+
+
+# Register the new recipe without changing either historical experiment.
+from . import config_v03 as _config_v03  # noqa: E402,F401
