@@ -2,7 +2,7 @@
 
 ## 已确认的训练语义
 
-纯视频 IT2V，从官方 Nano 重新开始。V0.3 单目标 run 已按用户要求在第194步停止；本版开发中，尚未通过 GPU 显存验收，不代表已启动训练。
+纯视频 IT2V，从官方 Nano 重新开始。V0.3 单目标 run 已按用户要求在第194步停止；本版已通过50K单节点8卡3步容量短测，四节点正式训练尚未启动；结果与限制见 experiment.md。
 
 完整 segment 只做一次连续 VAE 编码，文本只处理一次。由同一 GT latent 构造历史 H 与预测 P 两条表示；不是把模型生成的视频回填训练历史。
 
@@ -30,3 +30,12 @@ LingBot-VA公开代码固定commit `7c6ffa9bfc4b83582cafc860fab4c82cc7deeeeb`：
 本项目适配：`cosmos3_ar_it2v/model_v04.py`、`attention_v04.py`、`config_v04.py`、`configs/ego100h_parallel_tf.toml`。官方实现：`packages/cosmos3/cosmos_framework/model/generator/omni_mot_model.py`、`diffusion/rectified_flow.py`，以及 `configs/base/experiment/sft/models/nano_model_config.py`。
 
 用户最新决定：先维持单次前向，将源预算降至49920，重新统计保留/降采样/排除范围并做GPU短测，不启用CP2或CPU offload。两次前向方案暂缓，避免历史重算开销。
+
+## 不改变训练语义的局部优化（2026-10-06）
+
+`network_v04.py` 通过官方 `install_attention_dispatch` 构建扩展点，在FSDP/AC包装前仅特化当前network实例，无新增参数或state-dict键，不修改官方源码。
+
+1. H空间patch及P块内重复的timestep只执行一次官方FP32 embedding，再FP32 gather展开、转BF16；保留原噪声值和RNG。不能先转BF16再聚合重复行梯度。
+2. Transformer仍处理完整H/P；最终输出投影与官方unpatchify只处理P。H隐藏表示与历史间接梯度保留，H/P编码metadata与P输出metadata分开。
+
+无V0.4训练标记时回退官方推理路径。数学表达式保持一致，但GEMM维度、浮点归约顺序发生变化，不能宣称完整BF16训练逐位相同。当前compile=false；若以后开启fullgraph编译，动态unique需另行验证。官方MLP与RMSNorm融合未混入本轮。
