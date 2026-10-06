@@ -4,6 +4,7 @@ from cosmos_framework.utils.lazy_config import LazyCall as L, LazyDict
 
 from .config import ROOT, full_segment_experiment
 from .model_v04 import ARIT2VModelV04, ARIT2VModelV04Config
+from .checkpoint_memory import CheckpointMemory
 
 CONFIG_NAME = 'rbs_wam_ar_it2v_v0_4_parallel_tf'
 
@@ -23,6 +24,7 @@ def parallel_tf_experiment():
     c.job.update(group='ar_it2v_v0_4', name='ar_it2v_v0_4_parallel_tf')
     c.trainer.max_iter = 5000
     c.scheduler.cycle_lengths = [5000]
+    c.trainer.callbacks.checkpoint_memory = L(CheckpointMemory)()
     return c
 
 
