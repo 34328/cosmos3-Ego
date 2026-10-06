@@ -17,9 +17,11 @@
 
 保留已批准的65536源数据token预算、对应retention清单、完整segment边界和文本，不能为了容纳双分支静默减半数据长度。Transformer实际token数为 `2 × 源序列token数 − 文本token数`，另行记录，不能将它误报为65K。
 
-继续使用官方 full activation checkpointing。用户明确拒绝 CPU activation offload；新模型不安装该适配器。先做接近满预算的真实 GPU 前反传短测，再决定容量是否足够；若不足，再评估 GPU context parallelism，不自动截短segment、不自动失败重训。暂存的offload探索仅位于ignored tmp，不作为训练代码。
+继续使用官方 full activation checkpointing。用户明确拒绝 CPU activation offload 和 CP2，保持 CP1。先做接近满预算的真实 GPU 前反传短测，再决定容量是否足够；不自动截短segment、不自动失败重训。暂存的offload探索仅位于ignored tmp，不作为训练代码。
 
-其余已确认配方：四节点32卡，HSDP8×4/CP1（若需改CP必须记录新拓扑与batch影响），5000步/save500，seed42，全模型GEN峰值LR1e-4、官方LambdaCosine warmup100/cycle5000/f_min.3、weight_decay.01，UND冻结。正式启动前必须必要短测、Astra/xhigh审查及W&B online/API核实。
+其余已确认配方：四节点32卡，HSDP8×4/CP1（禁止CP2），5000步/save500，seed42，全模型GEN峰值LR1e-4、官方LambdaCosine warmup100/cycle5000/f_min.3、weight_decay.01，UND冻结。正式启动前必须必要短测、Astra/xhigh审查及W&B online/API核实。
+
+2026-10-06下一显存方案（待实现）：将同一segment的预测块分两组，分别前向、反向累积，最后只更新一次参数。整段VAE仍连续编码一次，两组沿用同一套预先采样噪声、原整段有效loss分母及官方样本平均。每次反向后释放激活，第二组重算GT历史并保留历史梯度，不能用第一组预测回填或retain_graph保留完整图。历史上下文要与原双流图一致，不能仅凭直接注意力窗口就裁掉多层历史依赖。显存不保证减半，耗时与容量仍待真实短测。
 
 ## 代码来源
 

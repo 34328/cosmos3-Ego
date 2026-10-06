@@ -17,3 +17,5 @@ Tdebug6、cosmos3环境、`CUDA_VISIBLE_DEVICES=''`、仓库根＋packages/cosmo
 完整临时证据保留远端 `tmp/ar_it2v_v04/smoke_20261005T155724Z/`：`launch_plan.json`、`Tdebug3/started.json`、`exit.json`、`logs/formal_sft.log`。本地输出的W&B ID为`qe0gsf6c`，仅作为失败短测身份，尚未用API核实，不作为正式训练结果。
 
 只读核查的下一候选是官方sequence-sharded CP2叠加HSDP8×4，并使用官方Trainer的两次梯度累积，保持每optimizer步32个独立源pack及65K完整segment范围。需适配V0.4 memory接口、CP组内历史RNG/owner、官方CP梯度校正，并验证输出/梯度与实际显存；尚未实现或派发。官方当前没有可直接启用的MLP token chunking配置。已请求用户确认新的GPU测试，不能把候选方案写成已验证的解决办法。
+
+2026-10-06后续决定：用户明确否决CP2，原因是此前已遇到Cosmos3 CP2问题。上述CP2候选撤销，未实现、未派发；保持CP1且禁止CPU offload。下一方向为预测块分两组分别前向/反向、累积后一次更新，保留原loss分母与噪声。尚未实现或启动新的GPU短测。
