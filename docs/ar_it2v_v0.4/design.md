@@ -42,3 +42,10 @@ LingBot-VA公开代码固定commit `7c6ffa9bfc4b83582cafc860fab4c82cc7deeeeb`：
 
 
 2026-10-06长segment后续压力测试：20步训练成功、显存稳定；最终官方DCP保存出现NCCL显存分配失败，exit1。50K训练容量与checkpoint生命周期须分别验收，保存问题解决前不得据短测自动启动正式训练。详见experiment.md末节。
+
+
+## 保存阶段显存余量（2026-10-06）
+
+`checkpoint_memory.py` 仅注册到V0.4的官方`on_save_checkpoint_start/end`回调；保存前同步当前设备的CUDA工作、回收不可达Python对象并调用`torch.cuda.empty_cache()`归还未用allocator缓存。官方DCP状态收集、通信、文件格式与Trainer保存时机不改；模型、优化器和活跃张量仍在GPU，不逐步清缓存、不启用CPU offload。各rank记录清理前后allocated/reserved/driver-free，当前同步保存路径记录end快照。
+
+6项临时CPU测试及Astra/xhigh审查通过。同一长段清单重复20步，临时save10覆盖中途保存后继续训练与末步保存；两次均成功、exit0，官方metadata引用范围及完成marker核对通过。正式save500不变。此项改善保存可用显存，未降低训练峰值或证明四节点长期稳定；详细量化见experiment.md。

@@ -90,3 +90,32 @@ Tdebug3单节点8×H800，重放基准相同seed/Nano起点的3个训练迭代�
 W&B API核实 [huqeaezo](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/huqeaezo) 状态crashed、远端已上传到step19/loss0.171559/LR1.8e-5；step20以本地formal_monitor和训练完成日志为证，不能声称API确认了step20。完整证据及汇总在 `tmp/ar_it2v_v04/longpack_20step_20261006T005644Z/`。
 
 后续优先排查/验证保存前释放allocator未使用缓存以及DCP首次NCCL通信额外分配；当前同步保存路径未调用empty_cache，仅加载后调用。缓存预留挤占NCCL余量是有代码/日志支持的候选解释，尚无保存时allocated/reserved快照，不当作已完全证实或已修复。正式四节点训练保持未启动；下一次验证需覆盖实际保存成功，不能仅以20步训练无OOM放行。
+
+
+## 保存前缓存清理及20步长包复测：两次保存均成功（2026-10-06）
+
+用户批准修复保存OOM后复测。源提交 `da0b20b623641cf8ab65132ea73e1cc12b58ebed`，仅V0.4增加官方保存前/后callback，保存前同步、GC并释放未用CUDA allocator缓存；不修改官方DCP/Trainer，不迁移活跃参数或优化器至CPU。6项针对性CPU测试通过，Astra/xhigh审查未发现阻塞项。新测试仍仅放ignored tmp。
+
+Tdebug3单节点8×H800、HSDP8×1/CP1、49920预算、官方Nano新起点，使用上一节完全相同长segment选择清单、seed及配方；临时max_iter20/save10，正式5000步/save500不变。实际config TOML SHA256 `42cc6e280471680c0dfd6f1c1f707e2640de0bf83b2c9364289c630452967353`，selection SHA256沿用 `d5f8176ce58624bd87bfa3e4d3653c75602e231bd1e28675c3124cb366115900`。启动前8卡4–5MiB/0%，CPU quota120核、affinity200，未抢占其他任务。北京时间10:03:13启动，10:41:54 exit0，GPU全部释放。
+
+8rank×20步共160条数据trace与失败长包run的有序sample IDs全部相同，无缺失/重复；仍是204条完整segment、116个单长段pack/44个双段pack，原时长13.13–55.03秒、实际输入394–825帧，98.3806%平均填充，最大Transformer99423 token。这里只确认样本顺序，不声称完整BF16噪声/梯度逐位一致。
+
+| 指标 | 修复前长包run | 保存修复后长包run |
+|---|---:|---:|
+| 第3–20步训练耗时均值 | 100.787秒 | 101.138秒（+0.35%） |
+| 同区间source token/秒 | 3896.95 | 3883.45 |
+| 训练峰值已分配显存 | 74.4626GiB | 74.4626GiB |
+| 训练峰值预留显存 | 77.6484GiB | 77.6465GiB |
+| 训练迭代完成 | 20 | 20 |
+| checkpoint/退出 | 最终保存OOM、exit1 | step10和20均成功、exit0 |
+
+新run第3–20步中位数100.850秒、范围99.859–102.786秒；第11步即中途保存后的首步100.483秒，未见明显重分配停顿或跨步显存增长。训练timer在batch_end采样，**不含DCP保存耗时**；上表不是含保存的总吞吐。loss首末0.351959→0.149553，梯度范数0.3576–9.7736均有限，无STOPPED/OOM；仍只覆盖warmup，首步LR=0、末步1.9e-5，不是峰值LR收敛/画质结论。
+
+| 保存点 | 各rank释放预留缓存 | 清理耗时范围 | 官方DCP写入耗时 |
+|---|---:|---:|---:|
+| step10 | 40.05–57.12GiB | 1.84–2.28秒 | 25.08秒 |
+| step20 | 43.11–57.23GiB | 2.37–2.66秒 | 19.49秒 |
+
+清理后step10各卡driver-free约60.38–60.46GiB；活跃allocated仍约17.1GiB，GC另外回收约6.6–7.0MiB不可达对象，并非allocated逐位不变。归还缓存为外部NCCL分配腾出空间，不等于训练激活节省40–57GiB，不支持恢复65K预算。两次保存8rank start/end回执完整。官方latest_checkpoint.txt最终指向iter_000000020，step10/20的model、optim、scheduler、trainer四组件metadata可由官方FileSystemReader读取，全部引用文件范围落在实际文件大小内，8rank dataloader状态齐全。scheduler未被引用的rank空shard是官方去重占位；未进行另一次恢复训练或全tensor校验。
+
+W&B API核实 [93kgrebu](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/93kgrebu) 为finished、step20/loss0.149553/LR1.9e-5。完整计划、monitor、两次DCP、显存快照、API与汇总均在 `tmp/ar_it2v_v04/longpack_savefix20_20261006T020259Z/`；新开发脚本仍ignored。结论：本次单节点长包训练和实际同步保存生命周期通过，保存OOM在这次复测未复现；训练速度/峰值显存基本不变。四节点正式训练尚未启动，不将单节点20步结果扩展为四节点或长期训练保证。
