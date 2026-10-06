@@ -59,3 +59,34 @@ Tdebug3单节点8×H800，重放基准相同seed/Nano起点的3个训练迭代�
 
 
 针对完整运行差异，另做一次实宽、无训练的模块隔离核对：H800、TF32关闭、官方4096宽时间MLP、97920行→203个唯一时间步，FP32输出逐位相同，参数梯度relative-L2最大1.10e-5；BF16输出头4096→192、97920行→48960行，P输出和P输入梯度逐位相同，weight梯度relative-L2为2.70e-4。固定随机权重测试不代表已定位正式Nano全图的全部差异，不将3.16%范数差自动归因于TF32或称为逐位等价。证据 `tmp/ar_it2v_v04/real_width_cuda.log`，exit0；未新增训练、未更新参数。模块局部峰值下降不能与整模型峰值节省混为一谈。
+
+
+## 20步长segment近满预算压力测试：训练完成，最终保存OOM（2026-10-06）
+
+用户认为3步不足，要求更多步骤及较长segment组合。源提交 `0263670`，Tdebug3单节点8×H800、HSDP8×1/CP1、49920源预算，沿用优化实现、官方Nano起点/full AC、seed42、原5000步scheduler/warmup100/LR/WD。仅临时入口将max_iter设为20并从正式train dataset筛选867个完整segment；未改生产代码、正式manifest、噪声或loss，未启用CP2/offload。20步仅覆盖warmup，不能证明峰值LR下长期收敛。临时入口/选择清单/检查全在ignored `tmp/ar_it2v_v04/longpack/`，Astra只读核对未发现正式配方污染。
+
+选择口径：单段source token在[49000,49920)的540条，以及[24000,24800)可成对打包的327条；仍由官方Packer实际打包。全为原train划分，完整segment无随机裁短，超长段沿用已批准的90%→50%均匀保留规则。selection SHA256 `d5f8176ce58624bd87bfa3e4d3653c75602e231bd1e28675c3124cb366115900`，其上游49920 retention记录hash不变。临时factory先执行原dataset的全量清单/retention校验，再筛原rows并将selection hash写入数据恢复契约；CPU实例化检查通过。
+
+北京时间08:57:18启动；训练20步在09:32:51全部完成。断开本地连接期间远端任务持续运行，无重复启动。实际160个pack、204条不同segment，其中116个单长段pack、44个双段pack；原始时长13.13–55.03秒，实际输入394–825帧（包含既定均匀保留策略），最大实际H/P Transformer长度99423。
+
+| 指标 | 结果 |
+|---|---:|
+| 完成训练迭代 | 20（首步LR=0） |
+| 平均source token填充率 | 98.38% |
+| 最低单rank填充率 | 96.27% |
+| 第3–20步耗时均值 / 中位数 | 100.79 / 100.75秒 |
+| 第3–20步耗时范围 | 99.25–102.52秒 |
+| 第3–20步全局source token吞吐 | 3896.95 token/秒 |
+| 训练阶段峰值已分配 / 预留 | 74.4626 / 77.6484 GiB |
+| 第3–20步起始已分配范围 | 15.4580–15.4659 GiB |
+| loss首步 / 末步 | 0.352114 / 0.148579 |
+| 梯度范数范围 | 0.4877–9.2468，全部有限 |
+| 末步LR | 1.9e-5 |
+
+训练阶段没有OOM/STOPPED，也未见跨步已分配显存持续增长；不同长包的loss不要求逐步单调。相比之前普通混合样本3步，输入分布不同，不能将本轮100.79秒与95.79秒直接解释为优化回退。
+
+**整个run未通过完整生命周期验收。** 官方Trainer在max_iter结束后仍自动保存最后一步（不受save500避免）；09:32:53 rank3在DCP `save_state_dict_worker → dcp.save → scatter_object_list` 的NCCL P2P分配处明确报告 `Cuda failure 2 'out of memory'`。09:33:42 launcher exit1，其他rank被launcher终止，GPU随后全部释放。`iter_000000020`目录存在但无有效shard/metadata/完成标记，不能当作可恢复checkpoint。全部失败输出保留，不自动重训/恢复。
+
+W&B API核实 [huqeaezo](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/huqeaezo) 状态crashed、远端已上传到step19/loss0.171559/LR1.8e-5；step20以本地formal_monitor和训练完成日志为证，不能声称API确认了step20。完整证据及汇总在 `tmp/ar_it2v_v04/longpack_20step_20261006T005644Z/`。
+
+后续优先排查/验证保存前释放allocator未使用缓存以及DCP首次NCCL通信额外分配；当前同步保存路径未调用empty_cache，仅加载后调用。缓存预留挤占NCCL余量是有代码/日志支持的候选解释，尚无保存时allocated/reserved快照，不当作已完全证实或已修复。正式四节点训练保持未启动；下一次验证需覆盖实际保存成功，不能仅以20步训练无OOM放行。

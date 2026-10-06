@@ -39,3 +39,6 @@ LingBot-VA公开代码固定commit `7c6ffa9bfc4b83582cafc860fab4c82cc7deeeeb`：
 2. Transformer仍处理完整H/P；最终输出投影与官方unpatchify只处理P。H隐藏表示与历史间接梯度保留，H/P编码metadata与P输出metadata分开。
 
 无V0.4训练标记时回退官方推理路径。数学表达式保持一致，但GEMM维度、浮点归约顺序发生变化，不能宣称完整BF16训练逐位相同。当前compile=false；若以后开启fullgraph编译，动态unique需另行验证。官方MLP与RMSNorm融合未混入本轮。
+
+
+2026-10-06长segment后续压力测试：20步训练成功、显存稳定；最终官方DCP保存出现NCCL显存分配失败，exit1。50K训练容量与checkpoint生命周期须分别验收，保存问题解决前不得据短测自动启动正式训练。详见experiment.md末节。
