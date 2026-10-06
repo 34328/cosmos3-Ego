@@ -4,7 +4,7 @@ Cosmos3-Nano 上的纯视频 AR 继续预训练：输入首帧图像与动作段
 
 ## 当前状态
 
-V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_000001500`。[训练记录](docs/ar_it2v_v0.2/experiment.md)和 [W&B run](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o)保留完整来源。V0.3 单目标实验已按用户要求停在194步。当前推进 [V0.4](docs/ar_it2v_v0.4/design.md)：GT历史与所有预测块并行监督，历史按LingBot加噪、预测使用Cosmos3官方flow matching；Nano起点、四节点32卡/5000步、C4/local32、65K源token预算。已完成CPU验证与独立代码审查，正式启动前仍须GPU容量短测。
+V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_000001500`。[训练记录](docs/ar_it2v_v0.2/experiment.md)和 [W&B run](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o)保留完整来源。V0.3 单目标实验已按用户要求停在194步。当前推进 [V0.4](docs/ar_it2v_v0.4/design.md)：GT历史与所有预测块并行监督，历史按LingBot加噪、预测使用Cosmos3官方flow matching；Nano起点、四节点32卡/5000步、C4/local32、50K源token预算（实际49920）。已完成CPU验证、独立代码审查和8卡3步GPU容量短测，峰值已分配74.52GiB，后两步约99秒/步；四节点正式训练尚未启动。
 
 V0.2基线设置（旧配方保留）：
 
