@@ -4,7 +4,9 @@
 
 本项目在 Cosmos3-Nano 上迁移 CMD Stage 1 的因果视频训练方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。输入是首帧图像与 segment 文本，输出只有视频；没有 action、state、骨架或联合监督。项目适配放在 `cosmos3_ar_it2v/`，官方框架保留在 `packages/cosmos3/`。
 
-当前基线为 V0.2 完整 segment / 75008 token 配方，已完成1500步。V0.3 单目标65K实验已按用户要求停在194步，无save500 checkpoint。正在实现 V0.4：LingBot式GT历史/预测两条表示，所有非条件预测块并行监督；历史不直接算loss，仍有间接梯度。历史噪声按LingBot公开代码，预测噪声复用Cosmos3官方Nano waver/分辨率shift，不再用手写uniform/clamp。四节点32卡、5000步/save500、C4/local32、Nano起点；65K双流短测OOM后，用户批准源预算降为50K（按128对齐取49920），保持单次前向；CPU offload被用户明确拒绝，已通过CPU验证、Astra/xhigh审查及50K单节点8卡3步短测（优化后峰值已分配74.51GiB、后两步约95.79秒/步；相同batch短测耗时减少3.4%，显存仅少17MiB，完整BF16运行非逐位一致），首次20步长segment压力测试最终DCP保存发生NCCL CUDA OOM；随后仅增加官方保存前回调释放未用allocator缓存，重复同批20步，step10/20保存均成功、exit0，98.38%填充、峰值74.46GiB、约101.14秒/步。每次保存前归还40–57GiB缓存、开销约2秒，不是CPU offload或训练峰值显存下降。四节点正式训练尚未启动，单节点短测不代表四节点或长期收敛验收。见 `docs/ar_it2v_v0.4/design.md`。下述V0.3条目仅供历史复现，不得用于覆盖V0.4。新模型、配置和文档分版本保留；不自动恢复或失败重训。此前 V0.1 是最长97帧随机短窗口训练。
+当前正式版本为 V0.4：LingBot式GT历史/预测两条表示，所有非条件预测块并行监督；历史不直接算loss，仍保留间接梯度。历史噪声按LingBot公开代码，预测噪声复用Cosmos3官方Nano waver/分辨率shift。已于2026-10-06北京时间11:12从官方Nano新起点启动四节点32卡正式训练：Tdebug1/2/3/4，HSDP8×4/CP1，49920源token、单次H/P前向、C4/local32、5000步/save500，禁止CP2与CPU offload；保存前使用官方回调归还未用CUDA allocator缓存。run为 `parallel_tf_50k_4n_5000_20261006T031219Z`，源提交 `6a88c6a3d3a95fa76652b0a137339433504934cf`；启动回执在 `outputs/maintenance/ar_it2v_v04_formal_preflight_20261006T031219Z`，W&B run `j29qq2x1`已通过API确认online上传，勿重复启动。详见 `docs/ar_it2v_v0.4/experiment.md`。
+
+历史基线：V0.2完整segment/75008 token已完成1500步；V0.3单目标65K按用户要求停在194步、无save500；V0.1为最长97帧随机短窗口。下述V0.3条目仅供历史复现，不得覆盖V0.4。各正式版本保留，不自动恢复或失败重训。
 
 本地项目：`/Users/cnf2026953090/Desktop/rbs-WAM-videogen pretrain`；远端仓库：`/mnt/lzh/cosmos-ar-it2v`；分支：`ar-it2v-pretrain`。本地保存源码和文档，计算、数据、权重与视频服务在远端。主导航见 `README.md`，现状与问题见 `docs/problems.md`，完整实验见 `docs/ar_it2v_v0.2/experiment.md`。
 
@@ -35,7 +37,7 @@
 ## 验证、记录与提交
 
 - 验证只覆盖本次变化的真实路径：数据边界、timestep、mask、loss、历史梯度、KV、VAE及训练生命周期。复用已验收产物；必要检查通过后推进，不重复无关全量实验。CPU 测试显式关闭 CUDA；涉及真实 GPU 行为的变化才做相应短测。
-- 用户要求新的开发测试、通信 profiling 脚本与结果仅放 ignored `tmp/`，不用 Git 记录；已有 tracked 测试保留。通信仅测一次，复用官方 profiler，报告区间并集与计算重叠，不把 NCCL kernel 总和称为纯通信开销。
+- 用户要求smoke、开发测试、通信 profiling 的脚本、缓存、结果和详细准备过程仅放 ignored `tmp/`，不新增Git提交、不计入正式实验；正式run的配置/状态/结果才写入版本实验记录。已有tracked测试保留。通信仅测一次，复用官方 profiler，报告区间并集与计算重叠，不把 NCCL kernel 总和称为纯通信开销。
 - 正式训练必须 W&B online，启动后用 API 核实本次 run/step/loss/LR，交付真实链接；不输出密钥，不用旧 run 或本地日志代替 API。配置、清单、源提交和资源写入版本实验记录。
 - 停止条件以已确认 monitor/配方为准；非有限数值、OOM 等保留完整证据，不因主观画质擅自停止或改配方。
 - 输出放独立 `outputs/` 版本目录；数据、权重、checkpoint、视频、缓存和密钥不进 Git。小型必要回执可进 `docs/<version>/evidence/`，临时材料仅放 `tmp/`。

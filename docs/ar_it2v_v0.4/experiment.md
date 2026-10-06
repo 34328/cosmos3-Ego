@@ -119,3 +119,21 @@ Tdebug3单节点8×H800、HSDP8×1/CP1、49920预算、官方Nano新起点，使
 清理后step10各卡driver-free约60.38–60.46GiB；活跃allocated仍约17.1GiB，GC另外回收约6.6–7.0MiB不可达对象，并非allocated逐位不变。归还缓存为外部NCCL分配腾出空间，不等于训练激活节省40–57GiB，不支持恢复65K预算。两次保存8rank start/end回执完整。官方latest_checkpoint.txt最终指向iter_000000020，step10/20的model、optim、scheduler、trainer四组件metadata可由官方FileSystemReader读取，全部引用文件范围落在实际文件大小内，8rank dataloader状态齐全。scheduler未被引用的rank空shard是官方去重占位；未进行另一次恢复训练或全tensor校验。
 
 W&B API核实 [93kgrebu](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/93kgrebu) 为finished、step20/loss0.149553/LR1.9e-5。完整计划、monitor、两次DCP、显存快照、API与汇总均在 `tmp/ar_it2v_v04/longpack_savefix20_20261006T020259Z/`；新开发脚本仍ignored。结论：本次单节点长包训练和实际同步保存生命周期通过，保存OOM在这次复测未复现；训练速度/峰值显存基本不变。四节点正式训练尚未启动，不将单节点20步结果扩展为四节点或长期训练保证。
+
+
+## 正式训练：四节点32卡 / 5000步（2026-10-06启动）
+
+用户批准清理准备阶段临时产物后启动正式run。此前本文smoke/容量短测均为准备记录，不计入正式训练；后续开发测试及详细回执只放ignored tmp，不再新增此类Git记录。本节为首次V0.4正式run，未从smoke或历史训练恢复。
+
+- run：`parallel_tf_50k_4n_5000_20261006T031219Z`，北京时间2026-10-06 11:12:48–52分别启动四端。
+- 源提交：`6a88c6a3d3a95fa76652b0a137339433504934cf`；生产入口`cosmos3_ar_it2v.train`、`configs/ego100h_parallel_tf.toml`，无longpack子集或临时配置。
+- 资源：Tdebug1 rank0 / Tdebug2 rank1 / Tdebug3 rank2 / Tdebug4 rank3，各8×H800；HSDP8×4、CP1，NCCL Socket/eth0内网TCP，master `10.3.12.57:29914`。启动前四端GPU均空闲且无计算进程，CPU quota各120核。
+- 配方：官方Nano新起点、seed42、49920源token动态Packer、完整train segment、C4/local32、全P监督/H仅间接梯度，历史LingBot公开代码噪声、P官方Nano waver/480shift5；full AC，无CP2/CPU offload。5000步/save500；warmup100、峰值1e-4→3e-5、WD0.01、GEN训练/UND冻结。
+- 数据：32,010个保留train segment、原时间跨度89.5189小时，正常段全帧，超预算段按已批准retention策略；不使用短测867条筛选清单。Packer每GPU每步1个动态pack，32个全局pack，segment batch数随长度变化。
+- TOML SHA256：`46709b11051480db4865734fe554ed30f8f7b4010b9ba86d3a6cc5e292585630`；实际展开config.yaml SHA256：`e1641d324e8315aaee5151e503e4bd8427d72bec96cf8a968a24eb79b08fb6c8`。
+- retention records SHA256：`799a9cd94282d266328503144baadee61361e60dc97f912a1bda55a8a93f0eae`；episode manifest：`98d8abdff990cc3cf0b39a0d1ac0b0338b8d3be9e7b2ea7ed8757acfdacec41d`；segment manifest：`64655579936e40bf2774c0aca50993f1ef6b53c5fc37a44d70cb752950f9be60`。
+- 正式输出：`outputs/train/rbs_wam_ar_it2v/ar_it2v_v0_4/parallel_tf_50k_4n_5000_20261006T031219Z`；计划及四端启动/退出回执：`outputs/maintenance/ar_it2v_v04_formal_preflight_20261006T031219Z`。
+
+前两步已完成，step1/2分别处理129/109个segment，loss 0.423044/0.464697，preclip norm 7.3440/8.7298均有限。首步LR0、第二步LR1e-6，第二步训练耗时107.95秒、峰值allocated74.52GiB。无OOM/STOPPED；单个预热后step不是稳定耗时或收敛结论。停止规则沿用现有monitor；不自动重试或恢复。
+
+W&B online实际run为 [j29qq2x1](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/j29qq2x1)。启动后API核实状态running，step1/loss0.423044/LR0已上传；上文step2与非零LR来自本次formal_monitor，不把本地进度冒充API进度。实际展开配置及learning_rate_receipt确认5000步周期、save500、49920预算及原生噪声设置均生效。
