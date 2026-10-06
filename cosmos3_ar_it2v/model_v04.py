@@ -11,6 +11,7 @@ from cosmos_framework.model.generator.omni_mot_model import OmniMoTModel
 from .attention_v04 import ParallelTeacherForcingAttention
 from .model import ARIT2VModel, ARIT2VModelConfig
 from .model_v03 import sample_lingbot_public_history_sigmas
+from .network_v04 import install_v04_network_adapters
 
 
 @attrs.define(slots=False)
@@ -67,6 +68,7 @@ def build_parallel_tf_pack(source, history_tokens, history_timesteps):
     out._sequence_pack_metadata = None
     out.sample_lens, out.split_lens = [], []
     text_indexes, video_indexes, positions, mse_indexes, timesteps = [], [], [], [], []
+    prediction_indexes = []
     tokens, masks, noisy_frames, shapes, item_lens = [], [], [], [], []
     device = source.position_ids.device
     old_cursor, new_cursor, time_cursor = 0, 0, 0
@@ -87,8 +89,9 @@ def build_parallel_tf_pack(source, history_tokens, history_timesteps):
         positions.extend((original[:, :text_count], original[:, text_count:], original[:, text_count:]))
         # These indexes also drive native timestep embedding. H receives no
         # direct loss because its predictions never reach the native loss call.
-        mse_indexes.extend((torch.arange(begin+h*w, begin+count, device=device),
-                            torch.arange(begin+count+h*w, begin+2*count, device=device)))
+        prediction_index = torch.arange(begin+count+h*w, begin+2*count, device=device)
+        mse_indexes.extend((torch.arange(begin+h*w, begin+count, device=device), prediction_index))
+        prediction_indexes.append(prediction_index)
         per_stream = (t-1)*h*w
         timesteps.extend((history_timesteps[i, 1:t].to(device).repeat_interleave(h*w),
                           vision.timesteps[time_cursor:time_cursor+per_stream]))
@@ -122,6 +125,10 @@ def build_parallel_tf_pack(source, history_tokens, history_timesteps):
     out.vision.timesteps = torch.cat(timesteps)
     out.vision.tokens, out.vision.condition_mask = tokens, masks
     out.vision.noisy_frame_indexes, out.vision.token_shapes = noisy_frames, shapes
+    # A separate output-only view leaves H/P timestep and encoding metadata intact.
+    # Native unpatchification sees the source P geometry and first-frame condition.
+    out.it2v_v04_prediction_vision = copy.copy(vision)
+    out.it2v_v04_prediction_vision.mse_loss_indexes = torch.cat(prediction_indexes)
     out.vision_item_split_lens = item_lens
     if source.vision_condition_type_mask is not None:
         parts = torch.split(source.vision_condition_type_mask,
@@ -138,6 +145,10 @@ class ARIT2VModelV04(ARIT2VModel):
         if not 0 <= config.clean_history_probability <= 1:
             raise ValueError("invalid V0.4 clean-history probability")
         super().__init__(config)
+
+    def install_attention_dispatch(self, net):
+        super().install_attention_dispatch(net)
+        install_v04_network_adapters(net)
 
     def _get_train_noise_level_vision(self, batch_size, is_image_batch,
                                      num_vision_latent_frames, resolutions=None,
@@ -216,8 +227,6 @@ class ARIT2VModelV04(ARIT2VModel):
                 memory=memory, video_temporal_causal=video_temporal_causal)
         out = super().denoise(net=net, data_batch_packed=parallel,
                              memory=memory, video_temporal_causal=video_temporal_causal)
-        out["preds_vision"] = [p[:, :, t:] for p, (t, _, _) in
-                              zip(out["preds_vision"], data_batch_packed.vision.token_shapes, strict=True)]
         self.v04_source_tokens = data_batch_packed.sequence_length
         self.v04_transformer_tokens = parallel.sequence_length
         return out
