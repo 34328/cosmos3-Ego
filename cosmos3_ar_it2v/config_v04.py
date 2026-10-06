@@ -10,10 +10,10 @@ CONFIG_NAME = 'rbs_wam_ar_it2v_v0_4_parallel_tf'
 
 def parallel_tf_experiment():
     # This is the source-data budget. H/P expansion is reported separately;
-    # preserving this ceiling preserves the accepted complete-segment cohort.
-    c = full_segment_experiment(token_budget=65536)
+    # User-approved 50k ceiling, rounded down to the native 128-token alignment.
+    c = full_segment_experiment(token_budget=49920)
     c.dataloader_train.dataloader.datasets.video.dataset.segment_statistics_path = str(
-        ROOT / 'outputs/maintenance/full_segment_retention_65536_20261005/summary.json')
+        ROOT / 'outputs/maintenance/full_segment_retention_49920_20261006/summary.json')
     model_config = dict(c.model.config)
     model_config.update(local_attention_frames=32, history_noise_mode='lingbot_public',
                         clean_history_probability=.5, target_history_seed=42)

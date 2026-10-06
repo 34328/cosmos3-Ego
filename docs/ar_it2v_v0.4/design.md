@@ -15,16 +15,18 @@
 
 ## 资源与数据
 
-保留已批准的65536源数据token预算、对应retention清单、完整segment边界和文本，不能为了容纳双分支静默减半数据长度。Transformer实际token数为 `2 × 源序列token数 − 文本token数`，另行记录，不能将它误报为65K。
+65K双流容量短测OOM后，用户批准改用50K源数据token预算（向下按128对齐为49920）、对应新retention清单、完整segment边界和文本，不能为了容纳双分支静默减半数据长度。Transformer实际token数为 `2 × 源序列token数 − 文本token数`，另行记录，50K源输入展开后接近100K，不能混淆源预算与实际计算长度。
 
 继续使用官方 full activation checkpointing。用户明确拒绝 CPU activation offload 和 CP2，保持 CP1。先做接近满预算的真实 GPU 前反传短测，再决定容量是否足够；不自动截短segment、不自动失败重训。暂存的offload探索仅位于ignored tmp，不作为训练代码。
 
 其余已确认配方：四节点32卡，HSDP8×4/CP1（禁止CP2），5000步/save500，seed42，全模型GEN峰值LR1e-4、官方LambdaCosine warmup100/cycle5000/f_min.3、weight_decay.01，UND冻结。正式启动前必须必要短测、Astra/xhigh审查及W&B online/API核实。
 
-2026-10-06下一显存方案（待实现）：将同一segment的预测块分两组，分别前向、反向累积，最后只更新一次参数。整段VAE仍连续编码一次，两组沿用同一套预先采样噪声、原整段有效loss分母及官方样本平均。每次反向后释放激活，第二组重算GT历史并保留历史梯度，不能用第一组预测回填或retain_graph保留完整图。历史上下文要与原双流图一致，不能仅凭直接注意力窗口就裁掉多层历史依赖。显存不保证减半，耗时与容量仍待真实短测。
+2026-10-06曾讨论、现已暂缓的显存方案（未实现）：将同一segment的预测块分两组，分别前向、反向累积，最后只更新一次参数。整段VAE仍连续编码一次，两组沿用同一套预先采样噪声、原整段有效loss分母及官方样本平均。每次反向后释放激活，第二组重算GT历史并保留历史梯度，不能用第一组预测回填或retain_graph保留完整图。历史上下文要与原双流图一致，不能仅凭直接注意力窗口就裁掉多层历史依赖。显存不保证减半，耗时与容量仍待真实短测。
 
 ## 代码来源
 
 LingBot-VA公开代码固定commit `7c6ffa9bfc4b83582cafc860fab4c82cc7deeeeb`：[历史加噪与loss](https://github.com/Robbyant/lingbot-va/blob/7c6ffa9bfc4b83582cafc860fab4c82cc7deeeeb/wan_va/train.py)、[双流注意力与forward_train](https://github.com/Robbyant/lingbot-va/blob/7c6ffa9bfc4b83582cafc860fab4c82cc7deeeeb/wan_va/modules/model.py)、[逐层重计算](https://github.com/Robbyant/lingbot-va/blob/7c6ffa9bfc4b83582cafc860fab4c82cc7deeeeb/wan_va/distributed/fsdp.py)。公开训练入口属于其发布的联合模型训练代码，不能声称已核实其全部大规模预训练内部设置。
 
 本项目适配：`cosmos3_ar_it2v/model_v04.py`、`attention_v04.py`、`config_v04.py`、`configs/ego100h_parallel_tf.toml`。官方实现：`packages/cosmos3/cosmos_framework/model/generator/omni_mot_model.py`、`diffusion/rectified_flow.py`，以及 `configs/base/experiment/sft/models/nano_model_config.py`。
+
+用户最新决定：先维持单次前向，将源预算降至49920，重新统计保留/降采样/排除范围并做GPU短测，不启用CP2或CPU offload。两次前向方案暂缓，避免历史重算开销。

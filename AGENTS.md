@@ -4,7 +4,7 @@
 
 本项目在 Cosmos3-Nano 上迁移 CMD Stage 1 的因果视频训练方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。输入是首帧图像与 segment 文本，输出只有视频；没有 action、state、骨架或联合监督。项目适配放在 `cosmos3_ar_it2v/`，官方框架保留在 `packages/cosmos3/`。
 
-当前基线为 V0.2 完整 segment / 75008 token 配方，已完成1500步。V0.3 单目标65K实验已按用户要求停在194步，无save500 checkpoint。正在实现 V0.4：LingBot式GT历史/预测两条表示，所有非条件预测块并行监督；历史不直接算loss，仍有间接梯度。历史噪声按LingBot公开代码，预测噪声复用Cosmos3官方Nano waver/分辨率shift，不再用手写uniform/clamp。四节点32卡、5000步/save500、C4/local32、Nano起点与65K源预算沿用批准值；CPU offload被用户明确拒绝，先GPU短测和Astra/xhigh审查再启动。见 `docs/ar_it2v_v0.4/design.md`。下述V0.3条目仅供历史复现，不得用于覆盖V0.4。新模型、配置和文档分版本保留；不自动恢复或失败重训。此前 V0.1 是最长97帧随机短窗口训练。
+当前基线为 V0.2 完整 segment / 75008 token 配方，已完成1500步。V0.3 单目标65K实验已按用户要求停在194步，无save500 checkpoint。正在实现 V0.4：LingBot式GT历史/预测两条表示，所有非条件预测块并行监督；历史不直接算loss，仍有间接梯度。历史噪声按LingBot公开代码，预测噪声复用Cosmos3官方Nano waver/分辨率shift，不再用手写uniform/clamp。四节点32卡、5000步/save500、C4/local32、Nano起点；65K双流短测OOM后，用户批准源预算降为50K（按128对齐取49920），保持单次前向；CPU offload被用户明确拒绝，先GPU短测和Astra/xhigh审查再启动。见 `docs/ar_it2v_v0.4/design.md`。下述V0.3条目仅供历史复现，不得用于覆盖V0.4。新模型、配置和文档分版本保留；不自动恢复或失败重训。此前 V0.1 是最长97帧随机短窗口训练。
 
 本地项目：`/Users/cnf2026953090/Desktop/rbs-WAM-videogen pretrain`；远端仓库：`/mnt/lzh/cosmos-ar-it2v`；分支：`ar-it2v-pretrain`。本地保存源码和文档，计算、数据、权重与视频服务在远端。主导航见 `README.md`，现状与问题见 `docs/problems.md`，完整实验见 `docs/ar_it2v_v0.2/experiment.md`。
 
@@ -14,7 +14,7 @@
 - 使用官方 Nano 起点，训练 GEN 相关参数、冻结 UND。当前只迁移 CMD Stage 1，不能称为完整复现 CMD，也不混入少步或长视频蒸馏。
 - 一个完整文本 segment 是一个样本，保留段边界、文本配对及原始 train/test 划分。正常段连续读取全部原始 30fps 帧，不随机裁窗口、不跨 segment、不改变动作速度。连续编码整段，不能按 AR 块重置 VAE。
 - 清单位于共享存储 `/mnt/lzh/cosmos-EgoWAM/training_manifests/`；这是只读数据位置，不是本项目的联合模型依赖。不复制数据，不混入 test。
-- 官方 token-budget Packer：`max_samples_per_batch=None`；V0.2历史预算75008，V0.3当前预算65536，packed样本间注意力隔离。仅单条超预算时采用已批准的90%→80%→70%→60%→50%均匀保留帧策略，保持原首尾与时间跨度；50%仍超限则明确排除。记录源索引、真实/对齐长度与effective_fps，不能静默丢弃或倍速播放。
+- 官方 token-budget Packer：`max_samples_per_batch=None`；V0.2历史预算75008，V0.3历史预算65536，V0.4当前预算49920，packed样本间注意力隔离。仅单条超预算时采用已批准的90%→80%→70%→60%→50%均匀保留帧策略，保持原首尾与时间跨度；50%仍超限则明确排除。记录源索引、真实/对齐长度与effective_fps，不能静默丢弃或倍速播放。
 - VAE 时间对齐保留动作末尾；补帧不计有效监督，支持部分末 AR 块。推理输出去除对齐补帧。
 - V0.3 单遍单目标 Diffusion Forcing：latent 分块 `[1,4,4,…]`，首 latent 干净且不计 loss。每个完整 segment 均匀选一个非条件目标块 k；该块沿用 V0.2 uniform→shift5→clamp[.02,.98] 的块内共享 σ 和官方速度目标。k 前的历史由 GT 加噪，50% 整样本历史干净，50% 每 latent 独立抽 timestep index500..999/1000，经官方 FlowMatch scheduler shift5，实际 σ≈.00498.. .83333。历史与目标选择使用独立于原 σ/ε 的可恢复 iteration/rank RNG；不是模型预测历史。
 - 仅 k 进入 loss 分子和有效分母，保留真实末帧权重及官方样本平均。历史输出无直接 loss，但历史输入/隐藏 KV 保留来自目标的梯度；未来块无 loss 且不可见。不能把历史标成首帧条件或 detach。V0.2 所有后续块均算 loss 的旧配方保留不变。
@@ -24,7 +24,7 @@
 
 ## 远端操作与资源
 
-- 用户明确禁止 CP2（此前遇到兼容性问题），保持 CP1；不得使用 CP2 或 CPU offload 解决双流显存不足。下一方案为预测块分两组、分别前向和反向累积、最后一次参数更新，保留整段有效 loss 分母、同一套噪声与 GT 历史梯度。该方案尚未实现或通过 GPU 验证。
+- 用户明确禁止 CP2（此前遇到兼容性问题），保持 CP1；不得使用 CP2 或 CPU offload 解决双流显存不足。用户最新选择为50K源预算（49920）、单次前向，暂不实施两组预测块分次前向方案；统计与GPU短测须绑定新预算。
 
 - 所有远端操作只用 MCP SSH Apply Patch，统一账号 `lzh`；禁止本地 SSH/SCP 或 root。首次先查询已知 host，确认仓库、分支、适用 AGENTS、`git log -5` 与 `git status`，查明他人变更，不顺手提交。
 - Tdebug1–6 共享存储；不要复制数据/权重，不修改其他仓库或活跃任务使用的源文件、输出。

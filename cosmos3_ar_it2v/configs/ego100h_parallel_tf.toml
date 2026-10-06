@@ -1,4 +1,5 @@
-# Complete segments; source pack <=65536 tokens. H/P transformer tokens reported separately.
+# Complete segments; source pack <=49920 tokens (50k aligned down to 128).
+# H/P transformer tokens reported separately; one forward, CP1, no CPU offload.
 # All P chunks supervised against strictly earlier GT-H chunks; H has no direct loss.
 # Official full activation checkpointing; no activation CPU offload.
 [job]
