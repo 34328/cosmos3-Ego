@@ -45,7 +45,7 @@
 
 ## 推理与可视化
 
-- 统一入口 `cosmos3_ar_it2v/visualization/`，先读该目录 README。临时测试放 `outputs/diagnostics/<version>/step<step>/<purpose>/`，保留版本、checkpoint与采样设置，默认不构建网页、不加入已有页面或服务。
+- 统一入口 `visualization/`，先读该目录 README。临时测试放 `outputs/diagnostics/<version>/step<step>/<purpose>/`，保留版本、checkpoint与采样设置，默认不构建网页、不加入已有页面或服务。
 - 查看临时结果时只同步用户需要的少量MP4至本地 `tmp/previews/<version>/step<step>/<purpose>/`，直接在对话中预览；不全量下载、不入Git。用户确认最终版本后，才将选定结果发布至 `outputs/visualization/<version>/step<step>/<purpose>/` 并构建/更新正式网页。可移动已验收产物，无须重新推理。
 - 默认 train/test 各选几个手部移动明显的拿起、移动、放下动作，长短分别选不同的完整 segment，使用对应完整文本；不从长片裁出短片。页面为 GT RGB／模型 RGB，不显示内部身份、存储路径或联合模型骨架。
 - 必须区分 Transformer 的历史 KV 与 VAE 的解码前缀。`generated` 是只给初始图像、后续使用自身预测历史的自由生成，整段预测 latent 连续解码（`decoder_mode=predicted_prefix`）。

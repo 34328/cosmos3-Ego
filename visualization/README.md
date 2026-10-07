@@ -55,8 +55,8 @@ GT模式必须用官方 `get_data_and_condition(..., vision_condition_indexes=No
 在仓库根、与训练相同PYTHONPATH下：
 
 ```bash
-/home/lzh/miniconda3/envs/cosmos3/bin/python -m cosmos3_ar_it2v.visualization.build_page --selection <purpose>/selection.json
-/home/lzh/miniconda3/envs/cosmos3/bin/python -m cosmos3_ar_it2v.visualization.serve --root <purpose> --port 18768
+/home/lzh/miniconda3/envs/cosmos3/bin/python -m visualization.build_page --selection <purpose>/selection.json
+/home/lzh/miniconda3/envs/cosmos3/bin/python -m visualization.serve --root <purpose> --port 18768
 ```
 
 构建前核对选定样本的manifest和非空MP4；网页使用根内相对媒体路径、支持历史和train/test/长短切换，同时只播放一个视频。checkpoint、seed、每块去噪次数、CFG、回放帧率及历史刷新噪声必须记录，不能把帧率和模型时间步混用。

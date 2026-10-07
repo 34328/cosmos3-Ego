@@ -5,7 +5,7 @@
 | 当前完整 segment 设计 | [ar_it2v_v0.2/design.md](ar_it2v_v0.2/design.md) |
 | 当前训练、推理与诊断证据 | [ar_it2v_v0.2/experiment.md](ar_it2v_v0.2/experiment.md) |
 | 问题与已确认边界 | [problems.md](problems.md) |
-| 预览输出与 GT／生成历史约定 | [visualization/README.md](../cosmos3_ar_it2v/visualization/README.md) |
+| 预览输出与 GT／生成历史约定 | [visualization/README.md](../visualization/README.md) |
 | 历史最长97帧随机短窗口设计 | [ar_it2v_v0.1/design.md](ar_it2v_v0.1/design.md) |
 | 历史短窗口实验 | [ar_it2v_v0.1/experiment.md](ar_it2v_v0.1/experiment.md) |
 

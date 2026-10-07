@@ -7,7 +7,7 @@ import torch
 from cosmos3_ar_it2v.inference import (
     _make_chunk_cache, cache_chunk_index, chunk_ranges, refresh_latents, rollout_chunks,
 )
-from cosmos3_ar_it2v.visualization.boundary_sampling import (
+from visualization.boundary_sampling import (
     BoundaryMemoryState, generate_boundary_latents, rollout_boundary_chunks, sample_known_boundary,
 )
 

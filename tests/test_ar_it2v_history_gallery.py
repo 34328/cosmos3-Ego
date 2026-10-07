@@ -4,8 +4,8 @@ import json
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
-from cosmos3_ar_it2v.visualization.build_page import build_page, load_gallery
-from cosmos3_ar_it2v.visualization.serve import create_app
+from visualization.build_page import build_page, load_gallery
+from visualization.serve import create_app
 
 
 def make_gallery(root, *, comparison=True):
@@ -144,7 +144,7 @@ def test_gt_only_page_infers_real_history_and_rejects_explicit_default_mismatch(
 def test_generated_preview_never_encodes_or_uses_gt():
     from types import SimpleNamespace
     import torch
-    from cosmos3_ar_it2v.visualization.preview import decode_preview
+    from visualization.preview import decode_preview
     predicted = torch.ones(1, 1, 7, 1, 1)
     calls = []
     def decode(value):
@@ -163,8 +163,8 @@ def test_generated_preview_never_encodes_or_uses_gt():
 def test_gt_preview_uses_official_complete_encode_and_only_matched_decoder(monkeypatch):
     from types import SimpleNamespace
     import torch
-    from cosmos3_ar_it2v.visualization import decoder_diagnostic
-    from cosmos3_ar_it2v.visualization.preview import decode_preview
+    from visualization import decoder_diagnostic
+    from visualization.preview import decode_preview
     predicted = torch.ones(1, 1, 7, 1, 1)
     gt = predicted.clone()
     gt[:, :, 1:] = 8

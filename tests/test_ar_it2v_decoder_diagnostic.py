@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from cosmos3_ar_it2v.visualization.decoder_diagnostic import (
+from visualization.decoder_diagnostic import (
     LATENT_FORMAT, decode_comparison, decode_gt_prefix, load_latent_archive, rgb_frame_range, save_latent_archive,
 )
 

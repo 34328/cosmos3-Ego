@@ -30,7 +30,7 @@ V0.2基线设置（旧配方保留）：
 | 完整段数据 / 官方 packing 适配 | [dataset.py](cosmos3_ar_it2v/dataset.py) / [dataloader.py](cosmos3_ar_it2v/dataloader.py) |
 | 配置 / 启动 | [ego100h_full_segments.toml](cosmos3_ar_it2v/configs/ego100h_full_segments.toml) / [launch.sh](cosmos3_ar_it2v/launch.sh) |
 | 逐块推理 | [inference.py](cosmos3_ar_it2v/inference.py) |
-| 统一预览与服务器网页 | [visualization/README.md](cosmos3_ar_it2v/visualization/README.md) |
+| 统一预览与服务器网页 | [visualization/README.md](visualization/README.md) |
 | 回归测试 | `tests/test_ar_it2v_*.py` |
 | 官方框架 | [packages/cosmos3/AGENTS.md](packages/cosmos3/AGENTS.md) |
 | 历史短窗口实验 | [V0.1设计](docs/ar_it2v_v0.1/design.md) / [实验记录](docs/ar_it2v_v0.1/experiment.md) |

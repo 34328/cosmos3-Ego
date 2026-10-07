@@ -9,7 +9,7 @@
 | `model.py` / `attention.py` | 连续VAE、单遍DF、C4/local16、packed隔离和flow loss |
 | `launch.sh` / `train.py` / `monitor.py` | 官方启动器、Trainer及运行回执 |
 | `inference.py` | 官方solver与有界KV，逐块自由生成或GT历史诊断 |
-| [visualization/README.md](visualization/README.md) | 完整长短段预览、解码历史、页面与服务 |
+| [visualization/README.md](../visualization/README.md) | 完整长短段预览、解码历史、页面与服务 |
 | `configs/ego100h.toml` | V0.1最长97帧随机短窗口历史复现，不是新训练默认 |
 
 数据清单是共享存储 `/mnt/lzh/cosmos-EgoWAM/training_manifests/` 的只读输入，不需要联合模型代码。正常段保留全部原帧；单条超预算时采用已批准的90%→50%均匀保留策略，真实时间跨度和有效帧率留在元数据中。
