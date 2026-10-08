@@ -343,6 +343,36 @@ _v0_6_model["video_action_causal_mask"] = False
 _v0_6_model["video_action_temporal_causal_mask"] = True
 
 
+# Decoded-oracle geometry ablation on the current v0.6 action contract. The
+# hand latent slices are unchanged by the B3 rigid-pose representation.
+egoverse_joint_video_hand_pose_geometry_b_decode_v0_6 = copy.deepcopy(
+    egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask
+)
+egoverse_joint_video_hand_pose_geometry_b_decode_v0_6["job"].update(
+    group="geometry", name="geometry_b_decode_v0_6"
+)
+egoverse_joint_video_hand_pose_geometry_b_decode_v0_6["model"]["geometry_loss"] = {
+    "enabled": True,
+    "decode_weight": 0.10,
+    "bone_weight": 0.0,
+    "velocity_weight": 0.0,
+    "sigma_min": 0.2,
+    "sigma_max": 0.8,
+    "warmup_steps": 100,
+    "ramp_steps": 200,
+    "target_mode": "decoded_oracle",
+}
+egoverse_joint_video_hand_pose_geometry_b_decode_v0_6["model"]["config"]["parallelism"].update(
+    data_parallel_shard_degree=8,
+    data_parallel_replicate_degree=1,
+    context_parallel_shard_degree=1,
+)
+_geometry_dataset = egoverse_joint_video_hand_pose_geometry_b_decode_v0_6["dataloader_train"]["dataloader"][
+    "datasets"
+]["egoverse"]["dataset"]
+_geometry_dataset["include_geometry_targets"] = True
+
+
 ConfigStore.instance().store(
     group="experiment",
     package="_global_",
@@ -372,6 +402,12 @@ ConfigStore.instance().store(
     package="_global_",
     name="egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask",
     node=egoverse_joint_video_hand_pose_overfit_v0_6_frame_delta_temporal_mask,
+)
+ConfigStore.instance().store(
+    group="experiment",
+    package="_global_",
+    name="egoverse_joint_video_hand_pose_geometry_b_decode_v0_6",
+    node=egoverse_joint_video_hand_pose_geometry_b_decode_v0_6,
 )
 
 

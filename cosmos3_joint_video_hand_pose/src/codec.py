@@ -34,6 +34,12 @@ class FrozenHandMLPAE15(nn.Module):
 
     @torch.no_grad()
     def decode(self, standardized_latent: torch.Tensor) -> torch.Tensor:
+        return self.decode_differentiable(standardized_latent)
+
+    def decode_differentiable(self, standardized_latent: torch.Tensor) -> torch.Tensor:
+        """Decode with gradients to the latent while codec weights stay frozen."""
+        if standardized_latent.shape[-1] != 15:
+            raise ValueError(f"hand latent must end in 15 channels, got {tuple(standardized_latent.shape)}")
         raw = standardized_latent.float() * self.latent_std + self.latent_mean
         flat = self.decoder(raw) * self.input_std + self.input_mean
         return flat.reshape(*standardized_latent.shape[:-1], 20, 3)

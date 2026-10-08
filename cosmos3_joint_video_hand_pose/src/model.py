@@ -6,6 +6,16 @@ from typing import Any
 
 import torch
 
+from .action import CODEC_ROOT
+from .codec import FrozenHandMLPAE15
+from .geometry_loss import (
+    GeometryLossConfig,
+    LEFT_HAND_LATENT,
+    RIGHT_HAND_LATENT,
+    clean_action_from_target,
+    hand_geometry_losses,
+    predict_clean_action,
+)
 from .loss import visibility_weighted_action_flow_loss
 
 
@@ -34,17 +44,57 @@ def _visibility_from_batch(data_batch: dict[str, Any]) -> list[torch.Tensor]:
     return result
 
 
+def _geometry_targets_from_batch(data_batch: dict[str, Any]) -> dict[str, list[torch.Tensor]]:
+    result: dict[str, list[torch.Tensor]] = {}
+    for key in ("right_hand_local_gt", "left_hand_local_gt"):
+        raw = data_batch.get(key)
+        if raw is None:
+            raise KeyError(f"{key} is required when geometry loss is enabled")
+        items = raw if isinstance(raw, list) else [raw]
+        tensors = []
+        for item in items:
+            while isinstance(item, list) and len(item) == 1:
+                item = item[0]
+            tensor = torch.as_tensor(item, dtype=torch.float32)
+            while tensor.ndim > 3 and tensor.shape[0] == 1:
+                tensor = tensor.squeeze(0)
+            if tensor.ndim != 3 or tensor.shape[-2:] != (20, 3):
+                raise ValueError(f"{key} must be [T,20,3], got {tuple(tensor.shape)}")
+            tensors.append(tensor.cpu())
+        result[key] = tensors
+    return result
+
+
 class EgoVerseOmniMoTModel(OmniMoTModel):
     """Thin loss adapter; the Cosmos Generator architecture is unchanged."""
 
-    def __init__(self, config, lambda_out_of_fov: float = 0.0, subblock_equal_weight: bool = False):
+    def __init__(
+        self,
+        config,
+        lambda_out_of_fov: float = 0.0,
+        subblock_equal_weight: bool = False,
+        geometry_loss: GeometryLossConfig | dict[str, Any] | None = None,
+        right_hand_codec: str = str(CODEC_ROOT / "right_mlp15_primary.pt"),
+        left_hand_codec: str = str(CODEC_ROOT / "left_mlp15_primary.pt"),
+    ):
         super().__init__(config)
         if not 0 <= lambda_out_of_fov <= 1:
             raise ValueError("lambda_out_of_fov must be in [0,1]")
         self.lambda_out_of_fov = float(lambda_out_of_fov)
         self.subblock_equal_weight = bool(subblock_equal_weight)
+        self.geometry_loss_config = GeometryLossConfig.from_value(geometry_loss)
+        if self.geometry_loss_config.enabled:
+            # Keep fixed codecs out of FSDP, optimizer groups and DCP state.
+            object.__setattr__(self, "right_hand_geometry_codec", FrozenHandMLPAE15(right_hand_codec))
+            object.__setattr__(self, "left_hand_geometry_codec", FrozenHandMLPAE15(left_hand_codec))
+        else:
+            self.right_hand_geometry_codec = None
+            self.left_hand_geometry_codec = None
         self._current_hand_visibility: list[torch.Tensor] | None = None
         self._cp_local_hand_visibility: list[torch.Tensor] | None = None
+        self._current_geometry_targets: dict[str, list[torch.Tensor]] | None = None
+        self._cp_local_geometry_targets: dict[str, list[torch.Tensor]] | None = None
+        self._geometry_iteration = 0
         self._fixed_pack_action_intervention = "original"
 
     def _add_noise_to_input(self, *args, **kwargs):
@@ -127,23 +177,33 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
         return original_output, original_loss
 
     def _get_training_inputs(self, data_batch: dict[str, torch.Tensor], iteration: int):
+        self._geometry_iteration = int(iteration)
         cp_enabled = self.parallel_dims is not None and self.parallel_dims.cp_enabled
         owner_slot = self._cp_window_slot
         if not cp_enabled:
             self._current_hand_visibility = _visibility_from_batch(data_batch)
+            if self.geometry_loss_config.enabled:
+                self._current_geometry_targets = _geometry_targets_from_batch(data_batch)
             return super()._get_training_inputs(data_batch, iteration)
 
         cp_size = self.parallel_dims.cp_mesh.size()
         if owner_slot == 0:
             self._cp_local_hand_visibility = _visibility_from_batch(data_batch)
+            if self.geometry_loss_config.enabled:
+                self._cp_local_geometry_targets = _geometry_targets_from_batch(data_batch)
         result = super()._get_training_inputs(data_batch, iteration)
         self._current_hand_visibility = broadcast_context_parallel_object(
             self._cp_local_hand_visibility,
             self.parallel_dims,
             owner_rank=owner_slot,
         )
+        if self.geometry_loss_config.enabled:
+            self._current_geometry_targets = broadcast_context_parallel_object(
+                self._cp_local_geometry_targets, self.parallel_dims, owner_rank=owner_slot
+            )
         if owner_slot == cp_size - 1:
             self._cp_local_hand_visibility = None
+            self._cp_local_geometry_targets = None
         return result
 
     def _compute_flow_matching_loss(
@@ -239,6 +299,17 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
             egoverse_loss_action_weighted=action_raw * rf_cfg.action_loss_weight,
             egoverse_loss_total=total_loss,
         )
+        if self.geometry_loss_config.enabled:
+            geometry_total, geometry_metrics = self._compute_geometry_loss(
+                out_net=out_net,
+                data_batch_packed=data_batch_packed,
+                gen_data_noised=gen_data_noised,
+            )
+            geometry_total = geometry_total * sample_scale
+            total_loss = total_loss + geometry_total
+            losses["egoverse_loss_total"] = total_loss
+            losses["egoverse_loss_geometry_weighted"] = geometry_total
+            losses.update({f"egoverse_geometry_{name}": value for name, value in geometry_metrics.items()})
         # Record the *actual*, post-scheduler video noise level used by this
         # forward pass.  This is deliberately derived from ``timesteps`` rather
         # than re-sampling the configured distribution, so checkpoint replay
@@ -257,3 +328,77 @@ class EgoVerseOmniMoTModel(OmniMoTModel):
             if name.endswith("_loss"):
                 losses[f"egoverse_loss_action_{name.removesuffix('_loss')}_raw"] = value * sample_scale
         return total_loss, losses
+
+    def _compute_geometry_loss(self, *, out_net, data_batch_packed, gen_data_noised):
+        config = self.geometry_loss_config
+        if self._current_geometry_targets is None or self._current_hand_visibility is None:
+            raise RuntimeError("geometry loss reached without synchronized GT geometry")
+        if data_batch_packed.action is None or gen_data_noised.xt_tokens_action is None:
+            dummy = 0.0 * sum(item.sum() for item in out_net["preds_action"])
+            return dummy, {"decode_raw": dummy.detach(), "bone_raw": dummy.detach(), "velocity_raw": dummy.detach()}
+
+        sample_metrics = []
+        for index, (prediction, noisy, epsilon, target_velocity, sigma, condition_mask, visibility) in enumerate(
+            zip(
+                out_net["preds_action"],
+                gen_data_noised.xt_tokens_action,
+                gen_data_noised.epsilon_action,
+                gen_data_noised.vt_target_action,
+                gen_data_noised.sigmas_action,
+                data_batch_packed.action.condition_mask,
+                self._current_hand_visibility,
+                strict=True,
+            )
+        ):
+            if prediction.shape[-1] < 57:
+                raise ValueError("geometry loss requires action predictions with at least 57 channels")
+            x0_pred = predict_clean_action(noisy[:, :57], prediction[:, :57], sigma)
+            x0_oracle = clean_action_from_target(epsilon[:, :57], target_velocity[:, :57])
+            if not torch.isfinite(x0_pred).all():
+                raise FloatingPointError("non-finite predicted clean action")
+            sigma_frames = sigma.reshape(-1).to(device=prediction.device)
+            if sigma_frames.numel() == 1:
+                sigma_frames = sigma_frames.expand(len(prediction))
+            active = (1.0 - condition_mask.reshape(-1).to(prediction)).bool()
+            active &= (sigma_frames >= config.sigma_min) & (sigma_frames <= config.sigma_max)
+            visible = visibility.to(device=prediction.device)
+
+            hand_results = []
+            for side, channel_slice, codec, visibility_index in (
+                ("right", RIGHT_HAND_LATENT, self.right_hand_geometry_codec, 0),
+                ("left", LEFT_HAND_LATENT, self.left_hand_geometry_codec, 1),
+            ):
+                assert codec is not None
+                if codec.input_mean.device != prediction.device:
+                    codec.to(prediction.device)
+                predicted_points = codec.decode_differentiable(x0_pred[:, channel_slice])
+                oracle_points = codec.decode_differentiable(x0_oracle[:, channel_slice]).detach()
+                raw_gt = self._current_geometry_targets[f"{side}_hand_local_gt"][index].to(
+                    device=prediction.device, dtype=torch.float32
+                )
+                if len(raw_gt) != len(prediction):
+                    raise ValueError(f"{side} geometry target length does not match action length")
+                hand_results.append(
+                    hand_geometry_losses(
+                        predicted_points=predicted_points,
+                        oracle_points=oracle_points,
+                        raw_gt_points=raw_gt,
+                        visible=visible[:, visibility_index],
+                        active=active,
+                        config=config,
+                    )
+                )
+            sample_metrics.append(
+                {key: torch.stack([item[key] for item in hand_results]).mean() for key in hand_results[0]}
+            )
+
+        metrics = {key: torch.stack([item[key] for item in sample_metrics]).mean() for key in sample_metrics[0]}
+        ramp = config.ramp(self._geometry_iteration)
+        weighted = ramp * (
+            config.decode_weight * metrics["decode"]
+            + config.bone_weight * metrics["bone"]
+            + config.velocity_weight * metrics["velocity"]
+        )
+        detached = {f"{key}_raw": value.detach() for key, value in metrics.items()}
+        detached["ramp"] = weighted.new_tensor(ramp)
+        return weighted, detached

@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 import zarr
 
-from .action import Action57Builder
+from .action import Action57Builder, wrist_local_non_wrist_points
 from .temporal import (
     CANVAS_HEIGHT,
     CANVAS_WIDTH,
@@ -132,6 +132,7 @@ class EgoVerseSegmentDataset(Dataset):
         action_builder: Action57Builder | None = None,
         max_sequence_length: int = MAX_SEQUENCE_LENGTH,
         prompt_mode: str = PROMPT_MODE_SEGMENT_ONLY,
+        include_geometry_targets: bool = False,
     ):
         with Path(episodes_manifest).open(newline="", encoding="utf-8") as handle:
             episodes = {row["episode_hash"]: row for row in csv.DictReader(handle) if row["split"] == split}
@@ -147,6 +148,7 @@ class EgoVerseSegmentDataset(Dataset):
         if prompt_mode not in PROMPT_MODES:
             raise ValueError(f"unsupported prompt mode {prompt_mode!r}; expected one of {PROMPT_MODES}")
         self.prompt_mode = prompt_mode
+        self.include_geometry_targets = bool(include_geometry_targets)
         self.retention_counts = {"100%": 0, "80%": 0, "70%": 0, "60%": 0, "50%": 0, "dropped": 0}
         self.dropped_segments = []
         self.rows = []
@@ -244,7 +246,7 @@ class EgoVerseSegmentDataset(Dataset):
         assert video.shape == (3, length, 368, 640)
         assert action.shape == (length, 57)
         assert visibility.shape == (length, 2)
-        return {
+        sample = {
             "ai_caption": structured_prompt,
             "video": video,
             "action": action,
@@ -257,6 +259,10 @@ class EgoVerseSegmentDataset(Dataset):
             "temporal_retention": row["_retention_label"],
             "source_frame_indices": torch.from_numpy(frame_indexes.copy()),
         }
+        if self.include_geometry_targets:
+            sample["right_hand_local_gt"] = wrist_local_non_wrist_points(right_wrist, right_keypoints)
+            sample["left_hand_local_gt"] = wrist_local_non_wrist_points(left_wrist, left_keypoints)
+        return sample
 
 
 class EgoVerseCosmosDataset(Dataset):
@@ -296,6 +302,7 @@ def get_egoverse_cosmos_dataset(
     state_normalizer: str | None = None,
     future_normalizer: str | None = None,
     rigid_pose_frame_delta: bool = False,
+    include_geometry_targets: bool = False,
 ):
     from cosmos_framework.data.generator.action.datasets.action_sft_dataset import ActionIterableShuffleDataset
     from cosmos_framework.data.generator.action.transforms import ActionTransformPipeline
@@ -312,6 +319,7 @@ def get_egoverse_cosmos_dataset(
         action_builder=Action57Builder(**action_builder_kwargs),
         max_sequence_length=max_sequence_length,
         prompt_mode=prompt_mode,
+        include_geometry_targets=include_geometry_targets,
     )
     transform = ActionTransformPipeline(
         pad_keys=[],

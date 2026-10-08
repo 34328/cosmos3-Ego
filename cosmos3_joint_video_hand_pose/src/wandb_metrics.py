@@ -22,6 +22,16 @@ BASE_LOSS_METRIC_SOURCES = {
     "loss/total": "egoverse_loss_total",
 }
 
+GEOMETRY_METRIC_SOURCES = {
+    "loss/geometry_weighted": "egoverse_loss_geometry_weighted",
+    "geometry/decode_raw": "egoverse_geometry_decode_raw",
+    "geometry/bone_raw": "egoverse_geometry_bone_raw",
+    "geometry/velocity_raw": "egoverse_geometry_velocity_raw",
+    "geometry/mpjpe_raw": "egoverse_geometry_mpjpe_raw_raw",
+    "geometry/coverage": "egoverse_geometry_coverage_raw",
+    "geometry/ramp": "egoverse_geometry_ramp",
+}
+
 SUBBLOCK_LOSS_METRIC_SOURCES = {
     "loss/action_camera_translation_raw": "egoverse_loss_action_camera_translation_raw",
     "loss/action_camera_rotation_raw": "egoverse_loss_action_camera_rotation_raw",
@@ -73,6 +83,7 @@ def filter_wandb_metrics(metrics: dict) -> dict:
     """Keep project losses, optimizer diagnostics, and real grad-clip events."""
     allowed = (
         set(LOSS_METRIC_SOURCES)
+        | set(GEOMETRY_METRIC_SOURCES)
         | set(SIGMA_METRIC_SOURCES)
         | LR_METRIC_NAMES
         | GRAD_NORM_METRIC_NAMES
@@ -148,7 +159,7 @@ def extract_loss_metrics(output_batch: dict[str, torch.Tensor]) -> dict[str, tor
     missing = [source for source in required if source not in output_batch]
     if missing:
         raise KeyError(f"EgoVerse W&B metrics missing model outputs: {missing}")
-    sources = LOSS_METRIC_SOURCES | SIGMA_METRIC_SOURCES
+    sources = LOSS_METRIC_SOURCES | GEOMETRY_METRIC_SOURCES | SIGMA_METRIC_SOURCES
     return {name: output_batch[source] for name, source in sources.items() if source in output_batch}
 
 
@@ -314,6 +325,8 @@ class EgoVerseLossWandbCallback(Callback):
     ) -> None:
         del model, data_batch, loss
         for name, value in extract_loss_metrics(output_batch).items():
+            if name not in self._records:
+                self._records[name] = _LossRecord(name=name)
             self._records[name].loss += value.detach().float()
             self._records[name].iter_count += 1
 
