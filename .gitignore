@@ -23,6 +23,7 @@ secrets.yaml
 # Shared data, weights, run outputs and temporary media
 /outputs/
 /tmp/
+/tests/
 /training_manifests/
 /checkpoints/
 /data/
