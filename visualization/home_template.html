@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="理解 Cosmos3 AR 视频模型的训练、逐块推理与连续 VAE 编解码，再查看视频对照与量化指标。">
+<title>cosmos3 AR 模型训练可视化</title>
+<script>document.documentElement.dataset.theme=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';</script>
+<style>
+/* Preserve the research viewer's cool neutral / teal palette.
+   DESIGN_VARIANCE 5, MOTION_INTENSITY 2, VISUAL_DENSITY 4.
+   Native CSS; 8px controls, 14px panels. No external dependencies. */
+:root{color-scheme:light;--bg:#eef2f4;--surface:#fff;--soft:#e8eef1;--ink:#192b33;--muted:#52636c;--line:#ccd7dc;--accent:#176b67;--accent-soft:#e3f1ef;--on-accent:#fff;--shadow:0 8px 28px rgb(39 67 80 / .06)}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#141e24;--surface:#1c2a32;--soft:#2a3b44;--ink:#e7f0f3;--muted:#b0c1ca;--line:#435863;--accent:#8dd1c4;--accent-soft:#29443f;--on-accent:#122c27;--shadow:none}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
+button,a,select{-webkit-tap-highlight-color:transparent}
+button{font:inherit;cursor:pointer;min-height:40px;white-space:nowrap}
+a{color:var(--accent);text-underline-offset:4px}
+button:focus-visible,a:focus-visible,summary:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+button:active{transform:scale(.98)}
+button,a{transition:background-color .15s,border-color .15s,color .15s}
+[hidden]{display:none!important}
+.wrap{max-width:1328px;margin:auto;padding:38px 40px 48px}
+.site-header{margin-bottom:40px}
+.run-selectors{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:26px}
+.run-selectors label{display:grid;gap:6px;color:var(--muted);font-size:12px;font-weight:600;min-width:160px}
+.run-selectors select{font:inherit;cursor:pointer;min-height:44px;padding:9px 38px 9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:600;font-size:15px}
+.run-selectors select:hover{border-color:var(--accent)}
+.title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+.title-row h1{font-size:26px;line-height:1.35;letter-spacing:-.035em;font-weight:650;margin:0}
+.page-nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.page-nav a,.action{border:1px solid var(--line);border-radius:8px;padding:9px 16px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;min-height:42px}
+.page-nav a:hover,.action:hover{background:var(--soft);border-color:var(--muted)}
+.page-nav a[aria-current="page"],.action.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.intro{display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:start;margin-bottom:36px}
+.intro-copy h2{font-size:38px;line-height:1.35;font-weight:650;letter-spacing:-.04em;margin:0 0 14px;max-width:600px}
+.intro-copy p{color:var(--muted);font-size:16px;margin:0 0 22px;max-width:610px}
+.model-summary{padding:20px 24px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 14px 14px 0}
+.model-summary h3{margin:0 0 12px;font-size:16px;font-weight:650}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:14px 24px;margin:0}
+.facts dt{color:var(--muted);font-size:12px;margin-bottom:2px}
+.facts dd{margin:0;font-size:15px;font-weight:600}
+.section{margin-bottom:36px}
+.section h2{font-size:23px;line-height:1.4;font-weight:650;letter-spacing:-.02em;margin:0 0 10px}
+.section-intro{color:var(--muted);margin:0 0 18px;max-width:900px}
+.data-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;margin:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 0}
+.data-facts dt{font-size:12px;color:var(--muted);margin-bottom:4px}
+.data-facts dd{margin:0;font-size:26px;font-weight:650;line-height:1.4;font-variant-numeric:tabular-nums}
+.data-facts small{display:block;font-size:12px;color:var(--muted);font-weight:450;margin-top:3px}
+.data-note{font-size:13px;color:var(--muted);margin:8px 0 0}
+.forcing{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.forcing-item{padding:20px 26px 20px 0}
+.forcing-item+.forcing-item{padding-left:26px;border-left:1px solid var(--line)}
+.forcing h3{font-size:17px;margin:0 0 7px;font-weight:650}
+.forcing h3 span{display:block;font-size:13px;color:var(--accent);font-weight:600;margin-top:2px}
+.forcing p{color:var(--muted);margin:0;max-width:540px}
+.together{font-size:13px;color:var(--muted);margin:12px 0 0}
+.together strong{color:var(--ink);font-weight:600}
+.explorer{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:26px;box-shadow:var(--shadow)}
+.explorer-head{display:flex;gap:18px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.explorer-head h2{margin:0}
+.example-label{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.segments{display:flex;gap:4px;padding:4px;border-radius:10px;background:var(--soft);max-width:600px;margin-bottom:16px}
+.switch{flex:1;min-width:0;border:1px solid transparent;border-radius:8px;padding:9px 14px;background:transparent;color:var(--muted);font-size:13px;font-weight:600}
+.switch[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);box-shadow:0 2px 5px rgb(25 59 58 / .14)}
+.switch:hover:not([aria-pressed="true"]){background:var(--surface);border-color:var(--line);color:var(--ink)}
+.mode-description{color:var(--muted);margin:0 0 22px;min-height:46px;max-width:980px}
+.timeline-scroll{overflow-x:auto;padding:4px;margin:-4px}
+.timeline-grid{display:grid;grid-template-columns:104px repeat(5,minmax(0,1fr));gap:10px;align-items:stretch;min-width:620px}
+.timeline-grid+.timeline-grid{margin-top:10px}
+.row-label{display:flex;flex-direction:column;justify-content:center;color:var(--ink);font-size:13px;font-weight:600;line-height:1.5}
+.row-label small{font-size:11px;color:var(--muted);font-weight:450;margin-top:3px}
+.chunk-selector{border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);padding:10px 8px;min-height:65px}
+.chunk-selector strong,.chunk-selector span{display:block}
+.chunk-selector strong{font-size:15px}
+.chunk-selector span{font-size:11px;color:var(--muted);font-weight:450;margin-top:2px}
+.chunk-selector:hover{border-color:var(--accent)}
+.chunk-selector[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent);color:var(--accent)}
+.chunk{border:1px dashed var(--line);border-radius:8px;background:var(--soft);padding:13px 8px;text-align:center;min-height:76px;display:flex;flex-direction:column;justify-content:center;color:var(--muted)}
+.chunk strong{font-size:14px;font-weight:600}
+.chunk small{font-size:11px;margin-top:3px}
+.chunk.is-history,.chunk.is-condition{background:var(--accent-soft);border:1px solid var(--accent);color:var(--accent)}
+.chunk.is-target{background:var(--accent);border:1px solid var(--accent);color:var(--on-accent)}
+.chunk.is-completed{background:var(--surface);border-style:solid;color:var(--ink)}
+.chunk .loss-label{font-weight:550;color:var(--ink)}
+.chunk.is-target .loss-label{color:var(--on-accent)}
+.legend{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin:16px 0 20px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:13px;height:13px;border-radius:3px;border:1px solid var(--line);background:var(--soft)}
+.legend .history-key{background:var(--accent-soft);border-color:var(--accent)}
+.legend .target-key{background:var(--accent);border-color:var(--accent)}
+.scroll-hint{display:none;font-size:12px;color:var(--muted);margin:10px 0 0}
+.block-detail{background:var(--accent-soft);border-radius:10px;padding:18px 20px}
+.block-detail h3{font-size:17px;font-weight:650;margin:0 0 6px}
+.block-detail p{margin:0;color:var(--ink)}
+.parallel-note{margin:12px 0 0;color:var(--muted);font-size:13px}
+.parallel-note strong{color:var(--ink);font-weight:600}
+.noise-details{margin-top:20px;border-top:1px solid var(--line);padding-top:15px}
+.noise-details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;width:fit-content;padding:4px 0;min-height:36px}
+.noise-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin:14px 0 4px}
+.noise-grid h3{font-size:15px;margin:0 0 6px;font-weight:600}
+.noise-grid p{font-size:13px;margin:0;color:var(--muted)}
+.noise-note{font-size:12px;color:var(--muted);margin:14px 0 0}
+.vae-layout{display:grid;grid-template-columns:1.35fr 1fr;gap:32px;margin-top:20px}
+.flow-group+.flow-group{margin-top:22px}
+.flow-group h3{font-size:14px;font-weight:600;margin:0 0 10px}
+.flow{list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin:0;padding:0}
+.flow li{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:90px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:600;text-align:center}
+.flow li+li:before{content:'→';position:absolute;left:-20px;color:var(--muted);font-weight:450}
+.flow li:last-child{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.flow small{font-size:11px;font-weight:450;color:var(--muted);margin-top:4px}
+.memory-notes{margin:0;border-left:1px solid var(--line);padding-left:28px}
+.memory-notes div+div{margin-top:20px}
+.memory-notes dt{font-size:15px;font-weight:650;margin-bottom:5px}
+.memory-notes dd{margin:0;font-size:13px;color:var(--muted)}
+.vae-note{font-size:13px;color:var(--muted);margin:18px 0 0;max-width:1000px}
+.endnote{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.endnote p{margin:0}
+@media(max-width:1023px){.wrap{padding:28px 24px 40px}.intro{gap:28px;grid-template-columns:1.2fr 1fr}.intro-copy h2{font-size:31px}.model-summary{padding:18px}.explorer{padding:22px}.vae-layout{gap:24px}.memory-notes{padding-left:22px}}
+@media(max-width:767px){.wrap{padding:24px 16px 36px}.site-header{margin-bottom:28px}.title-row{gap:12px;align-items:flex-start}.title-row h1{font-size:22px;max-width:260px}.action{padding:8px 12px}.page-nav a{padding:9px 13px}.intro{grid-template-columns:1fr;gap:24px;margin-bottom:30px}.intro-copy h2{font-size:31px}.intro-copy p{font-size:14px}.forcing{grid-template-columns:1fr}.forcing-item{padding:18px 0}.forcing-item+.forcing-item{padding:18px 0;border-left:0;border-top:1px solid var(--line)}.section h2{font-size:21px}.explorer{padding:18px 14px}.explorer-head{gap:7px;margin-bottom:16px}.segments{max-width:none}.switch{padding:8px 9px;font-size:12px;white-space:normal;line-height:1.5}.mode-description{min-height:70px;font-size:13px}.scroll-hint{display:block}.legend{gap:12px;font-size:11px}.block-detail{padding:15px}.block-detail h3{font-size:16px}.block-detail p{font-size:13px}.noise-grid,.vae-layout{grid-template-columns:1fr;gap:18px}.memory-notes{border-left:0;border-top:1px solid var(--line);padding:20px 0 0}.flow{gap:20px}.flow li{padding:10px 7px;min-height:94px}.flow li+li:before{left:-17px}.endnote{gap:10px}}
+@media(max-width:479px){.title-row h1{font-size:20px;max-width:230px}.title-row .action{font-size:12px;padding:7px 9px;min-height:38px}.intro-copy h2{font-size:29px}.segments{gap:3px;padding:3px}.switch{padding:8px 7px}.facts{gap:12px 20px}.timeline-grid{grid-template-columns:86px repeat(5,minmax(0,1fr));gap:8px;min-width:600px}.flow li{font-size:12px}.flow small{font-size:10px}.legend{gap:8px}}
+@media(prefers-reduced-motion:reduce){button,a{transition:none}button:active{transform:none}}
+</style>
+</head>
+<body>
+<main class="wrap">
+__RUN_SELECTOR__
+<header class="site-header">
+  <div class="title-row"><h1>cosmos3 AR 模型训练可视化</h1><button class="action" id="theme-toggle" type="button">切换深色</button></div>
+  <nav class="page-nav" aria-label="页面导航"><a href="index.html" aria-current="page">训练与推理</a><a href="results.html">视频与指标</a></nav>
+</header>
+
+<section class="intro" aria-labelledby="intro-heading">
+  <div class="intro-copy">
+    <h2 id="intro-heading">从一帧图像，<br>接续一个完整动作。</h2>
+    <p>训练并行学习每个视频块，推理依次生成下一块。先理解模型如何续接，再对照真实视频观察效果。</p>
+    <a class="action primary" href="results.html">查看视频与量化指标 →</a>
+  </div>
+  <aside class="model-summary" aria-label="当前模型配方">
+    <h3>当前训练配方 · V0.4</h3>
+    <dl class="facts"><div><dt>模型与条件</dt><dd>Cosmos3-Nano · 图像＋文本</dd></div><div><dt>训练方式</dt><dd>GT 历史 H / 预测 P</dd></div><div><dt>每块大小</dt><dd>4 latent ≈ 16 RGB 帧</dd></div><div><dt>注意力窗口</dt><dd>C4 / local32</dd></div></dl>
+    <p class="noise-note">首帧独立；后续每块通常 16 帧（约 0.53 秒），末块可更短。整段块数由完整动作段的长度决定。</p>
+  </aside>
+</section>
+
+<section class="section" aria-labelledby="training-data-heading">
+  <h2 id="training-data-heading">训练数据 · V0.4</h2>
+  <p class="section-intro">EgoVerse 第一人称视频，以首帧图像和完整动作段的文本作为条件。</p>
+  <dl class="data-facts">
+    <div><dt>训练视频时长</dt><dd>89.52 小时<small>保留片段的原始时间跨度</small></dd></div>
+    <div><dt>完整动作片段</dt><dd>32,010 clips<small>一个 clip 对应一个文本标注 segment</small></dd></div>
+    <div><dt>Ego 采集环境</dt><dd>77 类<small>覆盖 705 个具体采集任务</small></dd></div>
+  </dl>
+  <p class="data-note"><strong>环境例子：</strong>家居、礼品店、香水店、五金店、花店、烘焙店、木工车间、缝纫工厂等。77 类按数据清单的采集环境标签统计。</p>
+  <p class="data-note">训练清单原有 95.51 小时、32,355 段；按当前长度预算排除 345 个超长片段（5.99 小时），其余保留完整起止和对应文本。部分长片均匀保留帧，仍覆盖原始时间跨度。</p>
+  <p class="data-note">以上是可用于本轮训练的数据规模，不是累计训练观看时长；验证集未参与训练。类别按采集环境标签统计，705 个任务不等于 705 种动作类别。</p>
+</section>
+
+<section class="section" aria-labelledby="forcing-heading">
+  <h2 id="forcing-heading">Teacher Forcing 与 Diffusion Forcing，分别控制什么？</h2>
+  <div class="forcing">
+    <div class="forcing-item"><h3>Teacher Forcing<span>历史从哪里来</span></h3><p>训练使用真实视频的历史，学习正确的下一块。V0.4 的 H 来自 GT，可保持干净或加入噪声；它不会由模型预测回填。</p></div>
+    <div class="forcing-item"><h3>Diffusion Forcing<span>每个时间位置带多少噪声</span></h3><p>不同时间块可处于不同噪声水平。V0.4 为每个 P 块独立采样噪声，块内共享，在因果历史下学习当前块的去噪。</p></div>
+  </div>
+  <p class="together"><strong>两种机制可以同时使用。</strong> 当前训练结合 GT 历史与分块独立噪声；自由生成时，历史逐块换成模型自己的预测。</p>
+</section>
+
+<section class="section explorer" aria-labelledby="explorer-heading">
+  <div class="explorer-head"><h2 id="explorer-heading">点选一块，看它能读到什么</h2><span class="example-label">65 帧示例 · 17 latent · 5 个时间块</span></div>
+  <div class="segments" role="group" aria-label="训练和推理模式"><button class="switch" type="button" data-mode="train" aria-pressed="true">训练 · 并行监督</button><button class="switch" type="button" data-mode="rollout" aria-pressed="false">Rollout · 自由生成</button><button class="switch" type="button" data-mode="gt" aria-pressed="false">GT 历史 · 单块诊断</button></div>
+  <p class="mode-description" id="mode-description">同一完整 GT 段连续编码一次，构造 H 与 P 两条表示。所有后续 P 块在一次前向中学习，下面只高亮所选块的可见范围。</p>
+  <div class="timeline-scroll" role="region" aria-label="五块时间轴">
+    <div class="timeline-grid">
+      <div class="row-label">时间块<small>点击 C₀ 至 C₄</small></div>
+      <button class="chunk-selector" type="button" data-chunk="0" aria-pressed="false"><strong>C₀</strong><span>第 1 帧</span></button>
+      <button class="chunk-selector" type="button" data-chunk="1" aria-pressed="false"><strong>C₁</strong><span>第 2–17 帧</span></button>
+      <button class="chunk-selector" type="button" data-chunk="2" aria-pressed="false"><strong>C₂</strong><span>第 18–33 帧</span></button>
+      <button class="chunk-selector" type="button" data-chunk="3" aria-pressed="true"><strong>C₃</strong><span>第 34–49 帧</span></button>
+      <button class="chunk-selector" type="button" data-chunk="4" aria-pressed="false"><strong>C₄</strong><span>第 50–65 帧</span></button>
+    </div>
+    <div class="timeline-grid" id="history-row"><div class="row-label" id="history-label">历史 H<small>GT latent</small></div><div class="chunk is-history"><strong>H₀</strong><small>干净首帧</small></div><div class="chunk is-history"><strong>H₁</strong><small>可见历史</small></div><div class="chunk is-history"><strong>H₂</strong><small>可见历史</small></div><div class="chunk"><strong>H₃</strong><small>不可见</small></div><div class="chunk"><strong>H₄</strong><small>不可见</small></div></div>
+    <div class="timeline-grid" id="prediction-row"><div class="row-label" id="prediction-label">预测 P<small>块内共享 σ</small></div><div class="chunk"><strong>P₀</strong><small>首帧不计 loss</small></div><div class="chunk"><strong>P₁</strong><small class="loss-label">并行 loss</small></div><div class="chunk"><strong>P₂</strong><small class="loss-label">并行 loss</small></div><div class="chunk is-target"><strong>P₃</strong><small class="loss-label">并行 loss</small></div><div class="chunk"><strong>P₄</strong><small class="loss-label">并行 loss</small></div></div>
+  </div>
+  <p class="scroll-hint">横向查看完整时间轴，点击时间块切换。</p>
+  <div class="legend" aria-label="颜色含义"><span><i class="history-key" aria-hidden="true"></i>可见历史</span><span><i class="target-key" aria-hidden="true"></i>当前预测块</span><span><i aria-hidden="true"></i>当前块不可读取</span></div>
+  <div class="block-detail" aria-live="polite" aria-atomic="true"><h3 id="block-title">C₃：以真实过去预测当前块</h3><p id="block-description">P₃ 读取 H₀、H₁、H₂ 和本块 P₃；同一时刻的 H₃、未来 H₄，以及其他 P 块均不可见。</p></div>
+  <p class="parallel-note" id="parallel-note"><strong>C₁ 至 C₄ 全部参与 loss。</strong> 选中 C₃ 只是解释可见范围，不会把训练改成单目标。H 没有直接 loss，仍保留预测误差经历史隐藏表示回传的梯度。</p>
+  <details class="noise-details"><summary>展开训练噪声与监督细节</summary><div class="noise-grid"><div><h3>历史 H：真实段的另一条表示</h3><p>首 latent 干净。50% 样本整条 H 干净；另 50% 对每个后续 latent 独立采样 timestep index 500–999，经 shift5 后 σ ≈ 0.00498–0.83333。H 的噪声与 P 独立。</p></div><div><h3>预测 P：学习 flow 速度目标</h3><p>复用官方 Nano waver 分布与 480 分辨率 shift5，σ 支持 [0,1]。每块独立采样、块内共享；所有非条件块计算官方 flow loss，保留真实末帧权重与按样本平均。</p></div></div><p class="noise-note">噪声插值：zσ = (1−σ)zGT + σε。σ 越大，输入越接近噪声。对齐补帧不计有效监督；首 latent 不进入 loss。</p></details>
+  <noscript><p class="parallel-note">启用 JavaScript 后可切换模式与时间块。当前图示为训练时 C₃ 的可见范围。</p></noscript>
+</section>
+
+<section class="section" aria-labelledby="vae-heading">
+  <h2 id="vae-heading">VAE 连续编解码，KV 负责逐块续接</h2>
+  <p class="section-intro">时间块是 Transformer 的预测单位，不是重置 VAE 的边界。两种历史承担不同工作。</p>
+  <div class="vae-layout">
+    <div>
+      <div class="flow-group"><h3>训练 / GT 历史诊断</h3><ol class="flow" aria-label="连续编码流程"><li>完整 GT 视频<small>保留动作段边界</small></li><li>连续 VAE 编码<small>从首帧编码整段</small></li><li>连续 latent<small>再按 [1,4,4,…] 分块</small></li></ol></div>
+      <div class="flow-group"><h3>Rollout 输出</h3><ol class="flow" aria-label="连续解码流程"><li>逐块预测 latent<small>仅编码条件首帧</small></li><li>按时间拼接<small>不做 RGB 回填</small></li><li>连续 VAE 解码<small>去掉对齐补帧</small></li></ol></div>
+    </div>
+    <dl class="memory-notes"><div><dt>Transformer 历史 KV</dt><dd>保存已完成块的隐藏信息，让下一块预测读取过去。C4/local32 包含当前块，最多读取 7 个完整历史块；位置沿用绝对时间，首帧不会永久驻留。</dd></div><div><dt>VAE 解码前缀</dt><dd>帮助 latent 转回 RGB 时延续时间上下文。Rollout 使用完整预测前缀；GT 诊断使用完整 GT 前缀＋当前预测块，连续解码后裁出当前绝对时间区间。</dd></div></dl>
+  </div>
+  <p class="vae-note">GT 历史诊断视频是单块预测拼图，可能出现重新锚定的跳变；判断整段自主生成，应查看 Rollout。图中的“GT 历史”与结果页左侧的“GT 真实视频”含义不同。</p>
+</section>
+
+<footer class="endnote"><p>本项目为图像＋文本条件的纯视频 AR 继续预训练，输出只有视频。</p><p>机制参考：<a href="https://arxiv.org/abs/2407.01392" target="_blank" rel="noopener">Diffusion Forcing 原论文</a></p></footer>
+</main>
+<script>
+'use strict';
+const subs=['₀','₁','₂','₃','₄'];
+let mode='train',chunk=3;
+const descriptions={
+  train:'同一完整 GT 段连续编码一次，构造 H 与 P 两条表示。所有后续 P 块在一次前向中学习，下面只高亮所选块的可见范围。',
+  rollout:'只给首帧图像和文本。每完成一块，就把自己的预测写入历史，再生成下一块；全部预测 latent 最后连续解码。',
+  gt:'以已完成的真实视频块作为历史，当前块仍由模型预测。当前目标不会提前得到自身 GT；显示为 GT 前缀条件下的单块预测拼图。'
+};
+const notes={
+  train:['C₁ 至 C₄ 全部参与 loss。','选中一块只是解释可见范围，不会把训练改成单目标。H 没有直接 loss，仍保留预测误差经历史隐藏表示回传的梯度。'],
+  rollout:['这是完整自由生成。','误差会随自己的历史传到后续块，适合观察动作趋势、长期漂移与块间续接。历史刷新只影响写入 KV 的副本，不改变已生成输出。'],
+  gt:['这是单块预测诊断。','只有当前块完成后，才把其对应 GT 写入后续历史；它能帮助定位下一块预测问题，但不代表整段自由生成表现。']
+};
+function setText(selector,value){document.querySelector(selector).textContent=value;}
+function cellTitle(value){const strong=document.createElement('strong');strong.textContent=value;return strong;}
+function updateRow(selector,isHistory){
+  const cells=document.querySelector(selector).querySelectorAll('.chunk');
+  cells.forEach((cell,i)=>{
+    cell.className='chunk';
+    const small=document.createElement('small');
+    let title;
+    if(mode==='train'){
+      title=(isHistory?'H':'P')+subs[i];
+      if(isHistory){
+        if(i<chunk){cell.classList.add('is-history');small.textContent=i===0?'干净首帧':'可见 GT 历史';}
+        else if(chunk===0&&i===0){cell.classList.add('is-condition');small.textContent='干净首帧';}
+        else small.textContent='当前 P 不可读取';
+      }else{
+        if(i===0){small.textContent='首帧不计 loss';if(chunk===0)cell.classList.add('is-condition');}
+        else{small.textContent='并行 loss';small.className='loss-label';if(i===chunk)cell.classList.add('is-target');}
+      }
+    }else{
+      title='C'+subs[i];
+      if(isHistory){
+        if(i<chunk){cell.classList.add('is-history');small.textContent=i===0?'初始图像':mode==='gt'?'已完成 GT 块':'已完成预测块';}
+        else if(chunk===0&&i===0){cell.classList.add('is-condition');small.textContent='初始图像';}
+        else small.textContent='尚未写入历史';
+      }else{
+        if(i===0){small.textContent='条件首帧';if(chunk===0)cell.classList.add('is-condition');}
+        else if(i<chunk){cell.classList.add('is-completed');small.textContent='已生成输出';}
+        else if(i===chunk){cell.classList.add('is-target');small.textContent='当前块去噪';}
+        else small.textContent='等待生成';
+      }
+    }
+    cell.replaceChildren(cellTitle(title),small);
+  });
+}
+function render(){
+  document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===mode)));
+  document.querySelectorAll('[data-chunk]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.chunk)===chunk)));
+  setText('#mode-description',descriptions[mode]);
+  const historyLabel=document.querySelector('#history-label'),predictionLabel=document.querySelector('#prediction-label');
+  historyLabel.replaceChildren(document.createTextNode(mode==='train'?'历史 H':'写入 KV 的历史'));
+  const historySmall=document.createElement('small');historySmall.textContent=mode==='rollout'?'模型自己的预测':'真实 GT latent';historyLabel.append(historySmall);
+  predictionLabel.replaceChildren(document.createTextNode(mode==='train'?'预测 P':'预测输出'));
+  const predictionSmall=document.createElement('small');predictionSmall.textContent=mode==='train'?'块内共享 σ':'从噪声逐块去噪';predictionLabel.append(predictionSmall);
+  updateRow('#history-row',true);updateRow('#prediction-row',false);
+  if(chunk===0){
+    setText('#block-title','C₀：干净首帧是起点');
+    setText('#block-description',mode==='train'?'首 latent 在 H 与 P 中均为干净条件，不进入 loss。C₁ 至 C₄ 仍在这一次前向中并行计算。':'只提供这一帧图像及完整文本。C₀ 不需要去噪；先将它写入 KV，再从 C₁ 开始逐块生成。');
+  }else{
+    const past=Array.from({length:chunk},(_,i)=>(mode==='train'?'H':'C')+subs[i]).join('、');
+    const current='C'+subs[chunk];
+    setText('#block-title',current+'：'+(mode==='train'?'以真实过去预测当前块':mode==='rollout'?'接续自己的预测历史':'给定真实过去的单块预测'));
+    setText('#block-description',mode==='train'?`P${subs[chunk]} 读取 ${past} 和本块 P${subs[chunk]}；同一时刻或未来的 H，以及其他 P 块均不可见。`:mode==='rollout'?`${current} 读取 ${past}。除初始图像外，过去的块都来自模型预测；完成当前去噪后，再将本块预测写入历史。`:`${current} 读取 ${past} 对应的真实历史。当前块仍由模型预测；用完整 GT 前缀＋当前预测 latent 连续解码，再裁出本块 RGB。`);
+  }
+  const note=document.querySelector('#parallel-note'),strong=document.createElement('strong');strong.textContent=notes[mode][0];note.replaceChildren(strong,document.createTextNode(' '+notes[mode][1]));
+}
+document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{mode=button.dataset.mode;render();}));
+document.querySelectorAll('[data-chunk]').forEach(button=>button.addEventListener('click',()=>{chunk=Number(button.dataset.chunk);render();}));
+const themeToggle=document.querySelector('#theme-toggle');
+function updateThemeLabel(){themeToggle.textContent=document.documentElement.dataset.theme==='dark'?'切换浅色':'切换深色';}
+themeToggle.addEventListener('click',()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';updateThemeLabel();});
+updateThemeLabel();render();
+</script>
+</body>
+</html>

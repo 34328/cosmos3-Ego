@@ -7,20 +7,24 @@ from pathlib import Path
 
 from aiohttp import web
 
-from .build_page import media_names, load_gallery, relative_path
+from .build_page import load_catalog, media_names, load_gallery, relative_path
 
 
-def create_app(root, *, extra_pages=()):
-    root = Path(root).resolve()
+def create_app(catalog_path):
+    catalog_path = Path(catalog_path).resolve()
+    root = catalog_path.parent
+    entries, default = load_catalog(catalog_path)
     allowed = {}
-    for page_root in [root, *(relative_path(root, name) for name in extra_pages)]:
+    for entry in entries:
+        page_root = entry['selection_path'].parent
         selection_path = page_root / 'selection.json'
         load_gallery(selection_path)  # Fail on incomplete or inconsistent media.
         selection = json.loads(selection_path.read_text(encoding='utf-8'))
-        index = page_root / 'index.html'
-        if not index.is_file() or not index.stat().st_size:
-            raise FileNotFoundError('Build index.html before starting the preview server')
-        allowed[index.relative_to(root).as_posix()] = index
+        for filename in ('index.html', 'results.html'):
+            page = page_root / filename
+            if not page.is_file() or not page.stat().st_size:
+                raise FileNotFoundError('Build both pages before starting the preview server')
+            allowed[page.relative_to(root).as_posix()] = page
         for sample in selection['windows']:
             directory = relative_path(page_root, sample['output_dir'])
             for filename in media_names(selection):
@@ -28,7 +32,11 @@ def create_app(root, *, extra_pages=()):
                 allowed[path.relative_to(root).as_posix()] = path
 
     async def serve(request):
-        name = request.match_info['path'] or 'index.html'
+        name = request.match_info['path']
+        if name in ('', 'index.html', 'results.html'):
+            page = name or 'index.html'
+            base_url = next(entry['base_url'] for entry in entries if entry['path'] == default)
+            raise web.HTTPFound(base_url + '/' + page)
         path = allowed.get(name)
         if path is None:
             raise web.HTTPNotFound()
@@ -44,14 +52,12 @@ def create_app(root, *, extra_pages=()):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, required=True)
+    parser.add_argument('--catalog', type=Path, required=True)
     parser.add_argument('--port', type=int, default=18768)
-    parser.add_argument('--extra-page', action='append', default=[],
-                        help='Allow one completed gallery below root; never serve its directory')
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error('--port must be in [1,65535]')
-    web.run_app(create_app(args.root, extra_pages=args.extra_page), host='127.0.0.1', port=args.port, access_log=None)
+    web.run_app(create_app(args.catalog), host='127.0.0.1', port=args.port, access_log=None)
 
 
 if __name__ == '__main__':

@@ -1,12 +1,28 @@
 # 纯视频 AR 预览
 
-统一复用现有 sampler、选样清单、renderer和服务器页面。`preview.py` 生成视频，`build_page.py` 构建页面，`serve.py` 只服务清单允许的媒体。不训练、不计算质量指标。
+本分支的 AR 继续预训练统一使用这个网页：顶部先选模型版本，再选训练步数，只列出已完成并发布的结果。切换时保留当前的“训练与推理”或“视频与指标”页面。
+
+统一复用现有 sampler、选样清单、renderer和服务器页面。`preview.py` 生成视频，`metrics.py` 在 CPU 上量化已完成的完整视频，`build_page.py` 构建两页，`serve.py` 只服务允许的页面与媒体。不修改训练。
+
+首页 `index.html` 介绍当前 V0.4 的 H/P 并行训练、GT 历史与 Rollout、连续 VAE 编解码；第二页 `results.html` 展示视频与指标。参数与数值来自实际清单和 manifest，不能在模板里填演示分数。
+
+首页 V0.4 数据概况按正式启动绑定的 `outputs/maintenance/full_segment_retention_49920_20261006/summary.json` 及保留 records 核对：32,010 个 train segment，原始时间跨度 89.518898148 小时。77 类采集环境与 705 个具体任务分别来自 episode manifest 的 `environment_id` / `manifest_task`，仅统计保留片段，不按 caption 猜分类。切换到其他训练版本时，数据介绍应核对该版本实际清单，不能沿用 V0.4 数字。
+
+## 完整视频的量化
+
+固定 train/test 各 6 个完整动作段，两种历史共 24 份结果；按原始文本和 GT 选明显操作，不根据生成结果挑样。已有样本直接复用。这个规模用于观察当前 checkpoint，不能当作全数据集任务完成率。
+
+`metrics.py --selection <selection.json> --output <metrics.json> --workers 4` 读取同一时刻的 `gt.mp4` 和 `generated.mp4`，不重新推理、不降回放帧率。PSNR 排除条件首帧，按真实预测帧的 RGB MSE 池化；OpenCV Farneback 相邻帧光流统一在 320×180 上计算，方向余弦先合并 dot/norm，幅值比使用 RMS。这个相邻帧/RMS 口径与早期联合模型的块端点光流/平均幅值不同，不能直接混表。
+
+整段统计包含块间接缝，另保留块内统计、真正的块间接缝和首帧过渡；按完整预测时长分为前、中、后三等份观察趋势。train/test 与两种 history 独立汇总，不平均逐帧、逐段余弦或 PSNR。指标基于已发布 MP4，含压缩和相机运动；它们反映画面与运动接近程度，不单独判定语义任务成功。
+
+`metrics.json` 保存输入 hash、累计量和采样来源，留在服务器私有输出。构建时必须与 selection hash 一致，网页只嵌入显示数值，不公开原始 report 或内部样本身份。
 
 ## 先临时查看，再发布
 
 临时推理、GT历史和接缝测试统一放 `outputs/diagnostics/<version>/step<step>/<purpose>/`，默认只生成视频和来源记录，不调用`build_page.py`、不加入网页服务。查看时仅同步选定MP4到本地`tmp/previews/<version>/step<step>/<purpose>/`，直接在对话里展示。
 
-用户确认最终版本后，才把选定结果放入下面的`outputs/visualization/`发布目录，构建并更新正式网页；复用已完成视频，不重新推理。服务器继续部署在远端。历史测试保留在诊断目录，不在网页里堆叠。
+用户确认最终版本后，才把选定结果放入下面的`outputs/visualization/`发布目录，登记到 `catalog.json` 并更新正式网页；复用已完成视频，不重新推理。服务器继续部署在远端。历史测试保留在诊断目录，不在网页里堆叠。
 
 ## 完整动作段
 
@@ -22,6 +38,8 @@ outputs/visualization/<version>/step<step>/<purpose>/
   train_01/{manifest.json,preview.mp4,generated.mp4,gt.mp4}
   test_01/{manifest.json,preview.mp4,generated.mp4,gt.mp4}
   index.html
+  results.html
+  metrics.json  # 私有计算结果，不由服务公开
 ```
 
 旧V0.1的窗口裁剪与`short_preview.mp4`格式只兼容已有产物，不是新预览默认。
@@ -56,9 +74,31 @@ GT模式必须用官方 `get_data_and_condition(..., vision_condition_indexes=No
 
 ```bash
 /home/lzh/miniconda3/envs/cosmos3/bin/python -m visualization.build_page --selection <purpose>/selection.json
-/home/lzh/miniconda3/envs/cosmos3/bin/python -m visualization.serve --root <purpose> --port 18768
+# 已有量化结果时增加 --metrics <purpose>/metrics.json
+/home/lzh/miniconda3/envs/cosmos3/bin/python -m visualization.build_page --catalog outputs/visualization/catalog.json
+/home/lzh/miniconda3/envs/cosmos3/bin/python -m visualization.serve --catalog outputs/visualization/catalog.json --port 18768
 ```
+
+`catalog.json` 是服务的明确发布清单，路径相对于它所在的目录；每项读取该目录下的 `selection.json`，版本与步数来自真实清单，不能虚填。`metrics` 仅在该 checkpoint 的量化已经完成时登记。示例：
+
+```json
+{
+  "default": "ar_it2v_v0.4/step1000/validation_two_history",
+  "galleries": [
+    {"path": "ar_it2v_v0.4/step500/validation_two_history", "metrics": "metrics.json"},
+    {"path": "ar_it2v_v0.4/step1000/validation_two_history", "metrics": "metrics.json"}
+  ]
+}
+```
+
+新结果尚未完成时不要登记。更新清单后重建所有已发布页面，再重启已有网页服务使媒体白名单生效；不用新增端口或复制视频。访问 `/` 进入默认 checkpoint，两个下拉框可回到已发布的其他版本与步数。
 
 构建前核对选定样本的manifest和非空MP4；网页使用根内相对媒体路径、支持历史和train/test/长短切换，同时只播放一个视频。checkpoint、seed、每块去噪次数、CFG、回放帧率及历史刷新噪声必须记录，不能把帧率和模型时间步混用。
 
-启动服务前检查现有进程及端口。服务只监听远端`127.0.0.1`，经已有连接转发；支持Range/HEAD，只开放index和选定MP4，manifest、latent、日志、权重、目录遍历均不公开。只有用户确认发布的页面才允许`--extra-page`，临时测试不使用它，也不为每次测试重复启动服务。
+网页视频默认以 16 fps 播放，按各样本原帧率设置 `playbackRate=16/fps`，可通过已有速度选择恢复原速或其他倍率。视频文件、原始时间轴和量化指标不变；切换历史保留当前速度，视频仍点击时才加载。
+
+启动服务前检查现有进程及端口。服务只监听远端`127.0.0.1`，经已有连接转发；支持Range/HEAD，只开放清单所列的 index.html、results.html 和选定MP4，catalog、selection、metrics、manifest、latent、日志、权重、目录遍历均不公开。临时测试不登记进发布清单，也不为每次测试重复启动服务。
+
+用户明确要求公网分享时，在网页服务所在节点运行 Cloudflare Quick Tunnel 指向 `http://127.0.0.1:18768`，复用同一页面与媒体白名单。实际链接、进程回执和日志存于 ignored `tmp/public_share/`；复用已存活的隧道，不重复启动。公网链接无需本地转发，隧道进程停止或重建后原链接失效。
+
+公网分享默认开放24小时。`tmp/public_share/expiry.json`记录本次到期时间及隧道的hostname/PID birth tick，由同节点临时到期任务只关闭对应隧道；网页服务和训练继续运行，不自动重新公开。后续新增checkpoint沿用当前链接及到期时间，不因更新页面自动续期。

@@ -2,6 +2,8 @@
 
 ## 项目范围与当前状态
 
+**最新状态：2026-10-09北京时间11:20，用户明确要求停止V0.4并释放资源；四节点已人工终止，最后完成2536步，最新已保存checkpoint为iter_000002500。保留全部权重、日志与评测产物，不再运行到5000步，不自动恢复或重启。**
+
 本项目在 Cosmos3-Nano 上迁移 CMD Stage 1 的因果视频训练方法，进行 EgoVerse 图像＋文本条件的纯视频 AR 继续预训练。输入是首帧图像与 segment 文本，输出只有视频；没有 action、state、骨架或联合监督。项目适配放在 `cosmos3_ar_it2v/`，官方框架保留在 `packages/cosmos3/`。
 
 当前正式版本为 V0.4：LingBot式GT历史/预测两条表示，所有非条件预测块并行监督；历史不直接算loss，仍保留间接梯度。历史噪声按LingBot公开代码，预测噪声复用Cosmos3官方Nano waver/分辨率shift。已于2026-10-06北京时间11:12从官方Nano新起点启动四节点32卡正式训练：Tdebug1/2/3/4，HSDP8×4/CP1，49920源token、单次H/P前向、C4/local32、5000步/save500，禁止CP2与CPU offload；保存前使用官方回调归还未用CUDA allocator缓存。run为 `parallel_tf_50k_4n_5000_20261006T031219Z`，源提交 `6a88c6a3d3a95fa76652b0a137339433504934cf`；启动回执在 `outputs/maintenance/ar_it2v_v04_formal_preflight_20261006T031219Z`，W&B run `j29qq2x1`已通过API确认online上传，勿重复启动。详见 `docs/ar_it2v_v0.4/experiment.md`。
@@ -12,6 +14,7 @@
 
 ## 模型、数据与训练语义
 
+- 仅实现当前明确需求。严禁超前设计、过度工程、为未出现的假设性错误添加防御代码、添加或保留向后兼容层；直接修剪冗余实现与旧路径，严禁用胶水代码掩盖问题。
 - 优先复用官方 Cosmos3 的 VAE、文本路径、RoPE、flow 参数化、Packer、Trainer、优化器、调度器、DCP checkpoint 和 W&B。复杂功能先查官方代码及扩展接口；只有已核实的缺口才写最小适配，不另造训练主循环或重复实现。
 - 使用官方 Nano 起点，训练 GEN 相关参数、冻结 UND。当前只迁移 CMD Stage 1，不能称为完整复现 CMD，也不混入少步或长视频蒸馏。
 - 一个完整文本 segment 是一个样本，保留段边界、文本配对及原始 train/test 划分。正常段连续读取全部原始 30fps 帧，不随机裁窗口、不跨 segment、不改变动作速度。连续编码整段，不能按 AR 块重置 VAE。
@@ -36,15 +39,18 @@
 
 ## 验证、记录与提交
 
+- 未经用户明确授权，不得 commit 或 push；授权仅限当前任务，允许 commit 不代表允许 push。此前任务的授权不得沿用，完成修改或通过测试不构成提交、推送授权。
+- 一次性 smoke、日志和临时产物放入 Git 忽略的项目 `tmp/`，不提交。
 - 验证只覆盖本次变化的真实路径：数据边界、timestep、mask、loss、历史梯度、KV、VAE及训练生命周期。复用已验收产物；必要检查通过后推进，不重复无关全量实验。CPU 测试显式关闭 CUDA；涉及真实 GPU 行为的变化才做相应短测。
 - 用户要求smoke、开发测试、通信 profiling 的脚本、缓存、结果和详细准备过程仅放 ignored `tmp/`，不新增Git提交、不计入正式实验；正式run的配置/状态/结果才写入版本实验记录。项目根目录 `tests/` 只保留磁盘文件，统一忽略并取消 Git 跟踪。通信仅测一次，复用官方 profiler，报告区间并集与计算重叠，不把 NCCL kernel 总和称为纯通信开销。
 - 正式训练必须 W&B online，启动后用 API 核实本次 run/step/loss/LR，交付真实链接；不输出密钥，不用旧 run 或本地日志代替 API。配置、清单、源提交和资源写入版本实验记录。
 - 停止条件以已确认 monitor/配方为准；非有限数值、OOM 等保留完整证据，不因主观画质擅自停止或改配方。
 - 输出放独立 `outputs/` 版本目录；数据、权重、checkpoint、视频、缓存和密钥不进 Git。小型必要回执可进 `docs/<version>/evidence/`，临时材料仅放 `tmp/`。
-- 独立任务可多 Agent 并行，明确文件负责人；同一文件、配置或资源按依赖顺序处理。提交前审查 diff，分批 commit/push，每次 push 前 `git pull --rebase`，不覆盖他人变更。
+- 独立任务可多 Agent 并行，明确文件负责人；同一文件、配置或资源按依赖顺序处理。仅在本任务获得对应明确授权后执行 commit 或 push；提交前审查 diff，获准 push 时先 `git pull --rebase`，不覆盖他人变更。
 
 ## 推理与可视化
 
+- 本分支后续 AR 预训练可视化统一复用同一个两页网页，顶部按版本和训练步数切换；仅纳入已完成的推理结果，不另建重复界面。
 - 统一入口 `visualization/`，先读该目录 README。临时测试放 `outputs/diagnostics/<version>/step<step>/<purpose>/`，保留版本、checkpoint与采样设置，默认不构建网页、不加入已有页面或服务。
 - 查看临时结果时只同步用户需要的少量MP4至本地 `tmp/previews/<version>/step<step>/<purpose>/`，直接在对话中预览；不全量下载、不入Git。用户确认最终版本后，才将选定结果发布至 `outputs/visualization/<version>/step<step>/<purpose>/` 并构建/更新正式网页。可移动已验收产物，无须重新推理。
 - 默认 train/test 各选几个手部移动明显的拿起、移动、放下动作，长短分别选不同的完整 segment，使用对应完整文本；不从长片裁出短片。页面为 GT RGB／模型 RGB，不显示内部身份、存储路径或联合模型骨架。
@@ -52,4 +58,5 @@
 - `gt` 是真实历史单块诊断：官方 `get_data_and_condition(..., vision_condition_indexes=None)` 连续编码完整 GT，仅已完成块可写入历史 KV；当前目标块没有自身 GT 条件。显示采用同一 GT 前缀连续解码预测目标块，再按绝对时间裁出 RGB（`decoder_mode=gt_prefix_montage`）。这是 GT 锚定的单块预测拼图，不能当作完整自由生成能力。
 - 生成历史的官方首帧优化 `vision_condition_indexes=[[0]]` 不可用于提取完整 GT 历史。不得单独重置 VAE 解码目标块，不得 decode→encode 回填历史。
 - 旧 manifest 未记录 decoder_mode 时按旧 `predicted_prefix` 解释，不能把旧 MP4 改名成新解码结果。共享预测末 latent 的额外边界条件在短测中未改善，不设为默认；证据保留，避免重复试验。
-- 正式网页服务仅监听远端回环地址，经已有连接转发；只发布已确认页面与选定MP4，不公开manifest、latent、日志、数据或权重。临时测试不加`--extra-page`；临时查看按上一条只同步所需视频。
+- 正式网页服务仅监听远端回环地址；本地访问经已有连接转发，用户明确要求公网分享时，可用隧道公开同一网页与媒体白名单。只发布已确认页面与选定MP4，不公开manifest、latent、日志、数据或权重。临时测试不加`--extra-page`；临时查看按上一条只同步所需视频。
+- 公网分享默认开放24小时，记录明确到期时间并安排远端自动关闭本次隧道；到期不停止网页服务或训练，不自动重新公开。

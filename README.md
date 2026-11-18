@@ -4,7 +4,9 @@ Cosmos3-Nano 上的纯视频 AR 继续预训练：输入首帧图像与动作段
 
 ## 当前状态
 
-V0.2 完整 segment 实验已完成 **1500 步**，最终 checkpoint 为 `iter_000001500`。[训练记录](docs/ar_it2v_v0.2/experiment.md)和 [W&B run](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/7aa7je4o)保留完整来源。V0.3 单目标实验已按用户要求停在194步。当前推进 [V0.4](docs/ar_it2v_v0.4/design.md)：GT历史与所有预测块并行监督，历史按LingBot加噪、预测使用Cosmos3官方flow matching；Nano起点、四节点32卡/5000步、C4/local32、50K源token预算（实际49920）。已完成CPU验证、独立代码审查和8卡3步GPU容量短测，峰值已分配74.52GiB，后两步约99秒/步；四节点正式训练尚未启动。
+V0.4 四节点32卡正式训练已于2026-10-09按用户要求停止，最后完成 **2536 步**，最新已保存 checkpoint 为 `iter_000002500`；保留全部权重、日志和评测，不自动恢复或重启。[训练记录](docs/ar_it2v_v0.4/experiment.md)和 [W&B run](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/j29qq2x1)保留来源；W&B 云端终态尚未核实。配方为 GT历史与所有预测块并行监督、LingBot历史噪声、Cosmos3官方flow matching、C4/local32、49920源token预算。统一网页已发布 step500/1000/1500/2500 的完整片段与两种历史对照。
+
+V0.2 完整 segment 基线已完成1500步，V0.3 单目标实验按用户要求停在194步；历史配方和产物保留。
 
 V0.2基线设置（旧配方保留）：
 
@@ -23,15 +25,14 @@ V0.2基线设置（旧配方保留）：
 | 内容 | 入口 |
 |---|---|
 | 协作规则 | [AGENTS.md](AGENTS.md) |
-| 当前设计 / 实验 | [V0.2设计](docs/ar_it2v_v0.2/design.md) / [实验记录](docs/ar_it2v_v0.2/experiment.md) |
-| 新训练设计 / 实验 | [V0.4设计](docs/ar_it2v_v0.4/design.md) / [实验记录](docs/ar_it2v_v0.4/experiment.md) |
+| 当前设计 / 实验 | [V0.4设计](docs/ar_it2v_v0.4/design.md) / [实验记录](docs/ar_it2v_v0.4/experiment.md) |
+| 历史完整段基线 | [V0.2设计](docs/ar_it2v_v0.2/design.md) / [实验记录](docs/ar_it2v_v0.2/experiment.md) |
 | 历史单目标实验 | [V0.3设计](docs/ar_it2v_v0.3/design.md) / [实验记录](docs/ar_it2v_v0.3/experiment.md) |
-| 模型 / 注意力 | [model.py](cosmos3_ar_it2v/model.py) / [attention.py](cosmos3_ar_it2v/attention.py) |
+| 当前模型 / 注意力 | [model_v04.py](cosmos3_ar_it2v/model_v04.py) / [attention_v04.py](cosmos3_ar_it2v/attention_v04.py) |
 | 完整段数据 / 官方 packing 适配 | [dataset.py](cosmos3_ar_it2v/dataset.py) / [dataloader.py](cosmos3_ar_it2v/dataloader.py) |
-| 配置 / 启动 | [ego100h_full_segments.toml](cosmos3_ar_it2v/configs/ego100h_full_segments.toml) / [launch.sh](cosmos3_ar_it2v/launch.sh) |
+| 当前配置 / 启动 | [ego100h_parallel_tf.toml](cosmos3_ar_it2v/configs/ego100h_parallel_tf.toml) / [launch.sh](cosmos3_ar_it2v/launch.sh) |
 | 逐块推理 | [inference.py](cosmos3_ar_it2v/inference.py) |
 | 统一预览与服务器网页 | [visualization/README.md](visualization/README.md) |
-| 回归测试 | `tests/test_ar_it2v_*.py` |
 | 官方框架 | [packages/cosmos3/AGENTS.md](packages/cosmos3/AGENTS.md) |
 | 历史短窗口实验 | [V0.1设计](docs/ar_it2v_v0.1/design.md) / [实验记录](docs/ar_it2v_v0.1/experiment.md) |
 

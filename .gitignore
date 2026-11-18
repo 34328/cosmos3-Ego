@@ -33,6 +33,10 @@ wandb/
 *.log
 *.mp4
 *.npz
+*.pt
+*.pth
+*.safetensors
+*.ckpt
 core.*
 .DS_Store
 .ipynb_checkpoints/

@@ -3,100 +3,257 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="light dark">
 <title>cosmos3 AR 模型训练可视化</title>
+<script>document.documentElement.dataset.theme=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';</script>
 <style>
-:root{color-scheme:dark;--bg:#101315;--panel:#181d20;--ink:#eef2f2;--muted:#a6b1b6;--line:#30383d;--accent:#a3ddc5;--focus:#bdefff}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6}button,a{-webkit-tap-highlight-color:transparent}button{font:inherit}a{color:inherit}button:focus-visible,a:focus-visible,video:focus-visible{outline:3px solid var(--focus);outline-offset:4px}button{cursor:pointer}.wrap{max-width:1376px;margin:auto;padding:32px 40px 80px}.masthead{display:flex;justify-content:space-between;align-items:center;padding-bottom:23px;border-bottom:1px solid var(--line)}.brand{font-weight:650;letter-spacing:.08em;font-size:12px}.mode-label{color:var(--muted);font-size:13px}.intro{padding:34px 0 26px}.intro h1{font-size:clamp(32px,4vw,48px);line-height:1.15;letter-spacing:-.045em;margin:0 0 15px;font-weight:650}.intro p{color:var(--muted);max-width:880px;margin:0;font-size:16px}.recipe{border:1px solid var(--line);border-radius:12px;padding:20px 24px;background:var(--panel)}.recipe-title{display:flex;align-items:baseline;gap:14px;margin-bottom:10px}.recipe-title h2{font-size:17px;letter-spacing:-.02em;margin:0}.recipe-title span{color:var(--accent);font-size:13px}.param-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 28px}.param{padding:9px 0}.param dt{font-size:12px;color:var(--muted);margin:0 0 2px}.param dd{margin:0;font-size:15px;font-variant-numeric:tabular-nums}.recipe-note{color:var(--muted);font-size:12px;margin:11px 0 0;padding-top:14px;border-top:1px solid var(--line)}.toolbar{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;border-bottom:1px solid var(--line);margin:18px 0 32px}.toolbar-group{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.switch{border:1px solid transparent;border-radius:7px;color:var(--muted);background:transparent;padding:7px 13px;min-height:40px}.switch[aria-pressed="true"]{background:#27312e;color:#c9efe1;border-color:#41564d}.switch:hover{color:var(--ink);background:#242b2f}.switch[aria-pressed="true"]:hover{background:#303e37}.section{margin-bottom:56px;scroll-margin-top:95px}.section[hidden],.sample[hidden]{display:none}.section-heading{display:flex;align-items:baseline;gap:14px;margin:0 0 22px}.section-heading h2{font-size:23px;letter-spacing:-.035em;margin:0}.section-heading p{font-size:13px;color:var(--muted);margin:0}.sample{margin:0 0 34px}.sample-head{display:flex;gap:24px;justify-content:space-between;align-items:flex-start;margin-bottom:12px}.sample h3{font-size:17px;line-height:1.45;margin:0 0 6px;font-weight:550}.caption{font-size:14px;color:var(--muted);margin:0;max-width:980px;overflow-wrap:anywhere}.clip-note{font-size:12px;white-space:nowrap;color:var(--accent);padding-top:3px;font-variant-numeric:tabular-nums}.video-frame{background:#070a0b;border:1px solid var(--line);border-radius:10px;overflow:hidden}.video-labels{display:grid;grid-template-columns:1fr 1fr;font-size:12px;color:#d6dee2;background:#1b2226}.video-labels span{padding:9px 16px}.video-labels span+span{border-left:1px solid var(--line);color:var(--accent)}video{display:block;width:100%;height:auto;aspect-ratio:1280/360;background:#070a0b;object-fit:contain}.media-error{display:none;padding:18px;color:#f4c9a7;font-size:13px}.media-error.visible{display:block}.sample-footer{display:flex;gap:20px;justify-content:space-between;align-items:baseline;margin-top:8px;font-size:12px;color:var(--muted)}.source-links{display:flex;gap:15px}.source-links a{text-decoration:none;text-underline-offset:4px}.source-links a:hover{text-decoration:underline;color:var(--ink)}.endnote{margin:10px 0 0;border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:12px}.empty{padding:32px;color:var(--muted)}@media(max-width:800px){.wrap{padding:22px 20px 48px}.param-grid{grid-template-columns:repeat(2,1fr)}.recipe{padding:17px 18px}.sample-head{display:block}.clip-note{display:block;padding-top:8px}.toolbar{align-items:flex-start;flex-wrap:wrap;margin-bottom:26px;padding:12px 0}.switch{padding:6px 10px}.sample-footer{align-items:flex-start;gap:8px;flex-wrap:wrap}.intro{padding:28px 0 23px}}@media(max-width:420px){.wrap{padding-inline:14px}.recipe-title{display:block}.mode-label{display:none}.video-labels span{padding:7px 10px}.param-grid{gap:4px 12px}}
+/* Research viewer: native inputs, one teal accent, 8px controls / 14px panels.
+   DESIGN_VARIANCE 5, MOTION_INTENSITY 3, VISUAL_DENSITY 4. */
+:root{color-scheme:light;--bg:#eef2f4;--surface:#fff;--soft:#e8eef1;--ink:#192b33;--muted:#52636c;--line:#ccd7dc;--accent:#176b67;--accent-soft:#e3f1ef;--on-accent:#fff;--shadow:0 8px 28px rgb(39 67 80 / .06)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+button,a,input,select{-webkit-tap-highlight-color:transparent}
+button,select{font:inherit;cursor:pointer}
+button{white-space:nowrap;min-height:40px}
+a{color:var(--accent);text-underline-offset:4px}
+button:focus-visible,a:focus-visible,video:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+[hidden]{display:none!important}
+.wrap{max-width:1328px;margin:auto;padding:38px 40px 48px}
+.run-selectors{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:26px}
+.run-selectors label{display:grid;gap:6px;color:var(--muted);font-size:12px;font-weight:600;min-width:160px}
+.run-selectors select{min-height:44px;padding:9px 38px 9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:600;font-size:15px}
+.run-selectors select:hover{border-color:var(--accent)}
+.intro{margin-bottom:22px}
+.page-nav{display:flex;gap:6px;margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.page-nav a{padding:8px 15px;border-radius:8px;text-decoration:none;font-weight:600;color:var(--muted)}
+.page-nav a[aria-current="page"]{background:var(--accent);color:var(--on-accent)}
+.page-nav a:hover:not([aria-current]){background:var(--soft);color:var(--ink)}
+.metrics-panel{padding:22px;background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-bottom:24px}
+.metrics-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:16px;flex-wrap:wrap}
+.metrics-heading>div:first-child{flex:1 1 360px;min-width:0}
+.metrics-heading h2{margin:0;font-size:20px}.metrics-heading p{margin:5px 0 0;color:var(--muted);font-size:13px}
+.metrics-heading .segments{flex:0 0 auto;max-width:100%}.metrics-heading .switch{white-space:normal}
+.metric-table-wrap{overflow-x:auto}.metric-table{width:100%;min-width:650px;border-collapse:collapse;text-align:left;font-variant-numeric:tabular-nums}
+.metric-table th{color:var(--muted);font-size:12px;font-weight:550;border-bottom:1px solid var(--line);padding:9px 12px;white-space:nowrap}
+.metric-table td{padding:12px;border-bottom:1px solid var(--line);font-size:14px}.metric-table td:nth-child(n+3){font-variant-numeric:tabular-nums}
+.metric-table tr:last-child td{border-bottom:0}.metric-table td:last-child{color:var(--accent);font-weight:600}
+.metric-definitions{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;border-top:1px solid var(--line);margin-top:12px;padding-top:16px}
+.metric-definitions p{margin:0;font-size:12px;color:var(--muted)}.metric-definitions strong{display:block;color:var(--ink);font-size:13px;margin-bottom:4px}
+.metric-note{margin:14px 0 0;color:var(--muted);font-size:12px}
+.sample-metrics{display:flex;gap:10px 24px;flex-wrap:wrap;padding:12px 0 0;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.sample-metrics b{color:var(--ink);font-size:14px;margin-left:6px;font-weight:600}
+.intro-title{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.intro h1{font-size:30px;line-height:1.35;letter-spacing:-.04em;font-weight:650;margin:0}
+.run{display:flex;align-items:center;gap:16px;color:var(--muted)}
+.run h2{font-size:14px;font-weight:550;margin:0;color:var(--ink)}
+#version{padding:2px 10px;background:var(--accent-soft);color:var(--accent);border-radius:8px;font-size:12px;font-weight:650}
+.settings{overflow-x:auto;margin-bottom:18px;padding:14px 20px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.settings table{width:100%;min-width:580px;border-collapse:collapse;text-align:left;table-layout:fixed}
+.settings th{font-size:12px;font-weight:450;color:var(--muted);padding:0 16px 4px 0;white-space:nowrap}
+.settings td{padding:0 16px 0 0;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.toolbar{display:grid;grid-template-columns:1.15fr 1fr 1.1fr;gap:18px;padding:16px 20px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);position:sticky;top:12px;z-index:1}
+.toolbar-group{min-width:0}
+.group-label{display:block;margin:0 0 7px;color:var(--muted);font-size:12px;font-weight:550}
+.segments{display:flex;gap:4px;padding:4px;border-radius:10px;background:var(--soft)}
+.switch{flex:1;border:1px solid transparent;border-radius:8px;padding:7px 10px;background:transparent;color:var(--muted);font-size:13px;font-weight:550;min-height:36px}
+.switch[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);box-shadow:0 2px 5px rgb(25 59 58 / .14)}
+.switch:hover:not([aria-pressed="true"]){background:var(--surface);color:var(--ink);border-color:var(--line)}
+button:active{transform:scale(.98)}
+.history-note{font-size:13px;color:var(--muted);max-width:1000px;margin:14px 2px 26px;min-height:21px}
+.section{margin-bottom:36px}
+.section-heading{display:flex;align-items:baseline;gap:14px;margin-bottom:16px}
+.section-heading h2{font-size:19px;font-weight:650;margin:0}
+.section-heading p{font-size:13px;color:var(--muted);margin:0}
+.sample{margin:0 0 24px;padding:22px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.sample.is-playing{border-color:var(--accent)}
+.sample-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:18px}
+.sample h3{font-size:19px;font-weight:600;line-height:1.5;margin:0 0 4px}
+.caption{font-size:14px;color:var(--muted);margin:0;max-width:920px;overflow-wrap:anywhere}
+.clip-note{font-size:12px;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums;background:var(--soft);padding:4px 10px;border-radius:8px}
+.video-frame{overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.video-labels{display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:12px;color:var(--ink);padding:10px 14px;font-weight:550}
+.video-labels span:last-child{padding-left:14px;border-left:1px solid var(--line);color:var(--accent)}
+video{display:block;width:100%;height:auto;aspect-ratio:1280/360;background:#19242a;object-fit:contain;cursor:pointer}
+.player-controls{padding:12px 14px;background:var(--surface);border-top:1px solid var(--line)}
+.timeline{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.timeline input{width:100%;min-width:0;accent-color:var(--accent);cursor:pointer;height:20px;margin:0}
+.time{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);white-space:nowrap;min-width:86px;text-align:right}
+.player-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.action{border:1px solid var(--line);border-radius:8px;padding:7px 13px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:550}
+.action:hover{background:var(--soft);border-color:var(--muted)}
+.action.primary,.action[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.action.primary{min-width:92px}
+.speed{display:flex;align-items:center;gap:7px;margin-left:auto;color:var(--muted);font-size:12px}
+.speed select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--ink);min-height:40px}
+.media-error{display:none;margin:0;padding:14px;color:var(--ink);background:var(--soft)}
+.media-error.visible{display:block}
+.sample-footer{display:flex;justify-content:space-between;align-items:baseline;gap:20px;margin-top:12px;font-size:12px;color:var(--muted)}
+.endnote{margin:0;padding-top:12px;color:var(--muted);font-size:12px}
+.empty{padding:32px 20px;background:var(--surface);border:1px solid var(--line);border-radius:14px;color:var(--muted)}
+.video-frame:fullscreen{display:flex;flex-direction:column;border-radius:0;background:#19242a;border:0;width:100%;height:100%}
+.video-frame:fullscreen video{flex:1;min-height:0;aspect-ratio:auto}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#141e24;--surface:#1c2a32;--soft:#2a3b44;--ink:#e7f0f3;--muted:#b0c1ca;--line:#435863;--accent:#8dd1c4;--accent-soft:#29443f;--on-accent:#122c27;--shadow:none}
+@media(max-width:1023px){.wrap{padding:28px 24px 40px}.toolbar{position:static;grid-template-columns:1fr 1fr}.toolbar-group.history-group{grid-column:1/-1}.history-group .segments{max-width:440px}.sample{padding:18px}}
+@media(max-width:767px){.wrap{padding:24px 16px 36px}.intro h1{font-size:25px}.toolbar{gap:14px;padding:14px}.settings{padding:12px 14px}.sample{padding:14px}.sample-head{display:block;margin-bottom:14px}.sample h3{font-size:17px}.clip-note{display:inline-block;margin-top:10px}.section-heading{gap:10px}.section-heading p{font-size:12px}.sample-footer{align-items:flex-start;flex-wrap:wrap;gap:8px}.video-labels{gap:8px;font-size:11px;padding:8px 10px}.video-labels span:last-child{padding-left:8px}.player-controls{padding:10px}.player-actions{gap:6px}.action{padding:7px 10px}.speed{margin-left:0}.caption{font-size:13px}}
+@media(max-width:479px){.toolbar{grid-template-columns:1fr}.toolbar-group.history-group{grid-column:auto}.history-group .segments{max-width:none}.switch{padding:7px 8px}.run{gap:12px;flex-wrap:wrap}.sample{margin-bottom:18px}.section-heading{flex-wrap:wrap;gap:3px 12px}.speed{order:2}.timeline{gap:8px}.player-actions .action.primary{min-width:88px}}
+@media(prefers-reduced-motion:reduce){button:active{transform:none}}
+@media(max-width:767px){.metrics-panel{padding:16px}.metrics-heading{display:block}.metrics-heading .segments{margin-top:14px;min-width:0;max-width:340px}.metric-definitions{grid-template-columns:1fr;gap:12px}.page-nav{margin-bottom:20px}.metric-table td,.metric-table th{padding:10px}.sample-metrics{gap:8px 16px}}
 </style>
 </head>
 <body>
 <main class="wrap">
-<header class="masthead"><span class="brand">COSMOS3 / AR IT2V</span><span class="mode-label">首帧图像 ＋ 文本 → 视频</span></header>
-<div class="intro"><h1>cosmos3 AR 模型训练可视化</h1><p>训练集与验证集的真实视频和生成结果并排播放。训练片段最长 97 帧（约 3.23 秒）；本次长片为 257 帧（约 8.57 秒），观察超过训练长度的连续生成。短片截自同一次长片的动作区间，并非单独的短段推理。</p></div>
-<section class="recipe" aria-label="本次生成设置"><div class="recipe-title"><h2 id="checkpoint-title"></h2><span id="version"></span></div><dl class="param-grid" id="params"></dl><p class="recipe-note" id="noise-note"></p></section>
-<nav class="toolbar" aria-label="视频筛选和片长"><div class="toolbar-group" aria-label="数据划分"><button class="switch" data-split="all" aria-pressed="true">全部片段</button><button class="switch" data-split="train" aria-pressed="false">训练集</button><button class="switch" data-split="test" aria-pressed="false">验证集</button></div><div class="toolbar-group" aria-label="片长"><button class="switch" data-length="short" aria-pressed="true">短片 · 动作区间</button><button class="switch" data-length="long" aria-pressed="false">长片 · 完整生成</button></div></nav>
+__RUN_SELECTOR__
+<header class="intro">
+  <div class="intro-title"><h1>cosmos3 AR 模型训练可视化</h1><button class="action" id="theme-toggle"></button></div>
+  <nav class="page-nav" aria-label="页面导航"><a href="index.html">训练与推理</a><a href="results.html" aria-current="page">视频与指标</a></nav>
+  <div class="run"><h2 id="checkpoint-title"></h2><span id="version"></span><span>Cosmos3-Nano</span></div>
+</header>
+<section class="settings" aria-label="本次生成设置">
+  <table aria-label="采样参数"><thead><tr id="parameter-labels"></tr></thead><tbody><tr id="parameter-values"></tr></tbody></table>
+</section>
+<section class="metrics-panel" id="metrics-panel" aria-label="量化结果" hidden>
+  <div class="metrics-heading"><div><h2>视频与 GT 的差距</h2><p id="metrics-coverage"></p></div><div class="segments" aria-label="光流统计范围"><button class="switch" data-metric-scope="total" aria-pressed="true">光流：整段（含接缝）</button><button class="switch" data-metric-scope="within_chunk" aria-pressed="false">光流：块内（排除接缝）</button></div></div>
+  <p class="metric-note">上方只切换两项光流指标的统计范围。PSNR 始终统计全部预测帧，切换时数值不变。</p>
+  <div class="metric-table-wrap"><table class="metric-table" aria-label="训练集与验证集指标"><thead><tr><th>数据划分</th><th>历史模式</th><th>完整片段</th><th>运动方向余弦 ↑</th><th>运动幅度比 ≈ 1</th><th>PSNR · 全预测帧 ↑</th></tr></thead><tbody id="metric-rows"></tbody></table></div>
+  <div class="metric-definitions"><p><strong>方向余弦 · −1 至 1</strong>同一时刻、同一像素位置的光流向量整体一致性。1 最一致，0 整体正交，负值总体相反。</p><p><strong>运动幅度比 · 1 为相当</strong>模型 / GT 的光流 RMS 幅度。大于 1 动得更多，小于 1 动得更少；接近 1 不代表动作正确。</p><p><strong>PSNR · dB · 全预测帧</strong>预测画面与同一时刻 GT 的像素接近程度。排除条件首帧，合并所有 RGB 像素的 MSE 后换算；不随光流范围变化。</p></div>
+  <p class="metric-note" id="metric-scope-note"></p><p class="metric-note">相邻帧光流在 320 × 180 上计算。汇总先合并全部片段的统计量，不平均逐片段的余弦或 dB。指标取自本页 MP4，含视频压缩影响与相机运动，不能单独代表任务完成率。GT 历史模式是单块诊断拼图，自由生成使用自己的历史。</p>
+</section>
+<nav class="toolbar" aria-label="视频筛选和片长">
+  <div class="toolbar-group" aria-label="数据划分"><span class="group-label">数据划分</span><div class="segments"><button class="switch" data-split="all" aria-pressed="true">全部片段</button><button class="switch" data-split="train" aria-pressed="false">训练集</button><button class="switch" data-split="test" aria-pressed="false">验证集</button></div></div>
+  <div class="toolbar-group" aria-label="片长"><span class="group-label">完整动作段</span><div class="segments"><button class="switch" data-length="short" aria-pressed="true">短片</button><button class="switch" data-length="long" aria-pressed="false">长片</button></div></div>
+</nav>
+<p class="history-note" id="noise-note"></p>
 <div id="gallery"></div>
-<p class="endnote">只提供视频观察，不计算指标。短片是长片的原速裁剪，使用同一批生成结果；切换片长不会重新生成。</p>
+<p class="empty" id="empty-state" hidden>当前筛选下没有片段，请切换数据划分或片长。</p>
+<p class="endnote">每条视频对应一个完整动作段及其原始文本。默认以 16 fps 播放，进度和时长仍对应原始视频时间轴。</p>
 <noscript><p class="empty">请启用 JavaScript 查看视频画廊。</p></noscript>
 </main>
 <script id="gallery-data" type="application/json">__GALLERY_JSON__</script>
 <script>
 'use strict';
 const data=JSON.parse(document.querySelector('#gallery-data').textContent);
-const fullSegment=data.preview_mode==='full_segment';
-const historyComparison=Boolean(data.history_comparison);
-let historyMode=data.default_history_mode||'generated';
-if(historyComparison){
-const group=document.createElement('div');group.className='toolbar-group';group.setAttribute('aria-label','历史来源');
-for(const [mode,label] of [['gt','真实视频历史'],['generated','模型生成历史']]){
-const button=document.createElement('button');button.className='switch';button.dataset.history=mode;button.textContent=label;button.setAttribute('aria-pressed',String(mode===historyMode));group.append(button);
-}
-document.querySelector('.toolbar').prepend(group);
-}
-if(fullSegment){
-document.querySelector('.intro p').textContent='每条预览对应一个完整动作段及其原始文本，保留所有真实帧。短片和长片是不同的完整 segment，不从长片中裁剪，也不改变原始动作速度。';
-document.querySelector('.endnote').textContent='只提供视频观察，不计算指标。每条片段均保留完整动作与对应文本；长短筛选切换样本，不裁剪视频。';
-document.querySelector('[data-length="short"]').textContent='短片 · 完整动作段';
-document.querySelector('[data-length="long"]').textContent='长片 · 完整动作段';
-const all=document.createElement('button');all.className='switch';all.dataset.length='all';all.textContent='全部时长';all.setAttribute('aria-pressed','true');
-document.querySelector('[data-length="short"]').before(all);
-document.querySelector('[data-length="short"]').setAttribute('aria-pressed','false');
-}
+const fullSegment=data.preview_mode==='full_segment',historyComparison=Boolean(data.history_comparison);
 const fmt=value=>Number(value).toFixed(2).replace(/\.00$/,'');
 const text=(tag,value,cls)=>{const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;};
-document.title='cosmos3 AR 模型训练可视化';
-document.querySelector('#checkpoint-title').textContent=`训练第 ${data.checkpoint_step} 步`;
-document.querySelector('#version').textContent=data.version.replace('ar_it2v_','AR IT2V ');
-const durations=[...new Set(data.samples.map(s=>`${s.frames} 帧 / ${fmt(s.duration)} 秒`))];
-const parameters=[['模型','Cosmos3-Nano · 纯视频 AR'],[fullSegment?'生成范围':'长片时长',fullSegment?'完整动作段 · 各段时长见下方':durations.join('；')],['回放速度',`${fmt(data.fps)} fps · 原始时间轴`],['随机种子',data.seed],['每块去噪次数',`${data.denoise_steps} 次`],['文本引导强度',`${fmt(data.guidance)}（CFG）`],['历史刷新噪声',fmt(data.context_sigma)],['对照方式','左：真实视频　右：模型生成']];
-for(const [label,value] of parameters){const item=text('div','','param');item.append(text('dt',label),text('dd',value));document.querySelector('#params').append(item);}
-function updateHistoryNote(){
-const source=historyMode==='gt'?'每块预测结束后，用对应时间段的真实视频更新历史记忆。右侧仍是每块的模型预测，不是整段自由生成；当前目标块不会获得其真实图像。每段下方注明解码方式，匹配真实前缀版本是单块诊断拼图。':'只提供起始图像，后续使用模型已生成的块作为历史，逐块连续生成。';
-document.querySelector('#noise-note').textContent=`${source} “历史刷新噪声 ${fmt(data.context_sigma)}”指写入历史记忆前加入的噪声，不是给展示视频添加噪点。`;
+const clock=value=>{const sec=Math.floor(value);return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;};
+let historyMode=data.default_history_mode||'generated',lengthMode=fullSegment?'all':'short',splitMode='all';
+let metricScope='total';
+const metricNumber=(value,digits=3)=>value===null||value===undefined?'—':Number(value).toFixed(digits);
+function fillSampleMetrics(element,sample){
+  element.replaceChildren();if(!sample.metrics)return;
+  const values=sample.metrics.full;
+  for(const [label,value] of [['方向余弦',metricNumber(values[metricScope].direction_cosine)],['运动幅度比',metricNumber(values[metricScope].motion_ratio,2)+'×'],['PSNR · 全预测帧',metricNumber(values.psnr_db,2)+' dB']]){const item=text('span',label);item.append(text('b',value));element.append(item);}
+  const early=sample.metrics.early[metricScope].direction_cosine,late=sample.metrics.late[metricScope].direction_cosine;
+  const trend=text('span','方向 · 前 1/3 → 后 1/3');trend.append(text('b',`${metricNumber(early)} → ${metricNumber(late)}`));element.append(trend);
 }
-updateHistoryNote();
-let lengthMode=fullSegment?'all':'short', splitMode='all';
+function renderMetricSummary(){
+  if(!data.metrics)return;
+  document.querySelector('#metrics-panel').hidden=false;
+  const rows=document.querySelector('#metric-rows');rows.replaceChildren();
+  const unique=new Map(data.samples.map(s=>[s.pair_index,s]));
+  const duration=[...unique.values()].reduce((sum,s)=>sum+s.duration,0);
+  document.querySelector('#metrics-coverage').textContent=`固定 ${unique.size} 个完整动作段 · 每段两种历史 · 原始视频合计 ${fmt(duration)} 秒。汇总覆盖全部样本，下面的筛选只改变视频列表。`;
+  for(const group of data.metrics.groups){const v=group.stats.full,tr=text('tr','');for(const value of [group.split==='train'?'训练集':'验证集',group.history_mode==='gt'?'GT 历史诊断':'自由生成 Rollout',`${group.samples_count} 段`,metricNumber(v[metricScope].direction_cosine),metricNumber(v[metricScope].motion_ratio,2)+'×',metricNumber(v.psnr_db,2)+' dB'])tr.append(text('td',value));rows.append(tr);}
+  document.querySelector('#metric-scope-note').textContent=metricScope==='total'?'整段光流包含条件首帧到首个预测帧的过渡、各预测块内部，以及块间接缝。PSNR 统计所有预测帧。':'块内光流仅统计同一预测块内的相邻帧，同时排除块间接缝和条件首帧过渡。两种范围的分差反映这两类过渡的共同影响，不能只归因于接缝。PSNR 仍统计所有预测帧。';
+}
+document.querySelectorAll('[data-metric-scope]').forEach(button=>button.addEventListener('click',()=>{metricScope=button.dataset.metricScope;document.querySelectorAll('[data-metric-scope]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));renderMetricSummary();cards.forEach(card=>fillSampleMetrics(card.metricElement,card.sample));}));
 const cards=[];
-function predictionLabel(s){
-return s.decoder_mode==='gt_prefix_montage'?'模型预测 · 匹配真实前缀解码':s.history_mode==='gt'?'模型预测 · 原预测前缀解码':'模型生成 · 连续解码';
+const themeToggle=document.querySelector('#theme-toggle');
+function updateThemeLabel(){themeToggle.textContent=document.documentElement.dataset.theme==='dark'?'切换浅色':'切换深色';}
+themeToggle.addEventListener('click',()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';updateThemeLabel();});updateThemeLabel();
+document.querySelector('.endnote').textContent=(fullSegment?'每条视频对应一个完整动作段及其原始文本。长短片是不同样本。':'短片截自同一次长片的动作区间。')+'默认以 16 fps 播放，进度和时长仍对应原始视频时间轴。';
+if(historyComparison){
+  const group=text('div','','toolbar-group history-group');group.setAttribute('aria-label','历史来源');group.append(text('span','历史来源','group-label'));
+  const segments=text('div','','segments');
+  for(const [mode,label] of [['gt','真实视频历史'],['generated','模型生成历史']]){const button=text('button',label,'switch');button.dataset.history=mode;button.setAttribute('aria-pressed',String(mode===historyMode));segments.append(button);}
+  group.append(segments);document.querySelector('.toolbar').prepend(group);
+}else{document.querySelector('.toolbar').style.gridTemplateColumns='repeat(2,minmax(0,1fr))';}
+if(fullSegment){
+  const all=text('button','全部时长','switch');all.dataset.length='all';all.setAttribute('aria-pressed','true');document.querySelector('[data-length="short"]').before(all);document.querySelector('[data-length="short"]').setAttribute('aria-pressed','false');
+}else{document.querySelector('[aria-label="片长"] .group-label').textContent='播放范围';document.querySelector('[data-length="short"]').textContent='短片 · 动作区间';document.querySelector('[data-length="long"]').textContent='长片 · 完整生成';}
+document.querySelector('#checkpoint-title').textContent=`训练第 ${data.checkpoint_step} 步`;
+document.querySelector('#version').textContent=data.version.replace('ar_it2v_','');
+for(const [label,value] of [['默认播放','16 fps'],['原视频帧率',fmt(data.fps)+' fps'],['随机种子',data.seed],['每块去噪次数',data.denoise_steps+' 次'],['文本引导 (CFG)',fmt(data.guidance)],['历史刷新噪声',fmt(data.context_sigma)]]){const th=text('th',label);th.scope='col';document.querySelector('#parameter-labels').append(th);document.querySelector('#parameter-values').append(text('td',value));}
+function updateHistoryNote(){
+  const source=historyMode==='gt'?'真实视频历史：以已完成的 GT 块作为历史，当前目标块不会获得其真实图像。这是单块诊断，具体解码方式见视频上方，不代表自由生成。':'模型生成历史：仅提供首帧图像与文本，后续使用自身预测，整段连续解码。';
+  document.querySelector('#noise-note').textContent=source+' '+(data.context_sigma===0?'历史写入记忆时不加噪声。':'历史写入记忆前加入 '+fmt(data.context_sigma)+' 的噪声。');
 }
-function decoderDescription(s){
-if(s.decoder_mode==='gt_prefix_montage')return '每块沿完整真实前缀解码后裁出当前预测；单块诊断拼图，不代表连续自由生成。';
-if(s.history_mode==='gt')return '真实历史预测，整段预测前缀连续解码；沿用原产物口径，解码历史与预测条件可能不一致。';
-return '仅首帧图像与文本为真实条件，后续使用模型生成历史，整段预测连续解码。';
+function predictionLabel(s){return s.decoder_mode==='gt_prefix_montage'?'模型预测 / 匹配真实前缀解码':s.history_mode==='gt'?'模型预测 / 原预测前缀解码':'模型生成 / 连续解码';}
+function decoderDescription(s){return s.decoder_mode==='gt_prefix_montage'?'单块诊断拼图':s.history_mode==='gt'?'GT 历史预测，解码采用模型预测前缀':'连续自由生成';}
+function updatePlayer(card){
+  const {video,play,seek,time,article,status}=card;
+  const duration=Number.isFinite(video.duration)?video.duration:(fullSegment||lengthMode==='long'?card.sample.duration:card.sample.short_duration);
+  const position=card.pendingSeek??video.currentTime;
+  seek.max=duration;seek.value=position;seek.setAttribute('aria-valuetext',`${clock(position)} / ${clock(duration)}`);
+  time.textContent=`${clock(position)} / ${clock(duration)}`;
+  play.textContent=video.paused?'播放对照':'暂停';play.setAttribute('aria-label',`${video.paused?'播放':'暂停'}${card.sample.title}的对照视频`);
+  article.classList.toggle('is-playing',!video.paused);
+  status.textContent=video.error?'加载失败':!video.hasAttribute('src')?'点击播放':video.readyState<2?'正在加载视频':video.ended?'播放结束':video.paused?'左右同步对照':'正在播放';
+}
+function seekTo(card,value){if(card.video.readyState===0)card.pendingSeek=value;else card.video.currentTime=value;updatePlayer(card);}
+async function playVideo(card){
+  cards.forEach(c=>{if(c!==card)c.video.pause();});
+  if(!card.video.hasAttribute('src')||card.video.error){card.video.src=card.mediaSource;card.video.load();}
+  card.video.playbackRate=Number(card.select.value);
+  try{await card.video.play();}catch(error){if(error.name==='AbortError')return;card.error.classList.add('visible');card.error.textContent='播放未成功，请重试。';}
 }
 function changeLength(card){
-const s=card.sample;card.video.pause();card.video.src=s.media[!fullSegment&&lengthMode==='short'?'short_preview.mp4':'preview.mp4'];card.error.classList.remove('visible');card.video.load();
-const end=s.short_start+s.short_duration;
-card.note.textContent=fullSegment?`${s.length_group==='short'?'完整短片':'完整长片'} · ${fmt(s.duration)} 秒 · ${s.frames} 帧`:lengthMode==='short'?`${fmt(s.short_duration)} 秒 · 长片 ${fmt(s.short_start)}–${fmt(end)} 秒`:`${fmt(s.duration)} 秒 · ${s.frames} 帧`;
-card.description.textContent=decoderDescription(s)+(!fullSegment&&lengthMode==='short'?' 此短片来自同一次长片的动作区间裁剪。':'');
-card.video.previousElementSibling.lastElementChild.textContent=predictionLabel(s);
-card.video.setAttribute('aria-label',`${s.split==='train'?'训练集':'验证集'}，${s.title}，真实视频与${predictionLabel(s)}`);
-card.video.closest('.sample').querySelector('.source-links').lastElementChild.textContent=s.history_mode==='gt'?'预测视频':'生成视频';
+  const s=card.sample;card.video.pause();card.pendingSeek=null;card.mediaSource=s.media[!fullSegment&&lengthMode==='short'?'short_preview.mp4':'preview.mp4'];card.error.classList.remove('visible');
+  if(card.video.hasAttribute('src')){card.video.removeAttribute('src');card.video.load();}
+  card.note.textContent=fullSegment?`${fmt(s.duration)} 秒 / ${s.frames} 帧`:lengthMode==='short'?`${fmt(s.short_duration)} 秒 / 长片 ${fmt(s.short_start)}-${fmt(s.short_start+s.short_duration)} 秒`:`${fmt(s.duration)} 秒 / ${s.frames} 帧`;
+  card.description.textContent=decoderDescription(s)+(!fullSegment&&lengthMode==='short'?' 此短片来自同一次长片的动作区间裁剪。':'');
+  card.labels.lastElementChild.textContent=predictionLabel(s);card.video.setAttribute('aria-label',`${s.split==='train'?'训练集':'验证集'}，${s.title}，真实视频与${predictionLabel(s)}`);
+  updatePlayer(card);
 }
 function applyFilters(){
-for(const card of cards){const visible=(splitMode==='all'||card.sample.split===splitMode)&&(!fullSegment||lengthMode==='all'||card.sample.length_group===lengthMode)&&(!historyComparison||card.sample.history_mode===historyMode);card.video.closest('.sample').hidden=!visible;if(!visible)card.video.pause();}
-document.querySelectorAll('section[data-split]').forEach(section=>section.hidden=![...section.querySelectorAll('.sample')].some(sample=>!sample.hidden));
+  for(const card of cards){const visible=(splitMode==='all'||card.sample.split===splitMode)&&(!fullSegment||lengthMode==='all'||card.sample.length_group===lengthMode)&&(!historyComparison||card.sample.history_mode===historyMode);card.article.hidden=!visible;if(!visible)card.video.pause();}
+  let count=0;document.querySelectorAll('section[data-split]').forEach(section=>{const visible=[...section.querySelectorAll('.sample')].filter(sample=>!sample.hidden).length;section.hidden=visible===0;section.querySelector('.section-heading p').textContent=`${visible} 个片段 / ${section.dataset.split==='train'?'训练数据上的表现':'未参与训练的数据'}`;count+=visible;});document.querySelector('#empty-state').hidden=count>0;
 }
-for(const split of ['train','test']){const samples=data.samples.filter(s=>s.split===split);if(!samples.length)continue;const section=text('section','','section');section.dataset.split=split;const header=text('div','','section-heading');header.append(text('h2',split==='train'?'训练集':'验证集'),text('p',`${samples.length} 个片段 · ${split==='train'?'观察训练数据上的生成':'观察未参与训练的数据'}`));section.append(header);for(const s of samples){const article=text('article','','sample');const head=text('div','','sample-head');const copy=text('div','');copy.append(text('h3',s.title),text('p',s.caption||'未提供文本描述','caption'));const note=text('span','','clip-note');head.append(copy,note);const frame=text('div','','video-frame');const labels=text('div','','video-labels');labels.append(text('span','真实视频 · GT'),text('span','模型生成 · AR'));const video=document.createElement('video');video.controls=true;video.playsInline=true;video.preload='metadata';video.setAttribute('aria-label',`${split==='train'?'训练集':'验证集'}，${s.title}，真实视频与生成视频对照`);const error=text('p','视频暂时无法加载，请刷新或使用下方的单独视频链接。','media-error');video.addEventListener('error',()=>error.classList.add('visible'));video.addEventListener('play',()=>cards.forEach(c=>{if(c.video!==video)c.video.pause();}));frame.append(labels,video,error);const footer=text('div','','sample-footer');const description=text('span','');const links=text('div','','source-links');for(const [label,filename] of [['真实视频','gt.mp4'],['生成视频','generated.mp4']]){const a=text('a',label);a.href=s.media[filename];a.target='_blank';a.rel='noopener';links.append(a);}footer.append(description,links);article.append(head,frame,footer);section.append(article);const card={sample:s,video,note,error,description};cards.push(card);changeLength(card);}document.querySelector('#gallery').append(section);}
+for(const split of ['train','test']){
+  const samples=data.samples.filter(s=>s.split===split);if(!samples.length)continue;
+  const section=text('section','','section');section.dataset.split=split;const header=text('div','','section-heading');header.append(text('h2',split==='train'?'训练集':'验证集'),text('p',''));section.append(header);
+  for(const s of samples){
+    const article=text('article','','sample'),head=text('div','','sample-head'),copy=text('div',''),note=text('span','','clip-note');
+    copy.append(text('h3',s.title),text('p',s.caption||'未提供文本描述','caption'));head.append(copy,note);
+    const frame=text('div','','video-frame'),labels=text('div','','video-labels');labels.append(text('span','真实视频 / GT'),text('span',predictionLabel(s)));
+    const video=document.createElement('video');video.playsInline=true;video.preload='none';video.muted=true;
+    const controls=text('div','','player-controls'),timeline=text('div','','timeline'),seek=document.createElement('input'),time=text('span','','time');
+    seek.type='range';seek.min=0;seek.step=.01;seek.value=0;seek.setAttribute('aria-label',`${s.title}播放进度`);timeline.append(seek,time);
+    const actions=text('div','','player-actions'),play=text('button','播放对照','action primary'),restart=text('button','从头重播','action'),loop=text('button','循环','action'),fullscreen=text('button','全屏','action');
+    loop.setAttribute('aria-pressed','false');loop.setAttribute('aria-label',`${s.title}循环播放`);fullscreen.setAttribute('aria-label',`${s.title}全屏对照`);
+    const speed=text('label','','speed');speed.append(text('span','速度'));const select=document.createElement('select');select.setAttribute('aria-label',`${s.title}播放速度`);
+    const defaultRate=16/s.fps,defaultSpeed=text('option','16 fps · 默认');defaultSpeed.value=defaultRate;defaultSpeed.selected=true;select.append(defaultSpeed);
+    for(const rate of [.25,.5,1,2]){const option=text('option',rate+'×');option.value=rate;select.append(option);}speed.append(select);video.playbackRate=defaultRate;
+    actions.append(play,restart,speed,loop,fullscreen);controls.append(timeline,actions);
+    const error=text('p','视频暂时无法加载，请刷新。','media-error');frame.append(labels,video,controls,error);
+    const footer=text('div','','sample-footer'),description=text('span',''),status=text('span','左右同步对照');
+    const footerCopy=text('div','');footerCopy.append(description,text('span',' / '),status);footer.append(footerCopy);const metricElement=text('div','','sample-metrics');fillSampleMetrics(metricElement,s);article.append(head,frame,footer,metricElement);section.append(article);
+    const card={sample:s,article,video,note,error,description,labels,play,seek,time,status,select,loop,frame,fullscreen,metricElement,pendingSeek:null};cards.push(card);
+    play.addEventListener('click',()=>video.paused?playVideo(card):video.pause());video.addEventListener('click',()=>video.paused?playVideo(card):video.pause());
+    restart.addEventListener('click',()=>{seekTo(card,0);playVideo(card);});seek.addEventListener('input',()=>seekTo(card,Number(seek.value)));
+    select.addEventListener('change',()=>{video.playbackRate=Number(select.value);});loop.addEventListener('click',()=>{video.loop=!video.loop;loop.setAttribute('aria-pressed',String(video.loop));});
+    fullscreen.addEventListener('click',()=>document.fullscreenElement?document.exitFullscreen():frame.requestFullscreen());
+    video.addEventListener('loadedmetadata',()=>{if(card.pendingSeek!==null){video.currentTime=card.pendingSeek;card.pendingSeek=null;}updatePlayer(card);});
+    video.addEventListener('play',()=>updatePlayer(card));
+    for(const event of ['pause','ended','timeupdate','loadeddata'])video.addEventListener(event,()=>updatePlayer(card));
+    video.addEventListener('error',()=>{error.classList.add('visible');updatePlayer(card);});
+    video.addEventListener('waiting',()=>{status.textContent='正在加载视频';});video.addEventListener('playing',()=>{error.classList.remove('visible');updatePlayer(card);});
+    changeLength(card);
+  }
+  document.querySelector('#gallery').append(section);
+}
 for(const button of document.querySelectorAll('[data-length]'))button.addEventListener('click',()=>{lengthMode=button.dataset.length;document.querySelectorAll('[data-length]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));if(!fullSegment)cards.forEach(changeLength);applyFilters();});
 for(const button of document.querySelectorAll('button[data-split]'))button.addEventListener('click',()=>{splitMode=button.dataset.split;document.querySelectorAll('button[data-split]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));applyFilters();});
-if(historyComparison){
-document.querySelector('.intro p').textContent='同一批完整动作段，切换真实视频历史和模型生成历史，比较模型预测。每段下方注明其真实解码方式；当前预测块不会获得对应真实图像。';
-document.querySelector('.endnote').textContent='真实视频历史是诊断模式：每块预测后，以真实视频更新后续记忆。匹配真实前缀解码是单块诊断拼图。模型生成历史使用已生成结果继续预测，并连续解码整段预测。';
-for(const card of cards){
-card.video.previousElementSibling.lastElementChild.textContent=predictionLabel(card.sample);
-}
-for(const section of document.querySelectorAll('section[data-split]')){
-const count=data.samples.filter(s=>s.split===section.dataset.split&&s.history_mode===historyMode).length;
-section.querySelector('.section-heading p').textContent=`${count} 个片段 · ${section.dataset.split==='train'?'观察训练数据上的生成':'观察未参与训练的数据'}`;
-}
-for(const button of document.querySelectorAll('[data-history]'))button.addEventListener('click',()=>{
-historyMode=button.dataset.history;cards.forEach(card=>card.video.pause());document.querySelectorAll('[data-history]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));updateHistoryNote();applyFilters();
+if(historyComparison)for(const button of document.querySelectorAll('[data-history]'))button.addEventListener('click',()=>{
+  const next=button.dataset.history;if(next===historyMode)return;
+  for(const source of cards.filter(c=>c.sample.history_mode===historyMode)){
+    const target=cards.find(c=>c.sample.history_mode===next&&c.sample.pair_index===source.sample.pair_index);
+    seekTo(target,source.pendingSeek??source.video.currentTime);target.video.playbackRate=source.video.playbackRate;target.select.value=source.select.value;target.video.loop=source.video.loop;target.loop.setAttribute('aria-pressed',String(target.video.loop));
+  }
+  cards.forEach(card=>card.video.pause());historyMode=next;document.querySelectorAll('[data-history]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));updateHistoryNote();applyFilters();
 });
-}
-applyFilters();
+document.addEventListener('fullscreenchange',()=>cards.forEach(card=>{const active=document.fullscreenElement===card.frame;card.fullscreen.textContent=active?'退出全屏':'全屏';card.fullscreen.setAttribute('aria-label',`${card.sample.title}${active?'退出全屏':'全屏对照'}`);}));
+renderMetricSummary();updateHistoryNote();applyFilters();
 </script>
 </body>
 </html>

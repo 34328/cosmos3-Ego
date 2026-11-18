@@ -137,3 +137,16 @@ W&B API核实 [93kgrebu](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/93k
 前两步已完成，step1/2分别处理129/109个segment，loss 0.423044/0.464697，preclip norm 7.3440/8.7298均有限。首步LR0、第二步LR1e-6，第二步训练耗时107.95秒、峰值allocated74.52GiB。无OOM/STOPPED；单个预热后step不是稳定耗时或收敛结论。停止规则沿用现有monitor；不自动重试或恢复。
 
 W&B online实际run为 [j29qq2x1](https://wandb.ai/alexlzh431564/rbs_wam_ar_it2v/runs/j29qq2x1)。启动后API核实状态running，step1/loss0.423044/LR0已上传；上文step2与非零LR来自本次formal_monitor，不把本地进度冒充API进度。实际展开配置及learning_rate_receipt确认5000步周期、save500、49920预算及原生噪声设置均生效。
+
+
+## 用户主动停止（2026-10-09）
+
+2026-10-09北京时间11:20，用户明确要求停止V0.4并释放资源；四节点已人工终止，最后完成2536步，最新已保存checkpoint为iter_000002500。保留全部权重、日志与评测产物，不再运行到5000步，不自动恢复或重启。
+四端torchrun收到SIGTERM后退出，exit_code=1为本次人工中断；GPU计算进程清空，32卡利用率0%、每卡残留4–7MiB。停止回执为本run的USER_STOPPED.json和各节点user_stop_request.json、exit.json。W&B终态API查询超时，未声称云端已转为终态。
+
+
+## Step2500 同口径可视化（2026-10-09）
+
+用户要求复用step1500网页规则；使用iter_000002500/model，同一train/test各6个完整segment、两种history共24份，seed42、35步、CFG1、context_sigma0，C4/local32、CP1保持不变。GT采用gt_prefix_montage，rollout采用predicted_prefix。
+Tdebug1–6共11组FSDP4、峰值44张空闲H800并行，全部退出0，推理阶段约1015秒；12个单线程CPU进程汇总约41秒，24份/4组验收完成，GPU全部释放。selection SHA256为94bca9a5f7c40baf3c18d1d6ef0e35bc1f2242f27b6ac109ab2f1ad455e627f7；采样/来源/指标回执保留在outputs/visualization/ar_it2v_v0.4/step2500/validation_two_history及ignored tmp/step2500_gallery。
+已加入原catalog并设为默认，保留500/1000/1500选项与默认16fps播放；两页和24条对照视频HTTP200，视频Range206，私有清单/指标/manifest保持404。旧公网隧道已到期，本地18768转发当时无监听，未自动重新公开。未commit/push。
